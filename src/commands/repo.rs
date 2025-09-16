@@ -2,25 +2,24 @@ use std::collections::HashMap;
 use clap::Command;
 use crate::commands::def::CommandDefinition;
 
-pub struct CommandRepository<'a, T: CommandDefinition> {
-    command_definitions: &'a Vec<T>,
-    command_name_to_definition: HashMap<String, &'a T>,
+pub struct CommandRepository<T: CommandDefinition> {
+    command_name_to_definition: HashMap<String, T>,
 }
-impl<'a, T> CommandRepository<'a, T>
+impl<T> CommandRepository<T>
 where
     T: CommandDefinition,
 {
-    pub fn new(command_definitions: &'a Vec<T>) -> Self {
+    pub fn new() -> Self {
         Self {
-            command_definitions,
-            command_name_to_definition: command_definitions.iter()
-                .map(|x| (x.get_name(), x))
-                .collect(),
+            command_name_to_definition: HashMap::new(),
         }
     }
+    pub fn add_command(&mut self, command_definition: T) {
+        self.command_name_to_definition.insert(command_definition.get_name(), command_definition);
+    }
     pub fn all_commands(&self) -> Vec<Command> {
-        self.command_definitions.iter()
-            .map(|def| {def.build_command()})
+        self.command_name_to_definition.iter()
+            .map(|(_, def)| {def.build_command()})
             .collect::<Vec<Command>>()
     }
     pub fn execute_command(&self, command: &str) {

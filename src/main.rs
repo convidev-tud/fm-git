@@ -32,10 +32,9 @@ fn main() {
     //     Some(Commands::STATUS {}) => {}
     //     _ => {}
     // }
-    let commands = vec![
-        Status
-    ];
-    let command_repository = CommandRepository::new(&commands);
+
+    let mut command_repository = CommandRepository::new();
+    command_repository.add_command(Status);
     let cmd = Command::new("fm-git")
         .about("a test")
         .subcommands(command_repository.all_commands());
