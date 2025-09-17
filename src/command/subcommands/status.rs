@@ -1,5 +1,5 @@
 use clap::Command;
-use crate::commands::*;
+use crate::command::*;
 
 #[derive(Clone)]
 pub struct Status;
@@ -13,7 +13,10 @@ impl CommandDefinition for Status {
             .about("Shows details of a run")
             .after_help("More detail")
     }
-    fn run_command(&self) {
-        println!("run status command");
+    fn run_command(&self) -> std::process::Output {
+        std::process::Command::new("git")
+            .args(["status"])
+            .output()
+            .expect("failed to execute process")
     }
 }
