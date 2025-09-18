@@ -6,6 +6,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4", features = ["derive"]}
+termtree = "0"
 
 [build-dependencies]
 clap_complete = "4"

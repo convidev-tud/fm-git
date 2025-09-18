@@ -8,14 +8,7 @@ fn main() {
         Some((command, args)) => {
             command_repository.execute_subcommand(command)
         }
-        _ => {panic!("No such subcommand")}
+        _ => { panic!("No such subcommand") }
     };
-    let stdout = std::str::from_utf8(&output.stdout.trim_ascii()).unwrap();
-    let stderr = std::str::from_utf8(&output.stderr.trim_ascii()).unwrap();
-    if stdout.len() > 0 {
-        println!("{}", stdout)
-    }
-    if stderr.len() > 0 {
-        println!("{}", stderr)
-    }
+    output.print()
 }
