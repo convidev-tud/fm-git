@@ -9,10 +9,11 @@ impl CommandDefinition for TreeCommand {
     fn build_command(&self) -> Command {
         Command::new("tree")
             .about("Displays the tree structure")
+            .disable_help_subcommand(true)
     }
     fn run_command<'a>(
         &self,
-        args: &ArgMatches,
+        _args: &ArgMatches,
         state: CommandState<'a>,
     ) -> CommandState<'a> {
         let mut tree: Tree<String> = Tree::new("root".into());

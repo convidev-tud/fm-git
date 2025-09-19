@@ -1,5 +1,5 @@
 use crate::command::*;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{ArgMatches, Command};
 
 #[derive(Clone, Debug)]
 pub struct StatusCommand {}
@@ -9,13 +9,11 @@ impl CommandDefinition for StatusCommand {
         Command::new("status")
             .about("Shows details of a run")
             .after_help("More detail")
-            .arg(Arg::new("run").long("run").short('r').action(ArgAction::SetTrue))
-            .arg(Arg::new("path"))
-            .subcommand(Command::new("status2"))
+            .disable_help_subcommand(true)
     }
     fn run_command<'a>(
         &self,
-        args: &ArgMatches,
+        _args: &ArgMatches,
         state: CommandState<'a>,
     ) -> CommandState<'a> {
         let output = std::process::Command::new("git")
