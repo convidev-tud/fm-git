@@ -1,32 +1,24 @@
 use crate::command::*;
-use clap::builder::Str;
-use clap::Command;
+use clap::{ArgMatches, Command};
 use termtree::Tree;
 
-#[derive(Clone)]
-pub struct TreeCommand {
-    name: Str,
-}
-
-impl TreeCommand {
-    pub fn new() -> Self { Self { name: "tree".into() } }
-}
+#[derive(Clone, Debug)]
+pub struct TreeCommand {}
 
 impl CommandDefinition for TreeCommand {
-    fn get_name(&self) -> String {
-        self.name.clone().into()
-    }
     fn build_command(&self) -> Command {
-        Command::new(self.name.clone())
+        Command::new("tree")
             .about("Displays the tree structure")
     }
-    fn run_command(&self) -> CommandResult {
+    fn run_command(
+        &self,
+        args: &ArgMatches,
+        state: CommandState,
+    ) -> CommandState {
         let mut tree: Tree<String> = Tree::new("root".into());
         tree.push(Tree::new("files".into()));
         tree.push(Tree::new("files2".into()));
-        CommandResult {
-            stdout: tree.to_string(),
-            stderr: "".into(),
-        }
+        state.log_to_stdout(tree.to_string());
+        state
     }
 }

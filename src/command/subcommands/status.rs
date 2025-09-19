@@ -1,30 +1,28 @@
 use crate::command::*;
-use clap::builder::Str;
-use clap::Command;
+use clap::{Arg, ArgAction, ArgMatches, Command};
 
-#[derive(Clone)]
-pub struct StatusCommand {
-    name: Str,
-}
-
-impl StatusCommand {
-    pub fn new() -> Self { Self { name: "status".into()} }
-}
+#[derive(Clone, Debug)]
+pub struct StatusCommand {}
 
 impl CommandDefinition for StatusCommand {
-    fn get_name(&self) -> String {
-        self.name.clone().into()
-    }
     fn build_command(&self) -> Command {
-        Command::new(self.name.clone())
+        Command::new("status")
             .about("Shows details of a run")
             .after_help("More detail")
+            .arg(Arg::new("run").long("run").short('r').action(ArgAction::SetTrue))
+            .arg(Arg::new("path"))
+            .subcommand(Command::new("status2"))
     }
-    fn run_command(&self) -> CommandResult {
+    fn run_command(
+        &self, 
+        args: &ArgMatches,
+        state: CommandState,
+    ) -> CommandState {
         let output = std::process::Command::new("git")
             .args(["status", "--porcelain=1"])
             .output()
             .expect("failed to execute process");
-        CommandResult::from_u8(&output.stdout, &output.stderr)
+        state.log_from_u8(&output.stdout, &output.stderr);
+        state
     }
 }

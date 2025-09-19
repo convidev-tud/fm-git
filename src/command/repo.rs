@@ -1,48 +1,68 @@
 use crate::command::def::CommandDefinition;
-use clap::Command;
-use std::collections::HashMap;
-use crate::command::CommandResult;
+use crate::command::CommandState;
+use clap::{ArgMatches, Command};
 
-pub struct CommandRepositoryBuilder {
-    sub_commands: Vec<Box<dyn CommandDefinition>>,
+#[derive(Debug)]
+struct CommandMap {
+    command: Command,
+    command_definition: Box<dyn CommandDefinition>,
+    children: Vec<CommandMap>,
 }
 
-impl CommandRepositoryBuilder {
-    pub fn new() -> Self {
-        Self {
-            sub_commands: Vec::new()
-        } 
-    }
-    pub fn add_subcommand(mut self, command_definition: impl CommandDefinition + 'static) -> Self {
-        self.sub_commands.push(Box::new(command_definition));
-        self
-    }
-    pub fn finalize(self, main_command: Command) -> CommandRepository {
-        let new_main_command = main_command.subcommands(
-            self.sub_commands.iter().map(|sub| sub.build_command()).collect::<Vec<Command>>()
+impl CommandMap {
+    pub fn new(command: Box<dyn CommandDefinition>) -> CommandMap {
+        let mut children: Vec<CommandMap> = Vec::new();
+        let clap_command = command.build_command().subcommands(
+            command
+                .get_subcommands()
+                .into_iter()
+                .map(|c| {
+                    let sub_command = c.build_command();
+                    children.push(CommandMap::new(c));
+                    sub_command
+                })
+                .collect::<Vec<Command>>(),
         );
-        CommandRepository::new(new_main_command, self.sub_commands)
-    }
-}
-
-
-pub struct CommandRepository {
-    main_command: Command,
-    subcommand_name_to_definition: HashMap<String, Box<dyn CommandDefinition>>,
-}
-impl CommandRepository {
-    pub fn new(command: Command, sub_commands: Vec<Box<dyn CommandDefinition>>) -> Self {
-        Self {
-            main_command: command,
-            subcommand_name_to_definition: sub_commands.into_iter()
-                .map(|command| (command.get_name(), command))
-                .collect(),
+        CommandMap {
+            command: clap_command,
+            command_definition: command,
+            children,
         }
     }
-    pub fn get_main_command(&self) -> &Command {
-        &self.main_command
+}
+
+pub struct CommandRepository {
+    command: CommandMap,
+}
+impl CommandRepository {
+    pub fn new(command: Box<dyn CommandDefinition>) -> Self {
+        Self {
+            command: CommandMap::new(command),
+        }
     }
-    pub fn execute_subcommand(&self, command: &str) -> CommandResult {
-        self.subcommand_name_to_definition.get(command).unwrap().run_command()
+    pub fn get_command(&self) -> &Command {
+        &self.command.command
+    }
+    fn execute_recursive(&self, current: &CommandMap, matches: &ArgMatches, state: CommandState) {
+        let new_state = current.command_definition.run_command(matches, state);
+        match matches.subcommand() {
+            Some((sub, sub_args)) => self.execute_recursive(
+                current
+                    .children
+                    .iter()
+                    .find(|p| p.command.get_name() == sub)
+                    .unwrap(),
+                sub_args,
+                new_state,
+            ),
+            _ => {}
+        }
+    }
+    pub fn execute(&self) {
+        self.execute_recursive(
+            &self.command, 
+            &self.command.command.clone().get_matches(),
+            CommandState::new(),
+        );
     }
 }
