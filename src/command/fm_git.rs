@@ -10,6 +10,7 @@ impl CommandDefinition for FMGitCommand {
             .long_about("More detail")
             .after_long_help("Test")
             .arg_required_else_help(true)
+            .allow_external_subcommands(true)
     }
     fn get_subcommands(&self) -> Vec<Box<dyn CommandDefinition>> {
         vec![

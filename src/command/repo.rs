@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use crate::command::def::CommandDefinition;
 use crate::command::{CommandMap, CommandState};
 use clap::ArgMatches;
@@ -15,11 +16,22 @@ impl CommandRepository {
     fn execute_recursive(&self, current: &CommandMap, matches: &ArgMatches, state: CommandState) {
         let new_state = current.command_definition.run_command(matches, state);
         match matches.subcommand() {
-            Some((sub, sub_args)) => self.execute_recursive(
-                current.find_child(sub).unwrap(),
-                sub_args,
-                new_state,
-            ),
+            Some((sub, sub_args)) => {
+                if let Some(child) = current.find_child(sub) {
+                    self.execute_recursive(
+                        child,
+                        sub_args,
+                        new_state,
+                    )
+                } else {
+                    let ext_args: Vec<_> = sub_args.get_many::<OsString>("").unwrap().collect();
+                    std::process::Command::new("git")
+                        .arg(sub)
+                        .args(ext_args)
+                        .status()
+                        .expect("failed to execute git");
+                }
+            }
             _ => {}
         }
     }
