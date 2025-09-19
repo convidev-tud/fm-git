@@ -6,7 +6,7 @@ pub struct FMGitCommand {}
 
 impl CommandDefinition for FMGitCommand {
     fn build_command(&self) -> Command {
-        Command::new("fm_git")
+        Command::new("fm-git")
             .about("Shows details of a run")
             .after_help("More detail")
             .arg_required_else_help(true)
@@ -16,9 +16,14 @@ impl CommandDefinition for FMGitCommand {
         vec![
             Box::new(StatusCommand {}),
             Box::new(TreeCommand {}),
+            Box::new(CompletionCommand {}),
         ]
     }
-    fn run_command(&self, args: &ArgMatches, state: CommandState) -> CommandState {
+    fn run_command<'a>(
+        &self,
+        args: &ArgMatches,
+        state: CommandState<'a>,
+    ) -> CommandState<'a> {
         match args.get_one::<bool>("test") {
             Some(true) => {
                 println!("Running `fm_git` in test mode");
