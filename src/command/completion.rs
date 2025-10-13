@@ -11,14 +11,17 @@ impl CommandDefinition for HiddenCompletionCommand {
             .arg(Arg::new("command").raw(true))
             .disable_help_subcommand(true)
     }
-    fn run_command<'a>(&self, args: &ArgMatches, state: CommandState<'a>) -> CommandState<'a> {
+}
+
+impl CommandInterface for HiddenCompletionCommand {
+    fn run_command(&self, args: &ArgMatches, state: &mut CommandContext) {
         let mut to_complete = args
             .get_many::<String>("command")
             .unwrap()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
         if to_complete.is_empty() {
-            return state;
+            return;
         }
         let maybe_last_child = state
             .command_map
@@ -35,10 +38,10 @@ impl CommandDefinition for HiddenCompletionCommand {
                     let mut subcommands = last_child
                         .find_children_by_prefix(unwrapped_last_item)
                         .iter()
-                        .map(|c| c.command.get_name())
+                        .map(|c| c.clap_command.get_name())
                         .collect::<Vec<_>>();
                     if "help".starts_with(unwrapped_last_item)
-                        && !last_child.command.is_disable_help_subcommand_set()
+                        && !last_child.clap_command.is_disable_help_subcommand_set()
                     {
                         subcommands.push("help")
                     }
@@ -48,12 +51,12 @@ impl CommandDefinition for HiddenCompletionCommand {
                         }
                     }
                     if unwrapped_last_item.starts_with("-") {
-                        let mut all_args: Vec<&Arg> = last_child.command.get_arguments().collect();
+                        let mut all_args: Vec<&Arg> = last_child.clap_command.get_arguments().collect();
                         let help_attr = Arg::new("help")
                             .long("help")
                             .short('h')
                             .action(ArgAction::Help);
-                        if !last_child.command.is_disable_help_flag_set() {
+                        if !last_child.clap_command.is_disable_help_flag_set() {
                             all_args.push(&help_attr)
                         }
                         for arg in all_args {
@@ -79,8 +82,8 @@ impl CommandDefinition for HiddenCompletionCommand {
                     }
                 }
                 match last_child
-                    .command_definition
-                    .shell_complete(last_item, state.clone())
+                    .command
+                    .shell_complete(last_item, state)
                 {
                     Some(completed_string) => state.log_to_stdout(completed_string),
                     _ => {}
@@ -88,6 +91,5 @@ impl CommandDefinition for HiddenCompletionCommand {
             }
             None => {}
         }
-        state
     }
 }

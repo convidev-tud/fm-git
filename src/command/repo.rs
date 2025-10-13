@@ -1,27 +1,26 @@
-use std::ffi::OsString;
-use crate::command::def::CommandDefinition;
-use crate::command::{CommandMap, CommandState};
+use crate::command::{CommandContext, CommandImpl, CommandMap};
 use clap::ArgMatches;
-
+use std::ffi::OsString;
+use crate::git_interface::GitInterface;
 
 pub struct CommandRepository {
     command_map: CommandMap,
 }
 impl CommandRepository {
-    pub fn new(command: Box<dyn CommandDefinition>) -> Self {
+    pub fn new(command: Box<dyn CommandImpl>) -> Self {
         Self {
             command_map: CommandMap::new(command),
         }
     }
-    fn execute_recursive(&self, current: &CommandMap, matches: &ArgMatches, state: CommandState) {
-        let new_state = current.command_definition.run_command(matches, state);
+    fn execute_recursive(&self, current: &CommandMap, matches: &ArgMatches, state: &mut CommandContext) {
+        current.command.run_command(matches, state);
         match matches.subcommand() {
             Some((sub, sub_args)) => {
                 if let Some(child) = current.find_child(sub) {
                     self.execute_recursive(
                         child,
                         sub_args,
-                        new_state,
+                        state,
                     )
                 } else {
                     let ext_args: Vec<_> = sub_args.get_many::<OsString>("").unwrap().collect();
@@ -38,8 +37,8 @@ impl CommandRepository {
     pub fn execute(&self) {
         self.execute_recursive(
             &self.command_map,
-            &self.command_map.command.clone().get_matches(),
-            CommandState::new(&self.command_map),
+            &self.command_map.clap_command.clone().get_matches(),
+            &mut CommandContext::new(&self.command_map, &mut GitInterface {}),
         );
     }
 }

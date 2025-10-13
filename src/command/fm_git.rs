@@ -12,7 +12,7 @@ impl CommandDefinition for FMGitCommand {
             .arg_required_else_help(true)
             .allow_external_subcommands(true)
     }
-    fn get_subcommands(&self) -> Vec<Box<dyn CommandDefinition>> {
+    fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl>> {
         vec![
             Box::new(StatusCommand {}),
             Box::new(TreeCommand {}),
@@ -20,3 +20,5 @@ impl CommandDefinition for FMGitCommand {
         ]
     }
 }
+
+impl CommandInterface for FMGitCommand {}

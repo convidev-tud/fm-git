@@ -11,15 +11,17 @@ impl CommandDefinition for TreeCommand {
             .about("Displays the tree structure")
             .disable_help_subcommand(true)
     }
-    fn run_command<'a>(
+}
+
+impl CommandInterface for TreeCommand {
+    fn run_command(
         &self,
         _args: &ArgMatches,
-        state: CommandState<'a>,
-    ) -> CommandState<'a> {
+        state: &mut CommandContext,
+    ) {
         let mut tree: Tree<String> = Tree::new("root".into());
         tree.push(Tree::new("files".into()));
         tree.push(Tree::new("files2".into()));
         state.log_to_stdout(tree.to_string());
-        state
     }
 }

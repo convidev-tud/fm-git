@@ -11,19 +11,21 @@ impl CommandDefinition for StatusCommand {
             .after_help("More detail")
             .disable_help_subcommand(true)
     }
-    fn run_command<'a>(
+}
+
+impl CommandInterface for StatusCommand {
+    fn run_command(
         &self,
         _args: &ArgMatches,
-        state: CommandState<'a>,
-    ) -> CommandState<'a> {
+        state: &mut CommandContext,
+    ) {
         let output = std::process::Command::new("git")
             .args(["status", "--porcelain=1"])
             .output()
             .expect("failed to execute process");
         state.log_from_u8(&output.stdout, &output.stderr);
-        state
     }
-    fn shell_complete(&self, _appendix: Option<&str>, _state: CommandState) -> Option<String> {
+    fn shell_complete(&self, _appendix: Option<&str>, _state: &mut CommandContext) -> Option<String> {
         None
     }
 }
