@@ -1,6 +1,7 @@
 use clap::{ArgMatches, Command};
 use std::fmt::Debug;
 use crate::git_interface::GitInterface;
+use crate::util::u8_to_string;
 
 #[derive(Debug)]
 pub struct CommandMap {
@@ -64,8 +65,8 @@ impl CommandContext<'_> {
         CommandContext { command_map, git }
     }
     pub fn log_from_u8(&self, stdout: &Vec<u8>, stderr: &Vec<u8>) {
-        self.log_to_stdout(String::from(std::str::from_utf8(stdout).unwrap()));
-        self.log_to_stderr(String::from(std::str::from_utf8(stderr).unwrap()));
+        self.log_to_stdout(u8_to_string(stdout));
+        self.log_to_stderr(u8_to_string(stderr));
     }
     pub fn log_to_stdout(&self, stdout: String) {
         if stdout.len() > 0 {

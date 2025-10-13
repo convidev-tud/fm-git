@@ -38,7 +38,7 @@ impl CommandRepository {
         self.execute_recursive(
             &self.command_map,
             &self.command_map.clap_command.clone().get_matches(),
-            &mut CommandContext::new(&self.command_map, &mut GitInterface {}),
+            &mut CommandContext::new(&self.command_map, &mut GitInterface::new()),
         );
     }
 }
