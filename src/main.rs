@@ -2,7 +2,7 @@ use crate::command::CommandRepository;
 use crate::command::fm_git::FMGitCommand;
 
 mod command;
-mod git_interface;
+mod git;
 mod util;
 
 fn main() {

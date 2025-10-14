@@ -1,7 +1,7 @@
 use crate::command::{CommandContext, CommandImpl, CommandMap};
 use clap::ArgMatches;
 use std::ffi::OsString;
-use crate::git_interface::GitInterface;
+use crate::git::GitInterface;
 
 pub struct CommandRepository {
     command_map: CommandMap,
