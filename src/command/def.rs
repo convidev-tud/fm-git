@@ -1,6 +1,6 @@
 use clap::{ArgMatches, Command};
 use std::fmt::Debug;
-use crate::git::GitInterface;
+use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
 
 #[derive(Debug)]

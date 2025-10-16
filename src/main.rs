@@ -1,9 +1,9 @@
 use crate::command::CommandRepository;
-use crate::command::fm_git::FMGitCommand;
+use command::fm_git::FMGitCommand;
 
 mod command;
-mod git;
 mod util;
+mod git;
 
 fn main() {
     let command_repository = CommandRepository::new(
