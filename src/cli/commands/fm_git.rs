@@ -1,5 +1,6 @@
 use crate::cli::*;
 use clap::Command;
+use crate::cli::commands::derive::DeriveCommand;
 
 #[derive(Clone, Debug)]
 pub struct FMGitCommand {}
@@ -16,6 +17,7 @@ impl CommandDefinition for FMGitCommand {
         vec![
             Box::new(StatusCommand {}),
             Box::new(TreeCommand {}),
+            Box::new(DeriveCommand {}),
             Box::new(HiddenCompletionCommand {}),
         ]
     }

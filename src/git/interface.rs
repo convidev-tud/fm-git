@@ -1,5 +1,7 @@
 use crate::git::tree::SymFeatureNode;
 use crate::util::u8_to_string;
+use std::io;
+use std::process::Output;
 
 #[derive(Clone, Debug)]
 pub struct GitInterface {
@@ -31,5 +33,22 @@ impl GitInterface {
             );
         }
         &self.virtual_root
+    }
+    pub fn get_main_branch(&self) -> &str {
+        "main"
+    }
+    pub fn checkout(&self, branch: &str, create: bool) -> io::Result<Output> {
+        let mut command = std::process::Command::new("git");
+        command.arg("checkout");
+        if create {
+            command.arg("-b");
+        }
+        command.arg(branch).output()
+    }
+    pub fn merge(&mut self, branches: Vec<String>) -> io::Result<Output> {
+        std::process::Command::new("git")
+            .arg("merge")
+            .args(branches)
+            .output()
     }
 }
