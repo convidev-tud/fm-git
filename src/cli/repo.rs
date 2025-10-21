@@ -1,4 +1,4 @@
-use crate::command::{CommandContext, CommandImpl, CommandMap};
+use crate::cli::{CommandContext, CommandImpl, CommandMap};
 use clap::ArgMatches;
 use std::ffi::OsString;
 use crate::git::interface::GitInterface;

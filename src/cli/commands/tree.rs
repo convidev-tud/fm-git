@@ -1,4 +1,4 @@
-use crate::command::*;
+use crate::cli::*;
 use clap::{ArgMatches, Command};
 use termtree::Tree;
 use crate::git::tree::SymFeatureNode;

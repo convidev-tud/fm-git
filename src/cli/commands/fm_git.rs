@@ -1,4 +1,4 @@
-use crate::command::*;
+use crate::cli::*;
 use clap::Command;
 
 #[derive(Clone, Debug)]

@@ -1,7 +1,6 @@
-use crate::command::CommandRepository;
-use command::fm_git::FMGitCommand;
+use crate::cli::{CommandRepository, FMGitCommand};
 
-mod command;
+mod cli;
 mod util;
 mod git;
 

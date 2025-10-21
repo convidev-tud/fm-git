@@ -1,4 +1,4 @@
-use crate::command::*;
+use crate::cli::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 #[derive(Clone, Debug)]
@@ -8,7 +8,7 @@ impl CommandDefinition for HiddenCompletionCommand {
     fn build_command(&self) -> Command {
         Command::new("__completion")
             .hide(true)
-            .arg(Arg::new("command").raw(true))
+            .arg(Arg::new("cli").raw(true))
             .disable_help_subcommand(true)
     }
 }
@@ -16,7 +16,7 @@ impl CommandDefinition for HiddenCompletionCommand {
 impl CommandInterface for HiddenCompletionCommand {
     fn run_command(&self, args: &ArgMatches, state: &mut CommandContext) {
         let mut to_complete = args
-            .get_many::<String>("command")
+            .get_many::<String>("cli")
             .unwrap()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();

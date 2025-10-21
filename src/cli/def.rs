@@ -88,8 +88,8 @@ pub trait CommandDefinition: Debug {
 }
 
 pub trait CommandInterface: Debug {
-    fn run_command(&self, _args: &ArgMatches, _state: &mut CommandContext) {}
-    fn shell_complete(&self, _appendix: Option<&str>, _state: &mut CommandContext) -> Option<String> {
+    fn run_command(&self, _args: &ArgMatches, _context: &mut CommandContext) {}
+    fn shell_complete(&self, _appendix: Option<&str>, _context: &mut CommandContext) -> Option<String> {
         None
     }
 }
