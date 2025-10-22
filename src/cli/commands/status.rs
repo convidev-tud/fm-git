@@ -25,7 +25,4 @@ impl CommandInterface for StatusCommand {
             .expect("failed to execute process");
         state.log_from_u8(&output.stdout, &output.stderr);
     }
-    fn shell_complete(&self, _appendix: Option<&str>, _state: &mut CommandContext) -> Option<String> {
-        None
-    }
 }

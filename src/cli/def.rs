@@ -68,14 +68,16 @@ impl CommandContext<'_> {
         self.log_to_stdout(u8_to_string(stdout));
         self.log_to_stderr(u8_to_string(stderr));
     }
-    pub fn log_to_stdout(&self, stdout: String) {
-        if stdout.len() > 0 {
-            println!("{}", stdout.trim_end())
+    pub fn log_to_stdout<S: Into<String>>(&self, stdout: S) {
+        let converted = stdout.into();
+        if converted.len() > 0 {
+            println!("{}", converted.trim_end())
         }
     }
-    pub fn log_to_stderr(&self, stderr: String) {
-        if stderr.len() > 0 {
-            println!("{}", stderr.trim_end())
+    pub fn log_to_stderr<S: Into<String>>(&self, stderr: S) {
+        let converted = stderr.into();
+        if converted.len() > 0 {
+            println!("{}", converted.trim_end())
         }
     }
 }
@@ -89,8 +91,12 @@ pub trait CommandDefinition: Debug {
 
 pub trait CommandInterface: Debug {
     fn run_command(&self, _args: &ArgMatches, _context: &mut CommandContext) {}
-    fn shell_complete(&self, _appendix: Option<&str>, _context: &mut CommandContext) -> Option<String> {
-        None
+    fn shell_complete(
+        &self,
+        _appendix: Vec<&str>,
+        _context: &mut CommandContext
+    ) -> Vec<String> {
+        Vec::new()
     }
 }
 
