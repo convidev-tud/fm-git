@@ -1,11 +1,34 @@
-use crate::git::tree::SymFeatureNode;
+use crate::git::model::BranchDataModel;
 use crate::util::u8_to_string;
-use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::io;
 use std::process::{Command, Output};
 
+#[derive(Debug, Clone)]
+struct GitInterfaceError {
+    msg: String,
+}
+impl GitInterfaceError {
+    pub fn new(msg: &str) -> GitInterfaceError {
+        GitInterfaceError {
+            msg: msg.to_string(),
+        }
+    }
+}
+impl Display for GitInterfaceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+impl Error for GitInterfaceError {}
+enum GitError {
+    Io(io::Error),
+    GitInterface(GitInterfaceError),
+}
+
 #[derive(Clone, Debug)]
-struct RawGitInterface {}
+struct RawGitInterface;
 impl RawGitInterface {
     fn build_git_command(&self) -> Command {
         Command::new("git")
@@ -24,71 +47,58 @@ impl RawGitInterface {
             .args(branches)
             .output()
     }
-    pub fn get_main_branch(&self) -> &str {
+    pub fn branch(&self) -> io::Result<Output> {
+        self.build_git_command().arg("branch").output()
+    }
+    pub fn get_default_branch(&self) -> &str {
         "main"
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct GitInterface {
-    feature_root_node: SymFeatureNode,
-    feature_name_to_path: HashMap<String, Vec<String>>,
+    model: BranchDataModel,
     raw_git_interface: RawGitInterface,
 }
 impl GitInterface {
     pub fn new() -> Self {
         let raw_interface = RawGitInterface {};
         Self {
-            feature_root_node: SymFeatureNode::new(raw_interface.get_main_branch()),
-            feature_name_to_path: HashMap::new(),
+            model: BranchDataModel::new(raw_interface.get_default_branch()),
             raw_git_interface: raw_interface,
         }
     }
-    fn build_complete_tree(&mut self) {
-        let output = std::process::Command::new("git")
-            .arg("branch")
-            .output()
-            .expect("failed to execute process");
+    fn update_complete_model(&mut self) -> Result<&BranchDataModel, io::Error> {
+        let output = self.raw_git_interface.branch()?;
         let all_branches: Vec<String> = u8_to_string(&output.stdout)
             .split("\n")
             .map(|raw_string| raw_string.trim().to_string())
             .collect();
         for branch in all_branches {
-            let converted_branch = branch.replace("*", "").replace("_", "").trim().to_string();
-            let split_branch = converted_branch.split("/").collect::<Vec<&str>>();
-            let feature_name = split_branch.last().unwrap().to_string();
-            if !self.feature_name_to_path.contains_key(&feature_name) {
-                self.feature_name_to_path
-                    .insert(feature_name.clone(), vec![converted_branch.clone()]);
-            } else {
-                self.feature_name_to_path
-                    .get_mut(&feature_name)
-                    .unwrap()
-                    .push(converted_branch.clone());
-            }
-            self.feature_root_node.add_children_recursive(split_branch);
+            self.model.insert_from_git_native_branch(&branch);
         }
+        Ok(&self.model)
     }
-    pub fn get_complete_tree(&mut self) -> &SymFeatureNode {
-        self.build_complete_tree();
-        &self.feature_root_node
+    pub fn get_model(&mut self) -> Result<&BranchDataModel, io::Error> {
+        self.update_complete_model()
     }
-    pub fn get_unique_names(&mut self) -> Vec<String> {
-        self.build_complete_tree();
-        let mut unique: Vec<String> = Vec::new();
-        self.feature_name_to_path
-            .iter()
-            .filter_map(|(k, v)| match v.len() {
-                0 => {
-                    panic!("Must be a bug")
-                }
-                1 => Some(vec![k.clone()]),
-                _ => None,
-            })
-            .for_each(|e| unique.extend(e));
-        unique
+    pub fn checkout_global_root(&self) -> Result<Output, io::Error> {
+        self.raw_git_interface.checkout(self.raw_git_interface.get_default_branch(), false)
     }
-    pub fn get_main_branch(&self) -> &str {
-        self.raw_git_interface.get_main_branch()
-    }
+    // pub fn checkout(&self, branch: &str, create: bool) -> Result<Output, GitError> {
+    //     if !branch.starts_with(FEATURES_PREFIX) || !branch.starts_with(PRODUCTS_PREFIX) {
+    //         return Err(GitError::GitInterface(GitInterfaceError::new(
+    //             format!(
+    //                 "Cannot check out branch {}: must start with {} or {}",
+    //                 branch, FEATURES_PREFIX, PRODUCTS_PREFIX
+    //             )
+    //             .as_str(),
+    //         )));
+    //     }
+    //     let path = if branch.starts_with(FEATURES_PREFIX) {
+    //         branch.replace(FEATURES_PREFIX, "")
+    //     } else {
+    //         branch.replace(PRODUCTS_PREFIX, "")
+    //     };
+    // }
 }

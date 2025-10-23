@@ -1,2 +1,2 @@
 pub mod interface;
-pub mod tree;
+pub mod model;

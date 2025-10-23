@@ -1,6 +1,7 @@
 use crate::cli::util::{currently_editing, get_argument_value, get_argument_values};
 use crate::cli::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use std::error::Error;
 
 #[derive(Clone, Debug)]
 pub struct DeriveCommand {}
@@ -21,8 +22,13 @@ impl CommandDefinition for DeriveCommand {
 }
 
 impl CommandInterface for DeriveCommand {
-    fn run_command(&self, args: &ArgMatches, _current: &CommandMap, context: &mut CommandContext) {
-        let all_targets = get_argument_values::<String>(args, "features");
+    fn run_command(
+        &self,
+        args: &ArgMatches,
+        _current: &CommandMap,
+        context: &mut CommandContext,
+    ) -> Result<(), Box<dyn Error>> {
+        // let all_targets = get_argument_values::<String>(args, "features");
         // let target_branch = get_argument_value(args, "name");
         // let main = { context.git.get_main_branch() };
         // context.git.checkout(main, false);
@@ -33,13 +39,14 @@ impl CommandInterface for DeriveCommand {
         //     Ok(output) => { context.log_from_u8(&output.stdout, &output.stderr) },
         //     Err(output) => { context.log_to_stderr(output.to_string()); },
         // }
+        Ok(())
     }
     fn shell_complete(
         &self,
         appendix: Vec<&str>,
         _current: &CommandMap,
         context: &mut CommandContext,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, Box<dyn Error>> {
         let maybe_last = appendix.last();
         let last = if maybe_last.is_some() {
             maybe_last.unwrap()
@@ -47,19 +54,20 @@ impl CommandInterface for DeriveCommand {
             ""
         };
         if currently_editing("--name", &appendix) {
-            return vec![];
+            return Ok(vec![]);
         }
         let completion = context
             .git
-            .get_unique_names()
+            .get_model()?
+            .get_unique_feature_names()
             .into_iter()
             .filter(|s| s.starts_with(last))
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
-        completion
+        Ok(completion
             .iter()
             .filter(|s| completion.len() < 2 || !appendix.contains(&s.as_str()))
             .map(|s| s.to_string())
-            .collect::<Vec<String>>()
+            .collect::<Vec<String>>())
     }
 }

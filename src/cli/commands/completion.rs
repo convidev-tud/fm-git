@@ -1,5 +1,6 @@
 use crate::cli::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use std::error::Error;
 
 #[derive(Clone, Debug)]
 pub struct HiddenCompletionCommand {}
@@ -14,14 +15,19 @@ impl CommandDefinition for HiddenCompletionCommand {
 }
 
 impl CommandInterface for HiddenCompletionCommand {
-    fn run_command(&self, args: &ArgMatches, _current: &CommandMap, state: &mut CommandContext) {
+    fn run_command(
+        &self,
+        args: &ArgMatches,
+        _current: &CommandMap,
+        state: &mut CommandContext,
+    ) -> Result<(), Box<dyn Error>> {
         let mut to_complete = args
             .get_many::<String>("cli")
             .unwrap()
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
         if to_complete.is_empty() {
-            return;
+            return Ok(());
         }
         let maybe_last_child = state
             .command_map
@@ -74,10 +80,11 @@ impl CommandInterface for HiddenCompletionCommand {
                         }
                     }
                 }
-                let completion =
-                    last_child
-                        .command
-                        .shell_complete(to_complete[1..].to_vec(), last_child, state);
+                let completion = last_child.command.shell_complete(
+                    to_complete[1..].to_vec(),
+                    last_child,
+                    state,
+                )?;
                 match completion.len() {
                     0 => {}
                     _ => state.log_to_stdout(&*completion.join(" ")),
@@ -85,5 +92,6 @@ impl CommandInterface for HiddenCompletionCommand {
             }
             None => {}
         }
+        Ok(())
     }
 }

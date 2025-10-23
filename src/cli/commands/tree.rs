@@ -1,9 +1,10 @@
 use crate::cli::*;
-use crate::git::tree::SymFeatureNode;
+use crate::git::model::SymNode;
 use clap::{ArgMatches, Command};
+use std::error::Error;
 use termtree::Tree;
 
-fn transform_to_printable(root: &SymFeatureNode) -> Vec<Tree<String>> {
+fn transform_to_printable(root: &SymNode) -> Vec<Tree<String>> {
     root.iter_children()
         .map(|child| {
             let mut tree = Tree::new(child.name.clone());
@@ -25,10 +26,20 @@ impl CommandDefinition for TreeCommand {
 }
 
 impl CommandInterface for TreeCommand {
-    fn run_command(&self, _args: &ArgMatches, _current: &CommandMap, state: &mut CommandContext) {
-        let complete_tree = state.git.get_complete_tree();
-        for tree in transform_to_printable(complete_tree) {
+    fn run_command(
+        &self,
+        _args: &ArgMatches,
+        _current: &CommandMap,
+        state: &mut CommandContext,
+    ) -> Result<(), Box<dyn Error>> {
+        let maybe_feature_tree = state.git.get_model()?.get_feature_root();
+        if maybe_feature_tree.is_none() {
+            return Ok(());
+        }
+        let feature_tree = maybe_feature_tree.unwrap();
+        for tree in transform_to_printable(feature_tree) {
             state.log_to_stdout(tree.to_string().trim().to_string());
         }
+        Ok(())
     }
 }

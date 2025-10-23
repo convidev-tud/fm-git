@@ -1,5 +1,6 @@
 use crate::cli::*;
 use clap::{ArgMatches, Command};
+use std::error::Error;
 
 #[derive(Clone, Debug)]
 pub struct StatusCommand {}
@@ -14,11 +15,17 @@ impl CommandDefinition for StatusCommand {
 }
 
 impl CommandInterface for StatusCommand {
-    fn run_command(&self, _args: &ArgMatches, _current: &CommandMap, state: &mut CommandContext) {
+    fn run_command(
+        &self,
+        _args: &ArgMatches,
+        _current: &CommandMap,
+        state: &mut CommandContext,
+    ) -> Result<(), Box<dyn Error>> {
         let output = std::process::Command::new("git")
             .args(["status", "--porcelain=1"])
             .output()
             .expect("failed to execute process");
         state.log_from_u8(&output.stdout, &output.stderr);
+        Ok(())
     }
 }

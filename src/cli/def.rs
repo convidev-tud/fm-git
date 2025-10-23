@@ -1,6 +1,7 @@
 use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
 use clap::{ArgMatches, Command};
+use std::error::Error;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -108,15 +109,16 @@ pub trait CommandInterface: Debug {
         _args: &ArgMatches,
         _current: &CommandMap,
         _context: &mut CommandContext,
-    ) {
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
     fn shell_complete(
         &self,
         _appendix: Vec<&str>,
         _current: &CommandMap,
         _context: &mut CommandContext,
-    ) -> Vec<String> {
-        Vec::new()
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        Ok(Vec::new())
     }
 }
 

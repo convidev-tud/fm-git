@@ -1,4 +1,3 @@
-use crate::cli::commands::derive::DeriveCommand;
 use crate::cli::*;
 use clap::Command;
 
@@ -18,6 +17,7 @@ impl CommandDefinition for FMGitCommand {
             Box::new(StatusCommand {}),
             Box::new(TreeCommand {}),
             Box::new(DeriveCommand {}),
+            Box::new(CheckoutCommand {}),
             Box::new(HiddenCompletionCommand {}),
         ]
     }
