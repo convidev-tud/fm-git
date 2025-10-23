@@ -20,7 +20,9 @@ impl SymFeatureNode {
         self.children.iter_mut().find(|s| s.name == name)
     }
     pub fn add_children_recursive(&mut self, qualified_path: Vec<&str>) {
-        if qualified_path.is_empty() { return; }
+        if qualified_path.is_empty() {
+            return;
+        }
         let name = qualified_path[0];
         let next_child: &mut SymFeatureNode = match self.get_child_mut(name) {
             Some(node) => node,

@@ -1,7 +1,7 @@
 use crate::cli::{CommandContext, CommandImpl, CommandMap};
+use crate::git::interface::GitInterface;
 use clap::ArgMatches;
 use std::ffi::OsString;
-use crate::git::interface::GitInterface;
 
 pub struct CommandRepository {
     command_map: CommandMap,
@@ -12,16 +12,17 @@ impl CommandRepository {
             command_map: CommandMap::new(command),
         }
     }
-    fn execute_recursive(&self, current: &CommandMap, matches: &ArgMatches, state: &mut CommandContext) {
-        current.command.run_command(matches, state);
+    fn execute_recursive(
+        &self,
+        current: &CommandMap,
+        matches: &ArgMatches,
+        context: &mut CommandContext,
+    ) {
+        current.command.run_command(matches, current, context);
         match matches.subcommand() {
             Some((sub, sub_args)) => {
                 if let Some(child) = current.find_child(sub) {
-                    self.execute_recursive(
-                        child,
-                        sub_args,
-                        state,
-                    )
+                    self.execute_recursive(child, sub_args, context)
                 } else {
                     let ext_args: Vec<_> = sub_args.get_many::<OsString>("").unwrap().collect();
                     std::process::Command::new("git")

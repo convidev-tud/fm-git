@@ -1,7 +1,7 @@
-use clap::{ArgMatches, Command};
-use std::fmt::Debug;
 use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
+use clap::{ArgMatches, Command};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct CommandMap {
@@ -31,25 +31,38 @@ impl CommandMap {
         }
     }
     pub fn find_child(&self, name: &str) -> Option<&CommandMap> {
-        self.children.iter().find(|child| {child.clap_command.get_name() == name})
+        self.children
+            .iter()
+            .find(|child| child.clap_command.get_name() == name)
     }
     pub fn find_last_child_recursive(&self, names: &mut Vec<&str>) -> Option<&CommandMap> {
-        if names.is_empty() { return None; }
+        if names.is_empty() {
+            return None;
+        }
         if names.len() >= 1 && self.clap_command.get_name() == *names.first().unwrap() {
-            if names.len() == 1 { return Some(self) }
+            if names.len() == 1 {
+                return Some(self);
+            }
             names.remove(0);
             let maybe_child = self.find_child(names.first().unwrap());
             if maybe_child.is_some() {
                 let maybe_final = maybe_child.unwrap().find_last_child_recursive(names);
                 if maybe_final.is_some() {
                     maybe_final
-                } else { Some (self) }
-            } else { Some(self) }
-        } else { None }
+                } else {
+                    Some(self)
+                }
+            } else {
+                Some(self)
+            }
+        } else {
+            None
+        }
     }
     pub fn find_children_by_prefix(&self, prefix: &str) -> Vec<&CommandMap> {
-        self.children.iter()
-            .filter(|child| {child.clap_command.get_name().starts_with(prefix)})
+        self.children
+            .iter()
+            .filter(|child| child.clap_command.get_name().starts_with(prefix))
             .collect()
     }
 }
@@ -90,11 +103,18 @@ pub trait CommandDefinition: Debug {
 }
 
 pub trait CommandInterface: Debug {
-    fn run_command(&self, _args: &ArgMatches, _context: &mut CommandContext) {}
+    fn run_command(
+        &self,
+        _args: &ArgMatches,
+        _current: &CommandMap,
+        _context: &mut CommandContext,
+    ) {
+    }
     fn shell_complete(
         &self,
         _appendix: Vec<&str>,
-        _context: &mut CommandContext
+        _current: &CommandMap,
+        _context: &mut CommandContext,
     ) -> Vec<String> {
         Vec::new()
     }

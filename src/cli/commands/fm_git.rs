@@ -1,6 +1,6 @@
+use crate::cli::commands::derive::DeriveCommand;
 use crate::cli::*;
 use clap::Command;
-use crate::cli::commands::derive::DeriveCommand;
 
 #[derive(Clone, Debug)]
 pub struct FMGitCommand {}

@@ -14,11 +14,7 @@ impl CommandDefinition for StatusCommand {
 }
 
 impl CommandInterface for StatusCommand {
-    fn run_command(
-        &self,
-        _args: &ArgMatches,
-        state: &mut CommandContext,
-    ) {
+    fn run_command(&self, _args: &ArgMatches, _current: &CommandMap, state: &mut CommandContext) {
         let output = std::process::Command::new("git")
             .args(["status", "--porcelain=1"])
             .output()

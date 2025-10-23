@@ -14,7 +14,7 @@ impl CommandDefinition for HiddenCompletionCommand {
 }
 
 impl CommandInterface for HiddenCompletionCommand {
-    fn run_command(&self, args: &ArgMatches, state: &mut CommandContext) {
+    fn run_command(&self, args: &ArgMatches, _current: &CommandMap, state: &mut CommandContext) {
         let mut to_complete = args
             .get_many::<String>("cli")
             .unwrap()
@@ -74,12 +74,13 @@ impl CommandInterface for HiddenCompletionCommand {
                         }
                     }
                 }
-                let completion = last_child
-                    .command
-                    .shell_complete(to_complete[1..].to_vec(), state);
+                let completion =
+                    last_child
+                        .command
+                        .shell_complete(to_complete[1..].to_vec(), last_child, state);
                 match completion.len() {
-                    0 => {},
-                    _ => state.log_to_stdout(&*completion.join(" "))
+                    0 => {}
+                    _ => state.log_to_stdout(&*completion.join(" ")),
                 }
             }
             None => {}

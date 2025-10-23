@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use crate::git::tree::SymFeatureNode;
 use crate::util::u8_to_string;
+use std::collections::HashMap;
 use std::io;
 use std::process::{Command, Output};
-
 
 #[derive(Clone, Debug)]
 struct RawGitInterface {}
@@ -55,21 +54,19 @@ impl GitInterface {
             .map(|raw_string| raw_string.trim().to_string())
             .collect();
         for branch in all_branches {
-            let converted_branch = branch
-                .replace("*", "")
-                .replace("_", "")
-                .trim()
-                .to_string();
+            let converted_branch = branch.replace("*", "").replace("_", "").trim().to_string();
             let split_branch = converted_branch.split("/").collect::<Vec<&str>>();
             let feature_name = split_branch.last().unwrap().to_string();
             if !self.feature_name_to_path.contains_key(&feature_name) {
-                self.feature_name_to_path.insert(feature_name.clone(), vec![converted_branch.clone()]);
+                self.feature_name_to_path
+                    .insert(feature_name.clone(), vec![converted_branch.clone()]);
             } else {
-                self.feature_name_to_path.get_mut(&feature_name).unwrap().push(converted_branch.clone());
+                self.feature_name_to_path
+                    .get_mut(&feature_name)
+                    .unwrap()
+                    .push(converted_branch.clone());
             }
-            self.feature_root_node.add_children_recursive(
-                split_branch
-            );
+            self.feature_root_node.add_children_recursive(split_branch);
         }
     }
     pub fn get_complete_tree(&mut self) -> &SymFeatureNode {
@@ -81,12 +78,12 @@ impl GitInterface {
         let mut unique: Vec<String> = Vec::new();
         self.feature_name_to_path
             .iter()
-            .filter_map(|(k, v)| {
-                match v.len() {
-                    0 => { panic!("Must be a bug") }
-                    1 => Some(vec![k.clone()]),
-                    _ => None,
+            .filter_map(|(k, v)| match v.len() {
+                0 => {
+                    panic!("Must be a bug")
                 }
+                1 => Some(vec![k.clone()]),
+                _ => None,
             })
             .for_each(|e| unique.extend(e));
         unique
