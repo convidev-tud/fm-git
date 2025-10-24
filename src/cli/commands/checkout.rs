@@ -8,17 +8,17 @@ pub struct CheckoutCommand;
 impl CommandDefinition for CheckoutCommand {
     fn build_command(&self) -> Command {
         Command::new("checkout")
-            .about("Checkout a branch")
+            .about("Switch branches")
             .disable_help_subcommand(true)
             .arg(Arg::new("branch"))
             .arg(
-                Arg::new("create")
-                    .short('b')
+                Arg::new("new-feature")
+                    .short('f')
                     .action(ArgAction::SetTrue)
                     .help(
-                        "Creates a new feature branch as the child of the currently checked-out branch. \
-                        If the current branch is main/master, the new feature will be a root feature. \
-                        Fails if the current branch is a product."
+                        "Creates a new feature branch as the child of the currently checked-out branch and checks it out. \
+                        If checked-out on default, the new feature will be a root feature. \
+                        Fails if checked-out on a product or working branch."
                     ),
             )
     }
@@ -30,9 +30,9 @@ impl CommandInterface for CheckoutCommand {
         _current: &CommandMap,
         context: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
-        let branch = get_argument_value::<String>("branch", args);
-        let to_create = get_argument_value::<bool>("create", args);
-        let result = context.git.checkout(branch.as_str(), to_create)?;
+        let branch_any_name = get_argument_value::<String>("branch", args);
+        let new_feature = get_argument_value::<bool>("new-feature", args);
+        let result = context.git.checkout(branch_any_name.as_str(), new_feature)?;
         context.log_from_output(&result);
         Ok(())
     }

@@ -1,9 +1,9 @@
+use crate::git::error::{GitError, GitInterfaceError};
 use crate::git::model::BranchDataModel;
 use crate::util::u8_to_string;
 use std::fmt::Display;
 use std::io;
 use std::process::{Command, Output};
-use crate::git::error::{GitError, GitInterfaceError};
 
 #[derive(Clone, Debug)]
 struct RawGitInterface;
@@ -11,25 +11,11 @@ impl RawGitInterface {
     fn build_git_command(&self) -> Command {
         Command::new("git")
     }
-    pub fn checkout(&self, branch: &str, create: bool) -> io::Result<Output> {
-        let mut command = self.build_git_command();
-        command.arg("checkout");
-        if create {
-            command.arg("-b");
-        }
-        command.arg(branch).output()
-    }
-    pub fn merge(&self, branches: Vec<String>) -> io::Result<Output> {
-        self.build_git_command()
-            .arg("merge")
-            .args(branches)
-            .output()
-    }
-    pub fn branch(&self) -> io::Result<Output> {
-        self.build_git_command().arg("branch").output()
-    }
     pub fn get_default_branch(&self) -> &str {
         "main"
+    }
+    pub fn run(&self, args: Vec<&str>) -> io::Result<Output> {
+        self.build_git_command().args(args).output()
     }
 }
 
@@ -41,28 +27,34 @@ pub struct GitInterface {
 impl GitInterface {
     pub fn new() -> Self {
         let raw_interface = RawGitInterface {};
-        Self {
+        let mut interface = Self {
             model: BranchDataModel::new(raw_interface.get_default_branch()),
             raw_git_interface: raw_interface,
+        };
+        match interface.update_complete_model() {
+            Ok(_) => interface,
+            Err(e) => panic!("{:?}", e),
         }
     }
-    fn update_complete_model(&mut self) -> Result<&BranchDataModel, io::Error> {
-        let output = self.raw_git_interface.branch()?;
+    fn update_complete_model(&mut self) -> Result<(), io::Error> {
+        let output = self.raw_git_interface.run(vec!["branch"])?;
         let all_branches: Vec<String> = u8_to_string(&output.stdout)
             .split("\n")
             .map(|raw_string| raw_string.trim().to_string())
             .collect();
         for branch in all_branches {
             self.model.insert_from_git_native_branch(&branch);
-        }
-        Ok(&self.model)
+        };
+        Ok(())
     }
-    pub fn get_model(&mut self) -> Result<&BranchDataModel, io::Error> {
-        self.update_complete_model()
+    pub fn get_model(&mut self) -> &BranchDataModel {
+        &self.model
     }
     pub fn checkout_global_root(&self) -> Result<Output, io::Error> {
-        self.raw_git_interface
-            .checkout(self.raw_git_interface.get_default_branch(), false)
+        self.raw_git_interface.run(vec![
+            "checkout",
+            self.raw_git_interface.get_default_branch(),
+        ])
     }
     pub fn checkout(&self, branch: &str, create: bool) -> Result<Output, GitError> {
         let maybe_qualified_path = self.model.expand_from_short(branch);

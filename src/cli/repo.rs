@@ -19,8 +19,8 @@ impl CommandRepository {
         context: &mut CommandContext,
     ) {
         match current.command.run_command(matches, current, context) {
-            Ok(_) => {},
-            Err(err) => { context.log_to_stderr(err.to_string()) }
+            Ok(_) => {}
+            Err(err) => context.log_to_stderr(err.to_string()),
         };
         match matches.subcommand() {
             Some((sub, sub_args)) => {

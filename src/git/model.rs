@@ -127,7 +127,7 @@ impl BranchDataModel {
     pub fn get_product_root(&self) -> Option<&SymNode> {
         self.root_node.get_child(PRODUCTS_PREFIX)
     }
-    pub fn get_unique_feature_names(&self) -> Vec<String> {
+    pub fn get_short_feature_names(&self) -> Vec<String> {
         let mut unique: Vec<String> = Vec::new();
         self.feature_short_name_to_qualified_paths
             .iter()
