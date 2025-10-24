@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
-const FEATURES_PREFIX: &str = "feature";
-const PRODUCTS_PREFIX: &str = "product";
+// there is feature/ and product/
+// full feature paths are like this: root/featureA/featureA1
+// feature paths can be very long, so shortening them would be appropriate
+// feature/.../featureA1 or feature/featureA1?
+pub const FEATURES_PREFIX: &str = "feature";
+pub const PRODUCTS_PREFIX: &str = "product";
 
 #[derive(Clone, Debug)]
 pub struct SymNode {
@@ -57,6 +61,11 @@ impl NodeData {
     }
 }
 
+pub enum NodeType {
+    Feature,
+    Product,
+}
+
 #[derive(Clone, Debug)]
 pub struct BranchDataModel {
     root_node: SymNode,
@@ -64,6 +73,12 @@ pub struct BranchDataModel {
     qualified_path_to_node_data: HashMap<String, NodeData>,
 }
 impl BranchDataModel {
+    pub fn feature_path_prefix() -> String {
+        FEATURES_PREFIX.to_string() + "/"
+    }
+    pub fn product_path_prefix() -> String {
+        PRODUCTS_PREFIX.to_string() + "/"
+    }
     pub fn new(default_branch: &str) -> Self {
         Self {
             root_node: SymNode::new(default_branch),
@@ -125,5 +140,52 @@ impl BranchDataModel {
             })
             .for_each(|e| unique.extend(e));
         unique
+    }
+    pub fn get_long_name_from_short(&self, name: &str) -> Option<&str> {
+        let long_names = self.feature_short_name_to_qualified_paths.get(name)?;
+        match long_names.len() {
+            0 => None,
+            1 => Some(&long_names[0]),
+            _ => None,
+        }
+    }
+    pub fn get_git_branch(&self, qualified_path: &str) -> Option<&String> {
+        Some(
+            &self
+                .qualified_path_to_node_data
+                .get(qualified_path)?
+                .git_branch,
+        )
+    }
+    pub fn expand_from_short(&self, name: &str) -> Option<String> {
+        if self.qualified_path_to_node_data.contains_key(name) {
+            return Some(name.to_string());
+        }
+        match self.get_long_name_from_short(self.strip_branch_type(name).as_str()) {
+            Some(long_name) => Some(long_name.to_string()),
+            None => None,
+        }
+    }
+    pub fn branch_type(&self, branch: &str) -> Option<NodeType> {
+        let feature_path = BranchDataModel::feature_path_prefix();
+        let product_path = BranchDataModel::product_path_prefix();
+        if branch.starts_with(feature_path.as_str()) {
+            Some(NodeType::Feature)
+        } else if branch.starts_with(product_path.as_str()) {
+            Some(NodeType::Product)
+        } else {
+            None
+        }
+    }
+    pub fn strip_branch_type(&self, branch: &str) -> String {
+        match self.branch_type(branch) {
+            Some(NodeType::Feature) => {
+                branch.replace(BranchDataModel::feature_path_prefix().as_str(), "")
+            }
+            Some(NodeType::Product) => {
+                branch.replace(BranchDataModel::product_path_prefix().as_str(), "")
+            }
+            None => branch.to_string(),
+        }
     }
 }

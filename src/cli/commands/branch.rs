@@ -15,17 +15,17 @@ fn transform_to_printable(root: &SymNode) -> Vec<Tree<String>> {
 }
 
 #[derive(Clone, Debug)]
-pub struct TreeCommand {}
+pub struct BranchCommand {}
 
-impl CommandDefinition for TreeCommand {
+impl CommandDefinition for BranchCommand {
     fn build_command(&self) -> Command {
-        Command::new("tree")
+        Command::new("branch")
             .about("Displays the tree structure")
             .disable_help_subcommand(true)
     }
 }
 
-impl CommandInterface for TreeCommand {
+impl CommandInterface for BranchCommand {
     fn run_command(
         &self,
         _args: &ArgMatches,

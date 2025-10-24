@@ -3,6 +3,7 @@ use crate::util::u8_to_string;
 use clap::{ArgMatches, Command};
 use std::error::Error;
 use std::fmt::Debug;
+use std::process::Output;
 
 #[derive(Debug)]
 pub struct CommandMap {
@@ -78,9 +79,9 @@ impl CommandContext<'_> {
     pub fn new<'a>(command_map: &'a CommandMap, git: &'a mut GitInterface) -> CommandContext<'a> {
         CommandContext { command_map, git }
     }
-    pub fn log_from_u8(&self, stdout: &Vec<u8>, stderr: &Vec<u8>) {
-        self.log_to_stdout(u8_to_string(stdout));
-        self.log_to_stderr(u8_to_string(stderr));
+    pub fn log_from_output(&self, output: &Output) {
+        self.log_to_stdout(u8_to_string(&output.stdout));
+        self.log_to_stderr(u8_to_string(&output.stderr));
     }
     pub fn log_to_stdout<S: Into<String>>(&self, stdout: S) {
         let converted = stdout.into();

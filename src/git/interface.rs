@@ -1,31 +1,9 @@
 use crate::git::model::BranchDataModel;
 use crate::util::u8_to_string;
-use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::io;
 use std::process::{Command, Output};
-
-#[derive(Debug, Clone)]
-struct GitInterfaceError {
-    msg: String,
-}
-impl GitInterfaceError {
-    pub fn new(msg: &str) -> GitInterfaceError {
-        GitInterfaceError {
-            msg: msg.to_string(),
-        }
-    }
-}
-impl Display for GitInterfaceError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.msg)
-    }
-}
-impl Error for GitInterfaceError {}
-enum GitError {
-    Io(io::Error),
-    GitInterface(GitInterfaceError),
-}
+use crate::git::error::{GitError, GitInterfaceError};
 
 #[derive(Clone, Debug)]
 struct RawGitInterface;
@@ -83,22 +61,21 @@ impl GitInterface {
         self.update_complete_model()
     }
     pub fn checkout_global_root(&self) -> Result<Output, io::Error> {
-        self.raw_git_interface.checkout(self.raw_git_interface.get_default_branch(), false)
+        self.raw_git_interface
+            .checkout(self.raw_git_interface.get_default_branch(), false)
     }
-    // pub fn checkout(&self, branch: &str, create: bool) -> Result<Output, GitError> {
-    //     if !branch.starts_with(FEATURES_PREFIX) || !branch.starts_with(PRODUCTS_PREFIX) {
-    //         return Err(GitError::GitInterface(GitInterfaceError::new(
-    //             format!(
-    //                 "Cannot check out branch {}: must start with {} or {}",
-    //                 branch, FEATURES_PREFIX, PRODUCTS_PREFIX
-    //             )
-    //             .as_str(),
-    //         )));
-    //     }
-    //     let path = if branch.starts_with(FEATURES_PREFIX) {
-    //         branch.replace(FEATURES_PREFIX, "")
-    //     } else {
-    //         branch.replace(PRODUCTS_PREFIX, "")
-    //     };
-    // }
+    pub fn checkout(&self, branch: &str, create: bool) -> Result<Output, GitError> {
+        let maybe_qualified_path = self.model.expand_from_short(branch);
+        if maybe_qualified_path.is_none() {
+            return Err(GitError::GitInterface(GitInterfaceError::new(
+                format!("Cannot checkout branch {}: does not exist", branch).as_str(),
+            )));
+        }
+        Ok(self.raw_git_interface.checkout(
+            self.model
+                .get_git_branch(maybe_qualified_path.unwrap().as_str())
+                .unwrap(),
+            false,
+        )?)
+    }
 }

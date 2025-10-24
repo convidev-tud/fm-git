@@ -18,7 +18,10 @@ impl CommandRepository {
         matches: &ArgMatches,
         context: &mut CommandContext,
     ) {
-        current.command.run_command(matches, current, context);
+        match current.command.run_command(matches, current, context) {
+            Ok(_) => {},
+            Err(err) => { context.log_to_stderr(err.to_string()) }
+        };
         match matches.subcommand() {
             Some((sub, sub_args)) => {
                 if let Some(child) = current.find_child(sub) {

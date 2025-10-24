@@ -22,10 +22,10 @@ impl CommandInterface for StatusCommand {
         state: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
         let output = std::process::Command::new("git")
-            .args(["status", "--porcelain=1"])
+            .args(["status"])
             .output()
             .expect("failed to execute process");
-        state.log_from_u8(&output.stdout, &output.stderr);
+        state.log_from_output(&output);
         Ok(())
     }
 }
