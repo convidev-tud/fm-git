@@ -4,10 +4,10 @@ use clap::{ArgMatches, Command};
 use std::error::Error;
 use termtree::Tree;
 
-fn transform_to_printable(root: &SymNode) -> Vec<Tree<String>> {
-    root.iter_children()
+fn transform_to_printable(root: &SymNode) -> Vec<Tree<&str>> {
+    root.iter_children_flat()
         .map(|child| {
-            let mut tree = Tree::new(child.name.clone());
+            let mut tree = Tree::new(child.get_name());
             tree.leaves = transform_to_printable(child);
             tree
         })

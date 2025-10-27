@@ -1,7 +1,6 @@
 use crate::git::error::{GitError, GitInterfaceError};
 use crate::git::model::BranchDataModel;
 use crate::util::u8_to_string;
-use std::fmt::Display;
 use std::io;
 use std::process::{Command, Output};
 
@@ -65,9 +64,7 @@ impl GitInterface {
         }
         Ok(self.raw_git_interface.run(vec![
             "checkout",
-            self.model
-                .get_git_branch(maybe_qualified_path.unwrap().as_str())
-                .unwrap(),
+            self.model.get_git_branch(branch).unwrap().as_str(),
         ])?)
     }
 }

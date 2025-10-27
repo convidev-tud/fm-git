@@ -83,7 +83,7 @@ pub fn currently_editing(command: &Command, appendix: &Vec<&str>) -> Option<Stri
                 Some(option) => {
                     current_option = Some(option);
                     current_option_start = index;
-                    return None
+                    return None;
                 }
                 // if not, check if the last option is still edited
                 None => {
@@ -141,10 +141,7 @@ mod tests {
     fn test_currently_editing_emtpy() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool"];
-        assert_eq!(
-            currently_editing(&cmd, &appendix),
-            None
-        );
+        assert_eq!(currently_editing(&cmd, &appendix), None);
     }
     #[test]
     fn test_currently_editing_one_option() {
@@ -159,36 +156,24 @@ mod tests {
     fn test_currently_editing_one_option_one_positional() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "--option1", "abc", ""];
-        assert_eq!(
-            currently_editing(&cmd, &appendix),
-            Some("pos1".to_string())
-        );
+        assert_eq!(currently_editing(&cmd, &appendix), Some("pos1".to_string()));
     }
     #[test]
     fn test_currently_editing_one_positional() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "abc"];
-        assert_eq!(
-            currently_editing(&cmd, &appendix),
-            Some("pos1".to_string())
-        );
+        assert_eq!(currently_editing(&cmd, &appendix), Some("pos1".to_string()));
     }
     #[test]
     fn test_currently_editing_append() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "abc", "a", "b", "c", "d"];
-        assert_eq!(
-            currently_editing(&cmd, &appendix),
-            Some("pos2".to_string())
-        );
+        assert_eq!(currently_editing(&cmd, &appendix), Some("pos2".to_string()));
     }
     #[test]
     fn test_currently_boolean() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "-b", ""];
-        assert_eq!(
-            currently_editing(&cmd, &appendix),
-            Some("pos1".to_string())
-        );
+        assert_eq!(currently_editing(&cmd, &appendix), Some("pos1".to_string()));
     }
 }

@@ -1,4 +1,4 @@
-use crate::cli::util::get_argument_value;
+use crate::cli::util::{currently_editing, get_argument_value};
 use crate::cli::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::error::Error;
@@ -37,5 +37,28 @@ impl CommandInterface for CheckoutCommand {
             .checkout(branch_any_name.as_str(), new_feature)?;
         context.log_from_output(&result);
         Ok(())
+    }
+    fn shell_complete(
+        &self,
+        appendix: Vec<&str>,
+        current: &CommandMap,
+        context: &mut CommandContext,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        let last = appendix[appendix.len() - 1];
+        let current = currently_editing(&current.clap_command, &appendix);
+        if current.is_none() {
+            return Ok(vec![]);
+        }
+        match current.unwrap().as_str() {
+            "branch" => Ok(context
+                .git
+                .get_model()
+                .get_all_qualified_paths()
+                .iter()
+                .filter(|s| s.starts_with(last))
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()),
+            _ => Ok(vec![]),
+        }
     }
 }

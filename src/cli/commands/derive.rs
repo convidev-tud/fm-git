@@ -47,27 +47,30 @@ impl CommandInterface for DeriveCommand {
         current: &CommandMap,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let maybe_last = appendix.last();
-        let last = if maybe_last.is_some() {
-            maybe_last.unwrap()
-        } else {
-            ""
-        };
-        if currently_editing(&current.clap_command, &appendix) == Some("".to_string()) {
+        let last = appendix[appendix.len() - 1];
+        let current = currently_editing(&current.clap_command, &appendix);
+        if current.is_none() {
             return Ok(vec![]);
         }
-        let completion = context
-            .git
-            .get_model()
-            .get_short_feature_names()
-            .into_iter()
-            .filter(|s| s.starts_with(last))
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
-        Ok(completion
-            .iter()
-            .filter(|s| completion.len() < 2 || !appendix.contains(&s.as_str()))
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>())
+        match current.unwrap().as_str() {
+            "features" => {
+                let completion = context
+                    .git
+                    .get_model()
+                    .get_short_feature_names()
+                    .into_iter()
+                    .filter(|s| s.starts_with(last))
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
+                Ok(completion
+                    .iter()
+                    .filter(|s| completion.len() < 2 || !appendix.contains(&s.as_str()))
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>())
+            }
+            _ => {
+                return Ok(vec![]);
+            }
+        }
     }
 }
