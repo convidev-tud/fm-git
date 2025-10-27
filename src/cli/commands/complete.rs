@@ -16,11 +16,9 @@ impl CommandDefinition for HiddenCompletionCommand {
 }
 
 impl CommandInterface for HiddenCompletionCommand {
-    fn run_command(
-        &self,
-        context: &mut CommandContext,
-    ) -> Result<(), Box<dyn Error>> {
-        let to_complete = context.arg_matches
+    fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
+        let to_complete = context
+            .arg_matches
             .get_many::<String>("cli")
             .unwrap()
             .map(|s| s.as_str())

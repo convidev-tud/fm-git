@@ -131,19 +131,19 @@ impl BranchDataModel {
     pub fn product_path_prefix() -> String {
         PRODUCTS_PREFIX.to_string() + "/"
     }
-    pub fn new(default_branch: &str) -> Self {
+    pub fn new() -> Self {
         Self {
-            root_node: SymNode::new(default_branch, Some(BranchData::new(default_branch))),
+            root_node: SymNode::new("", None),
             feature_short_name_to_qualified_paths: HashMap::new(),
             qualified_paths_of_existing_branches: Vec::new(),
         }
     }
-    pub fn transform_to_qualified_paths<S: Into<String>>(&self, path: S) -> String {
-        path.into().replace("*", "").replace("_", "")
+    pub fn transform_to_qualified_path<S: Into<String>>(&self, path: S) -> String {
+        path.into().trim().replace("*", "").replace("_", "")
     }
     pub fn insert_from_git_native_branch(&mut self, branch: &str) {
-        let without_star = branch.replace("*", "");
-        let converted_branch = self.transform_to_qualified_paths(&without_star);
+        let without_star = branch.replace("*", "").trim().to_string();
+        let converted_branch = self.transform_to_qualified_path(&without_star);
         let split_branch = converted_branch.split("/").collect::<Vec<&str>>();
         if !self
             .qualified_paths_of_existing_branches
@@ -253,6 +253,15 @@ impl BranchDataModel {
 mod tests {
     use super::*;
 
+    fn prepare_model() -> BranchDataModel {
+        let mut model = BranchDataModel::new();
+        model.insert_from_git_native_branch("* _main/feature/_root/feature1");
+        model.insert_from_git_native_branch("  _main/feature/_root/feature2");
+        model.insert_from_git_native_branch("  _main/feature/root");
+        model.insert_from_git_native_branch("  main");
+        model
+    }
+
     #[test]
     fn test_sym_node_add_children_from_qualified_path_empty() {
         let mut root = SymNode::new("root", None);
@@ -275,5 +284,55 @@ mod tests {
         let bar = root.get_child("foo").unwrap().get_child("bar");
         assert!(bar.is_some());
         assert!(bar.unwrap().branch_data.is_some());
+    }
+    #[test]
+    fn test_branch_model_insert_branches() {
+        let model = prepare_model();
+        assert!(
+            model
+                .qualified_paths_of_existing_branches
+                .contains(&"main".to_string())
+        );
+        assert!(
+            model
+                .qualified_paths_of_existing_branches
+                .contains(&"feature/root".to_string())
+        );
+        assert!(
+            model
+                .qualified_paths_of_existing_branches
+                .contains(&"feature/root/feature1".to_string())
+        );
+        assert!(
+            model
+                .qualified_paths_of_existing_branches
+                .contains(&"feature/root/feature2".to_string())
+        );
+    }
+    #[test]
+    fn test_branch_model_get_git_branch() {
+        let model = prepare_model();
+        assert_eq!(model.get_git_branch("main").unwrap(), "main");
+        assert_eq!(
+            model.get_git_branch("feature/root").unwrap(),
+            "feature/root"
+        );
+        assert_eq!(
+            model.get_git_branch("feature/root/feature1").unwrap(),
+            "feature/_root/feature1"
+        );
+        assert_eq!(
+            model.get_git_branch("feature/root/feature2").unwrap(),
+            "feature/_root/feature2"
+        );
+    }
+    #[test]
+    fn test_sym_path_qualified_name() {
+        let model = prepare_model();
+        let path = model
+            .get_global_root()
+            .get_path("feature/root/feature1")
+            .unwrap();
+        assert_eq!(path.get_qualified_path(), "feature/root/feature1");
     }
 }

@@ -26,10 +26,7 @@ impl CommandDefinition for BranchCommand {
 }
 
 impl CommandInterface for BranchCommand {
-    fn run_command(
-        &self,
-        context: &mut CommandContext,
-    ) -> Result<(), Box<dyn Error>> {
+    fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let maybe_feature_tree = context.git.get_model().get_feature_root();
         if maybe_feature_tree.is_none() {
             return Ok(());

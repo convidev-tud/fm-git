@@ -22,10 +22,7 @@ impl CommandDefinition for DeriveCommand {
 }
 
 impl CommandInterface for DeriveCommand {
-    fn run_command(
-        &self,
-        context: &mut CommandContext,
-    ) -> Result<(), Box<dyn Error>> {
+    fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         // let all_targets = get_argument_values::<String>(args, "features");
         // let target_branch = get_argument_value(args, "name");
         // let main = { context.git.get_main_branch() };

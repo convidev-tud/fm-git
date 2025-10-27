@@ -25,10 +25,7 @@ impl CommandDefinition for CheckoutCommand {
     }
 }
 impl CommandInterface for CheckoutCommand {
-    fn run_command(
-        &self,
-        context: &mut CommandContext,
-    ) -> Result<(), Box<dyn Error>> {
+    fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let branch_any_name = get_argument_value::<String>("branch", context.arg_matches);
         let new_feature = get_argument_value::<bool>("new-feature", context.arg_matches);
         let result = context
