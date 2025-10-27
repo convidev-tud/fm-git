@@ -1,4 +1,4 @@
-use crate::cli::util::{currently_editing, get_argument_value, get_argument_values};
+use crate::cli::util::currently_editing;
 use crate::cli::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::error::Error;
@@ -44,7 +44,7 @@ impl CommandInterface for DeriveCommand {
     fn shell_complete(
         &self,
         appendix: Vec<&str>,
-        _current: &CommandMap,
+        current: &CommandMap,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
         let maybe_last = appendix.last();
@@ -53,13 +53,13 @@ impl CommandInterface for DeriveCommand {
         } else {
             ""
         };
-        if currently_editing("--name", &appendix) {
+        if currently_editing(&current.clap_command, &appendix) == Some("".to_string()) {
             return Ok(vec![]);
         }
         let completion = context
             .git
-            .get_model()?
-            .get_unique_feature_names()
+            .get_model()
+            .get_short_feature_names()
             .into_iter()
             .filter(|s| s.starts_with(last))
             .map(|s| s.to_string())

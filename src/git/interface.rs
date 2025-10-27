@@ -44,10 +44,10 @@ impl GitInterface {
             .collect();
         for branch in all_branches {
             self.model.insert_from_git_native_branch(&branch);
-        };
+        }
         Ok(())
     }
-    pub fn get_model(&mut self) -> &BranchDataModel {
+    pub fn get_model(&self) -> &BranchDataModel {
         &self.model
     }
     pub fn checkout_global_root(&self) -> Result<Output, io::Error> {
@@ -63,11 +63,11 @@ impl GitInterface {
                 format!("Cannot checkout branch {}: does not exist", branch).as_str(),
             )));
         }
-        Ok(self.raw_git_interface.checkout(
+        Ok(self.raw_git_interface.run(vec![
+            "checkout",
             self.model
                 .get_git_branch(maybe_qualified_path.unwrap().as_str())
                 .unwrap(),
-            false,
-        )?)
+        ])?)
     }
 }

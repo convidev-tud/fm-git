@@ -19,8 +19,8 @@ impl SymNode {
             children: Vec::new(),
         }
     }
-    pub fn add_child(&mut self, name: &str) {
-        self.children.push(SymNode::new(name));
+    pub fn add_child(&mut self, node: SymNode) {
+        self.children.push(node);
     }
     pub fn iter_children(&self) -> std::slice::Iter<'_, SymNode> {
         self.children.iter()
@@ -31,19 +31,22 @@ impl SymNode {
     pub fn get_child_mut(&mut self, name: &str) -> Option<&mut SymNode> {
         self.children.iter_mut().find(|s| s.name == name)
     }
-    pub fn add_children_recursive(&mut self, qualified_path: Vec<&str>) {
-        if qualified_path.is_empty() {
+    fn insert_from_split_path(&mut self, path: Vec<&str>) {
+        if path.is_empty() {
             return;
         }
-        let name = qualified_path[0];
+        let name = path[0];
         let next_child: &mut SymNode = match self.get_child_mut(name) {
             Some(node) => node,
             None => {
-                self.add_child(name);
+                self.add_child(SymNode::new(name));
                 self.get_child_mut(name).unwrap()
             }
         };
-        next_child.add_children_recursive(qualified_path[1..].to_vec());
+        next_child.insert_from_split_path(path[1..].to_vec());
+    }
+    pub fn insert_qualified_path(&mut self, qualified_path: &str) {
+        self.insert_from_split_path(qualified_path.split('/').collect::<Vec<_>>());
     }
 }
 
@@ -115,7 +118,8 @@ impl BranchDataModel {
             }
         }
         if converted_branch != self.root_node.name {
-            self.root_node.add_children_recursive(split_branch);
+            self.root_node
+                .insert_qualified_path(converted_branch.as_str());
         }
     }
     pub fn get_global_root(&self) -> &SymNode {
@@ -187,5 +191,32 @@ impl BranchDataModel {
             }
             None => branch.to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sym_node_add_children_from_qualified_path_empty() {
+        let mut root = SymNode::new("root");
+        root.insert_qualified_path("foo/bar");
+        let foo = root.get_child("foo");
+        assert!(foo.is_some());
+        let bar = foo.unwrap().get_child("bar");
+        assert!(bar.is_some());
+    }
+    #[test]
+    fn test_sym_node_add_children_from_qualified_path_prefilled() {
+        let mut root = SymNode::new("root");
+        {
+            root.insert_qualified_path("foo");
+            let foo = root.get_child_mut("foo");
+            assert!(foo.is_some());
+        };
+        root.insert_qualified_path("foo/bar");
+        let bar = root.get_child("foo").unwrap().get_child("bar");
+        assert!(bar.is_some());
     }
 }

@@ -32,7 +32,7 @@ impl CommandInterface for BranchCommand {
         _current: &CommandMap,
         state: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
-        let maybe_feature_tree = state.git.get_model()?.get_feature_root();
+        let maybe_feature_tree = state.git.get_model().get_feature_root();
         if maybe_feature_tree.is_none() {
             return Ok(());
         }

@@ -32,7 +32,9 @@ impl CommandInterface for CheckoutCommand {
     ) -> Result<(), Box<dyn Error>> {
         let branch_any_name = get_argument_value::<String>("branch", args);
         let new_feature = get_argument_value::<bool>("new-feature", args);
-        let result = context.git.checkout(branch_any_name.as_str(), new_feature)?;
+        let result = context
+            .git
+            .checkout(branch_any_name.as_str(), new_feature)?;
         context.log_from_output(&result);
         Ok(())
     }
