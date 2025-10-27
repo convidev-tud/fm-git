@@ -1,6 +1,7 @@
-use crate::cli::util::{currently_editing, get_argument_value};
+use crate::cli::completion::CompletionHelper;
+use crate::cli::util::get_argument_value;
 use crate::cli::*;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
@@ -26,12 +27,10 @@ impl CommandDefinition for CheckoutCommand {
 impl CommandInterface for CheckoutCommand {
     fn run_command(
         &self,
-        args: &ArgMatches,
-        _current: &CommandMap,
         context: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
-        let branch_any_name = get_argument_value::<String>("branch", args);
-        let new_feature = get_argument_value::<bool>("new-feature", args);
+        let branch_any_name = get_argument_value::<String>("branch", context.arg_matches);
+        let new_feature = get_argument_value::<bool>("new-feature", context.arg_matches);
         let result = context
             .git
             .checkout(branch_any_name.as_str(), new_feature)?;
@@ -40,12 +39,12 @@ impl CommandInterface for CheckoutCommand {
     }
     fn shell_complete(
         &self,
-        appendix: Vec<&str>,
-        current: &CommandMap,
+        completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
+        let appendix = completion_helper.get_appendix();
         let last = appendix[appendix.len() - 1];
-        let current = currently_editing(&current.clap_command, &appendix);
+        let current = completion_helper.currently_editing();
         if current.is_none() {
             return Ok(vec![]);
         }

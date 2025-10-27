@@ -1,5 +1,6 @@
+use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
@@ -17,11 +18,9 @@ impl CommandDefinition for HiddenCompletionCommand {
 impl CommandInterface for HiddenCompletionCommand {
     fn run_command(
         &self,
-        args: &ArgMatches,
-        _current: &CommandMap,
-        state: &mut CommandContext,
+        context: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
-        let mut to_complete = args
+        let to_complete = context.arg_matches
             .get_many::<String>("cli")
             .unwrap()
             .map(|s| s.as_str())
@@ -29,8 +28,8 @@ impl CommandInterface for HiddenCompletionCommand {
         if to_complete.is_empty() {
             return Ok(());
         }
-        let maybe_last_child = state
-            .command_map
+        let maybe_last_child = context
+            .root_command
             .find_last_child_recursive(&mut to_complete.clone());
         let last_item = <&str>::clone(to_complete.last().unwrap());
         match maybe_last_child {
@@ -47,7 +46,7 @@ impl CommandInterface for HiddenCompletionCommand {
                 }
                 for subcommand in subcommands {
                     if subcommand != "__completion" {
-                        state.log_to_stdout(subcommand)
+                        context.log_to_stdout(subcommand)
                     }
                 }
                 if last_item.starts_with("-") {
@@ -66,7 +65,7 @@ impl CommandInterface for HiddenCompletionCommand {
                                 let mut s = "-".to_string();
                                 s.push_str(short.unwrap().to_string().as_str());
                                 if s.starts_with(last_item) {
-                                    state.log_to_stdout(s)
+                                    context.log_to_stdout(s)
                                 }
                             }
                         }
@@ -75,19 +74,18 @@ impl CommandInterface for HiddenCompletionCommand {
                             let mut s = "--".to_string();
                             s.push_str(long.unwrap());
                             if s.starts_with(last_item) {
-                                state.log_to_stdout(s)
+                                context.log_to_stdout(s)
                             }
                         }
                     }
                 }
                 let completion = last_child.command.shell_complete(
-                    to_complete[1..].to_vec(),
-                    last_child,
-                    state,
+                    CompletionHelper::new(&last_child.clap_command, to_complete[1..].to_vec()),
+                    context,
                 )?;
                 match completion.len() {
                     0 => {}
-                    _ => state.log_to_stdout(&*completion.join(" ")),
+                    _ => context.log_to_stdout(&*completion.join(" ")),
                 }
             }
             None => {}

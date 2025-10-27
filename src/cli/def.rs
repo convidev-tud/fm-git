@@ -1,3 +1,4 @@
+use crate::cli::completion::CompletionHelper;
 use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
 use clap::{ArgMatches, Command};
@@ -71,13 +72,25 @@ impl CommandMap {
 
 #[derive(Debug)]
 pub struct CommandContext<'a> {
-    pub command_map: &'a CommandMap,
+    pub current_command: &'a CommandMap,
+    pub root_command: &'a CommandMap,
+    pub arg_matches: &'a ArgMatches,
     pub git: &'a mut GitInterface,
 }
 
 impl CommandContext<'_> {
-    pub fn new<'a>(command_map: &'a CommandMap, git: &'a mut GitInterface) -> CommandContext<'a> {
-        CommandContext { command_map, git }
+    pub fn new<'a>(
+        current_command: &'a CommandMap,
+        root_command: &'a CommandMap,
+        arg_matches: &'a ArgMatches,
+        git: &'a mut GitInterface,
+    ) -> CommandContext<'a> {
+        CommandContext {
+            current_command,
+            root_command,
+            arg_matches,
+            git,
+        }
     }
     pub fn log_from_output(&self, output: &Output) {
         self.log_to_stdout(u8_to_string(&output.stdout));
@@ -105,18 +118,12 @@ pub trait CommandDefinition: Debug {
 }
 
 pub trait CommandInterface: Debug {
-    fn run_command(
-        &self,
-        _args: &ArgMatches,
-        _current: &CommandMap,
-        _context: &mut CommandContext,
-    ) -> Result<(), Box<dyn Error>> {
+    fn run_command(&self, _context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     fn shell_complete(
         &self,
-        _appendix: Vec<&str>,
-        _current: &CommandMap,
+        _completion_helper: CompletionHelper,
         _context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
         Ok(Vec::new())

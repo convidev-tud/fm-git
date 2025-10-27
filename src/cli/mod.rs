@@ -1,4 +1,5 @@
 mod commands;
+mod completion;
 pub mod def;
 pub mod repo;
 mod util;

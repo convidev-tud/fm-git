@@ -138,7 +138,7 @@ impl BranchDataModel {
             qualified_paths_of_existing_branches: Vec::new(),
         }
     }
-    pub fn transform_to_qualified_paths<S: Into<String>>(&mut self, path: S) -> String {
+    pub fn transform_to_qualified_paths<S: Into<String>>(&self, path: S) -> String {
         path.into().replace("*", "").replace("_", "")
     }
     pub fn insert_from_git_native_branch(&mut self, branch: &str) {

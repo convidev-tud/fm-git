@@ -1,6 +1,6 @@
-use crate::cli::util::currently_editing;
+use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
@@ -24,8 +24,6 @@ impl CommandDefinition for DeriveCommand {
 impl CommandInterface for DeriveCommand {
     fn run_command(
         &self,
-        args: &ArgMatches,
-        _current: &CommandMap,
         context: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
         // let all_targets = get_argument_values::<String>(args, "features");
@@ -43,12 +41,12 @@ impl CommandInterface for DeriveCommand {
     }
     fn shell_complete(
         &self,
-        appendix: Vec<&str>,
-        current: &CommandMap,
+        completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
+        let appendix = completion_helper.get_appendix();
         let last = appendix[appendix.len() - 1];
-        let current = currently_editing(&current.clap_command, &appendix);
+        let current = completion_helper.currently_editing();
         if current.is_none() {
             return Ok(vec![]);
         }

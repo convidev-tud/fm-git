@@ -1,6 +1,6 @@
 use crate::cli::*;
 use crate::git::model::SymNode;
-use clap::{ArgMatches, Command};
+use clap::Command;
 use std::error::Error;
 use termtree::Tree;
 
@@ -28,17 +28,15 @@ impl CommandDefinition for BranchCommand {
 impl CommandInterface for BranchCommand {
     fn run_command(
         &self,
-        _args: &ArgMatches,
-        _current: &CommandMap,
-        state: &mut CommandContext,
+        context: &mut CommandContext,
     ) -> Result<(), Box<dyn Error>> {
-        let maybe_feature_tree = state.git.get_model().get_feature_root();
+        let maybe_feature_tree = context.git.get_model().get_feature_root();
         if maybe_feature_tree.is_none() {
             return Ok(());
         }
         let feature_tree = maybe_feature_tree.unwrap();
         for tree in transform_to_printable(feature_tree) {
-            state.log_to_stdout(tree.to_string().trim().to_string());
+            context.log_to_stdout(tree.to_string().trim().to_string());
         }
         Ok(())
     }
