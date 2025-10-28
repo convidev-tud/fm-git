@@ -41,6 +41,7 @@ impl CommandInterface for DeriveCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
+        let current_area = context.git.get_current_area()?;
         let appendix = completion_helper.get_appendix();
         let last = appendix[appendix.len() - 1];
         let current = completion_helper.currently_editing();
@@ -52,8 +53,7 @@ impl CommandInterface for DeriveCommand {
                 let completion = context
                     .git
                     .get_model()
-                    .get_short_feature_names()
-                    .into_iter()
+                    .iter_all_features_with_branches_of(current_area.as_str())
                     .filter(|s| s.starts_with(last))
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();

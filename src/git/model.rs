@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 pub const FEATURES_PREFIX: &str = "feature";
 pub const PRODUCTS_PREFIX: &str = "product";
 
@@ -32,8 +30,8 @@ impl SymNode {
             branch_data,
         }
     }
-    pub fn get_name(&self) -> &str {
-        self.name.as_str()
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
     pub fn get_branch_data(&self) -> Option<&BranchData> {
         match &self.branch_data {
@@ -47,8 +45,15 @@ impl SymNode {
     pub fn add_child(&mut self, node: SymNode) {
         self.children.push(node);
     }
-    pub fn iter_children_flat(&self) -> std::slice::Iter<'_, SymNode> {
+    pub fn iter_children_flat(&self) -> impl Iterator<Item = &SymNode> {
         self.children.iter()
+    }
+    pub fn iter_children_req(&self) -> impl Iterator<Item = &SymNode> {
+        self.iter_children_flat()
+            .map(|child| child.iter_children_req())
+            .flatten()
+            .collect::<Vec<&SymNode>>()
+            .into_iter()
     }
     pub fn get_child(&self, name: &str) -> Option<&SymNode> {
         self.children.iter().find(|s| s.get_name() == name)
@@ -77,11 +82,10 @@ impl SymNode {
     pub fn insert_qualified_path(&mut self, qualified_path: &str, branch_data: Option<BranchData>) {
         self.insert_from_split_path(qualified_path.split('/').collect::<Vec<_>>(), branch_data);
     }
-    pub fn get_path(&self, qualified_path: &str) -> Option<SymPath<'_>> {
+    pub fn get_path<S: Into<String>>(&self, qualified_path: S) -> Option<SymPath<'_>> {
         let mut current = self;
         let mut node_vec: Vec<&SymNode> = Vec::new();
-        node_vec.push(current);
-        for name in qualified_path.split('/') {
+        for name in qualified_path.into().split('/') {
             let maybe_child = current.get_child(name);
             if maybe_child.is_some() {
                 let child = maybe_child.unwrap();
@@ -106,10 +110,15 @@ impl<'a> SymPath<'a> {
     pub fn get_qualified_path(&self) -> String {
         self.node_path
             .iter()
-            .fold(String::new(), |acc, node| acc + "/" + node.get_name())
+            .map(|e| e.get_name().to_string())
+            .collect::<Vec<_>>()
+            .join("/")
     }
     pub fn get_last(&self) -> Option<&&SymNode> {
         self.node_path.last()
+    }
+    pub fn get_first(&self) -> Option<&&SymNode> {
+        self.node_path.first()
     }
 }
 
@@ -121,7 +130,6 @@ pub enum NodeType {
 #[derive(Clone, Debug)]
 pub struct BranchDataModel {
     root_node: SymNode,
-    feature_short_name_to_qualified_paths: HashMap<String, Vec<String>>,
     qualified_paths_of_existing_branches: Vec<String>,
 }
 impl BranchDataModel {
@@ -134,7 +142,6 @@ impl BranchDataModel {
     pub fn new() -> Self {
         Self {
             root_node: SymNode::new("", None),
-            feature_short_name_to_qualified_paths: HashMap::new(),
             qualified_paths_of_existing_branches: Vec::new(),
         }
     }
@@ -144,28 +151,12 @@ impl BranchDataModel {
     pub fn insert_from_git_native_branch(&mut self, branch: &str) {
         let without_star = branch.replace("*", "").trim().to_string();
         let converted_branch = self.transform_to_qualified_path(&without_star);
-        let split_branch = converted_branch.split("/").collect::<Vec<&str>>();
         if !self
             .qualified_paths_of_existing_branches
             .contains(&converted_branch)
         {
             self.qualified_paths_of_existing_branches
                 .push(converted_branch.clone());
-        }
-        if converted_branch.starts_with(FEATURES_PREFIX) {
-            let feature_name = split_branch.last().unwrap().to_string();
-            if !self
-                .feature_short_name_to_qualified_paths
-                .contains_key(&feature_name)
-            {
-                self.feature_short_name_to_qualified_paths
-                    .insert(feature_name.clone(), vec![converted_branch.clone()]);
-            } else {
-                self.feature_short_name_to_qualified_paths
-                    .get_mut(&feature_name)
-                    .unwrap()
-                    .push(converted_branch.clone());
-            }
         }
         if converted_branch != self.root_node.name {
             self.root_node.insert_qualified_path(
@@ -177,53 +168,29 @@ impl BranchDataModel {
     pub fn get_global_root(&self) -> &SymNode {
         &self.root_node
     }
-    pub fn get_feature_root(&self) -> Option<&SymNode> {
-        self.root_node.get_child(FEATURES_PREFIX)
+    pub fn get_feature_root_of(&self, area: &str) -> Option<&SymNode> {
+        let area_node = self.root_node.get_child(area)?;
+        area_node.get_child(FEATURES_PREFIX)
     }
-    pub fn get_product_root(&self) -> Option<&SymNode> {
-        self.root_node.get_child(PRODUCTS_PREFIX)
+    pub fn get_product_root_of(&self, area: &str) -> Option<&SymNode> {
+        let area_node = self.root_node.get_child(area)?;
+        area_node.get_child(PRODUCTS_PREFIX)
     }
-    pub fn get_short_feature_names(&self) -> Vec<String> {
-        let mut unique: Vec<String> = Vec::new();
-        self.feature_short_name_to_qualified_paths
+    pub fn iter_all_features_with_branches_of(&self, area: &str) -> impl Iterator<Item = &String> {
+        self.qualified_paths_of_existing_branches
             .iter()
-            .filter_map(|(k, v)| match v.len() {
-                0 => {
-                    panic!("Must be a bug")
-                }
-                1 => Some(vec![k.clone()]),
-                _ => None,
-            })
-            .for_each(|e| unique.extend(e));
-        unique
-    }
-    pub fn get_long_name_from_short(&self, name: &str) -> Option<&str> {
-        let long_names = self.feature_short_name_to_qualified_paths.get(name)?;
-        match long_names.len() {
-            0 => None,
-            1 => Some(&long_names[0]),
-            _ => None,
-        }
+            .filter(|name| name.starts_with(&(area.to_string() + "/" + FEATURES_PREFIX)))
     }
     pub fn get_git_branch(&self, qualified_path: &str) -> Option<String> {
         let path = self.get_global_root().get_path(qualified_path)?;
         let branch = path.get_last()?.get_branch_data()?.get_git_branch();
         Some(branch.clone())
     }
-    pub fn get_all_qualified_paths(&self) -> &Vec<String> {
-        &self.qualified_paths_of_existing_branches
+    pub fn iter_all_qualified_paths(&self) -> impl Iterator<Item = &String> {
+        self.qualified_paths_of_existing_branches.iter()
     }
-    pub fn expand_from_short(&self, name: &str) -> Option<String> {
-        if self
-            .qualified_paths_of_existing_branches
-            .contains(&name.into())
-        {
-            return Some(name.to_string());
-        }
-        match self.get_long_name_from_short(self.strip_branch_type(name).as_str()) {
-            Some(long_name) => Some(long_name.to_string()),
-            None => None,
-        }
+    pub fn has_qualified_path(&self, qualified_path: &str) -> bool {
+        self.qualified_paths_of_existing_branches.contains(&qualified_path.to_string())
     }
     pub fn branch_type(&self, branch: &str) -> Option<NodeType> {
         let feature_path = BranchDataModel::feature_path_prefix();
@@ -296,17 +263,17 @@ mod tests {
         assert!(
             model
                 .qualified_paths_of_existing_branches
-                .contains(&"feature/root".to_string())
+                .contains(&"main/feature/root".to_string())
         );
         assert!(
             model
                 .qualified_paths_of_existing_branches
-                .contains(&"feature/root/feature1".to_string())
+                .contains(&"main/feature/root/feature1".to_string())
         );
         assert!(
             model
                 .qualified_paths_of_existing_branches
-                .contains(&"feature/root/feature2".to_string())
+                .contains(&"main/feature/root/feature2".to_string())
         );
     }
     #[test]
@@ -314,16 +281,16 @@ mod tests {
         let model = prepare_model();
         assert_eq!(model.get_git_branch("main").unwrap(), "main");
         assert_eq!(
-            model.get_git_branch("feature/root").unwrap(),
-            "feature/root"
+            model.get_git_branch("main/feature/root").unwrap(),
+            "_main/feature/root"
         );
         assert_eq!(
-            model.get_git_branch("feature/root/feature1").unwrap(),
-            "feature/_root/feature1"
+            model.get_git_branch("main/feature/root/feature1").unwrap(),
+            "_main/feature/_root/feature1"
         );
         assert_eq!(
-            model.get_git_branch("feature/root/feature2").unwrap(),
-            "feature/_root/feature2"
+            model.get_git_branch("main/feature/root/feature2").unwrap(),
+            "_main/feature/_root/feature2"
         );
     }
     #[test]
@@ -331,8 +298,8 @@ mod tests {
         let model = prepare_model();
         let path = model
             .get_global_root()
-            .get_path("feature/root/feature1")
+            .get_path("main/feature/root/feature1")
             .unwrap();
-        assert_eq!(path.get_qualified_path(), "feature/root/feature1");
+        assert_eq!(path.get_qualified_path(), "main/feature/root/feature1");
     }
 }

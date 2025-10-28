@@ -28,9 +28,7 @@ impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let branch_any_name = get_argument_value::<String>("branch", context.arg_matches);
         let new_feature = get_argument_value::<bool>("new-feature", context.arg_matches);
-        let result = context
-            .git
-            .checkout(branch_any_name.as_str(), new_feature)?;
+        let result = context.git.checkout(branch_any_name.as_str())?;
         context.log_from_output(&result);
         Ok(())
     }
@@ -49,8 +47,7 @@ impl CommandInterface for CheckoutCommand {
             "branch" => Ok(context
                 .git
                 .get_model()
-                .get_all_qualified_paths()
-                .iter()
+                .iter_all_qualified_paths()
                 .filter(|s| s.starts_with(last))
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()),

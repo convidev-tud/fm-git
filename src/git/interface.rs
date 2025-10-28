@@ -1,5 +1,5 @@
 use crate::git::error::{GitError, GitInterfaceError};
-use crate::git::model::BranchDataModel;
+use crate::git::model::{BranchDataModel, SymPath};
 use crate::util::u8_to_string;
 use std::io;
 use std::process::{Command, Output};
@@ -9,9 +9,6 @@ struct RawGitInterface;
 impl RawGitInterface {
     fn build_git_command(&self) -> Command {
         Command::new("git")
-    }
-    pub fn get_default_branch(&self) -> &str {
-        "main"
     }
     pub fn run(&self, args: Vec<&str>) -> io::Result<Output> {
         self.build_git_command().args(args).output()
@@ -27,7 +24,7 @@ impl GitInterface {
     pub fn new() -> Self {
         let raw_interface = RawGitInterface {};
         let mut interface = Self {
-            model: BranchDataModel::new(raw_interface.get_default_branch()),
+            model: BranchDataModel::new(),
             raw_git_interface: raw_interface,
         };
         match interface.update_complete_model() {
@@ -49,22 +46,33 @@ impl GitInterface {
     pub fn get_model(&self) -> &BranchDataModel {
         &self.model
     }
-    pub fn checkout_global_root(&self) -> Result<Output, io::Error> {
-        self.raw_git_interface.run(vec![
-            "checkout",
-            self.raw_git_interface.get_default_branch(),
-        ])
+    pub fn get_current_qualified_branch_name(&self) -> Result<String, GitError> {
+        Ok(self.model.transform_to_qualified_path(u8_to_string(
+            &self
+                .raw_git_interface
+                .run(vec!["branch", "--show-current"])?
+                .stdout,
+        )))
     }
-    pub fn checkout(&self, branch: &str, create: bool) -> Result<Output, GitError> {
-        let maybe_qualified_path = self.model.expand_from_short(branch);
-        if maybe_qualified_path.is_none() {
+    pub fn get_current_path(&'_ self) -> Result<SymPath<'_>, GitError> {
+        Ok(self
+            .model
+            .get_global_root()
+            .get_path(self.get_current_qualified_branch_name()?)
+            .unwrap())
+    }
+    pub fn get_current_area(&self) -> Result<String, GitError> {
+        Ok(self.get_current_path()?.get_first().unwrap().get_name().clone())
+    }
+    pub fn checkout(&self, qualified_path: &str) -> Result<Output, GitError> {
+        if !self.model.has_qualified_path(qualified_path) {
             return Err(GitError::GitInterface(GitInterfaceError::new(
-                format!("Cannot checkout branch {}: does not exist", branch).as_str(),
+                format!("Cannot checkout branch {}: does not exist", qualified_path).as_str(),
             )));
         }
         Ok(self.raw_git_interface.run(vec![
             "checkout",
-            self.model.get_git_branch(branch).unwrap().as_str(),
+            self.model.get_git_branch(qualified_path).unwrap().as_str(),
         ])?)
     }
 }

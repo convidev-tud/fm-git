@@ -4,7 +4,7 @@ use clap::Command;
 use std::error::Error;
 use termtree::Tree;
 
-fn transform_to_printable(root: &SymNode) -> Vec<Tree<&str>> {
+fn transform_to_printable(root: &SymNode) -> Vec<Tree<&String>> {
     root.iter_children_flat()
         .map(|child| {
             let mut tree = Tree::new(child.get_name());
@@ -27,7 +27,11 @@ impl CommandDefinition for BranchCommand {
 
 impl CommandInterface for BranchCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let maybe_feature_tree = context.git.get_model().get_feature_root();
+        let current_branch = context.git.get_current_path()?;
+        let maybe_feature_tree = context
+            .git
+            .get_model()
+            .get_feature_root_of(current_branch.get_first().unwrap().get_name());
         if maybe_feature_tree.is_none() {
             return Ok(());
         }
