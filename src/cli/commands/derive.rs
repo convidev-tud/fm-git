@@ -41,7 +41,7 @@ impl CommandInterface for DeriveCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let current_area = context.git.get_current_area()?;
+        let current_area = context.git.get_current_area_node()?;
         let appendix = completion_helper.get_appendix();
         let last = appendix[appendix.len() - 1];
         let current = completion_helper.currently_editing();

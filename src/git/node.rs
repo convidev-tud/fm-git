@@ -190,7 +190,8 @@ impl BranchDataModel {
         self.qualified_paths_of_existing_branches.iter()
     }
     pub fn has_qualified_path(&self, qualified_path: &str) -> bool {
-        self.qualified_paths_of_existing_branches.contains(&qualified_path.to_string())
+        self.qualified_paths_of_existing_branches
+            .contains(&qualified_path.to_string())
     }
     pub fn branch_type(&self, branch: &str) -> Option<NodeType> {
         let feature_path = BranchDataModel::feature_path_prefix();

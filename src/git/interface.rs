@@ -1,5 +1,5 @@
 use crate::git::error::{GitError, GitInterfaceError};
-use crate::git::model::{BranchDataModel, SymPath};
+use crate::git::model::*;
 use crate::util::u8_to_string;
 use std::io;
 use std::process::{Command, Output};
@@ -17,14 +17,14 @@ impl RawGitInterface {
 
 #[derive(Clone, Debug)]
 pub struct GitInterface {
-    model: BranchDataModel,
+    model: TreeDataModel,
     raw_git_interface: RawGitInterface,
 }
 impl GitInterface {
     pub fn new() -> Self {
         let raw_interface = RawGitInterface {};
         let mut interface = Self {
-            model: BranchDataModel::new(),
+            model: TreeDataModel::new(),
             raw_git_interface: raw_interface,
         };
         match interface.update_complete_model() {
@@ -43,26 +43,26 @@ impl GitInterface {
         }
         Ok(())
     }
-    pub fn get_model(&self) -> &BranchDataModel {
+    pub fn get_model(&self) -> &TreeDataModel {
         &self.model
     }
     pub fn get_current_qualified_branch_name(&self) -> Result<String, GitError> {
-        Ok(self.model.transform_to_qualified_path(u8_to_string(
+        Ok(TreeDataModel::transform_to_qualified_path(u8_to_string(
             &self
                 .raw_git_interface
                 .run(vec!["branch", "--show-current"])?
                 .stdout,
         )))
     }
-    pub fn get_current_path(&'_ self) -> Result<SymPath<'_>, GitError> {
-        Ok(self
-            .model
-            .get_global_root()
-            .get_path(self.get_current_qualified_branch_name()?)
-            .unwrap())
-    }
-    pub fn get_current_area(&self) -> Result<String, GitError> {
-        Ok(self.get_current_path()?.get_first().unwrap().get_name().clone())
+    pub fn get_current_area_node(&self) -> Result<&AreaNode, GitError> {
+        let current_branch = self.get_current_qualified_branch_name()?;
+        let current_split_branch = current_branch
+            .split("/")
+            .collect::<Vec<&str>>();
+        let current_area_name = current_split_branch
+            .first()
+            .unwrap();
+        Ok(self.model.get_area_node(current_area_name).unwrap())
     }
     pub fn checkout(&self, qualified_path: &str) -> Result<Output, GitError> {
         if !self.model.has_qualified_path(qualified_path) {

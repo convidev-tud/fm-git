@@ -1,3 +1,4 @@
 mod error;
 pub mod interface;
-pub mod model;
+mod model;
+pub mod node;

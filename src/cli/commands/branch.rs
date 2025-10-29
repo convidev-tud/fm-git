@@ -1,5 +1,5 @@
 use crate::cli::*;
-use crate::git::model::SymNode;
+use crate::git::node::SymNode;
 use clap::Command;
 use std::error::Error;
 use termtree::Tree;
