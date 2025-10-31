@@ -56,12 +56,8 @@ impl GitInterface {
     }
     pub fn get_current_area_node(&self) -> Result<&AreaNode, GitError> {
         let current_branch = self.get_current_qualified_branch_name()?;
-        let current_split_branch = current_branch
-            .split("/")
-            .collect::<Vec<&str>>();
-        let current_area_name = current_split_branch
-            .first()
-            .unwrap();
+        let current_split_branch = current_branch.split("/").collect::<Vec<&str>>();
+        let current_area_name = current_split_branch.first().unwrap();
         Ok(self.model.get_area_node(current_area_name).unwrap())
     }
     pub fn checkout(&self, qualified_path: &str) -> Result<Output, GitError> {
