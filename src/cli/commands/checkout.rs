@@ -1,5 +1,4 @@
 use crate::cli::completion::CompletionHelper;
-use crate::cli::util::get_argument_value;
 use crate::cli::*;
 use clap::{Arg, ArgAction, Command};
 use std::error::Error;
@@ -26,9 +25,9 @@ impl CommandDefinition for CheckoutCommand {
 }
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let branch_any_name = get_argument_value::<String>("branch", context.arg_matches);
-        let new_feature = get_argument_value::<bool>("new-feature", context.arg_matches);
-        let result = context.git.checkout(branch_any_name.as_str())?;
+        let branch_any_name = context.arg_helper.get_argument_value::<String>("branch");
+        let new_feature = context.arg_helper.get_argument_value::<bool>("new-feature");
+        let result = context.git.checkout(branch_any_name.as_str(), false)?;
         context.log_from_output(&result);
         Ok(())
     }

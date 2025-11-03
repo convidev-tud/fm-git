@@ -1,7 +1,5 @@
 use crate::git::model::*;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use termtree::Tree;
 
 #[derive(Clone, Debug)]
@@ -9,7 +7,7 @@ pub struct Node {
     name: String,
     node_type: NodeType,
     git_branch: Option<String>,
-    children: HashMap<String, Rc<RefCell<Node>>>,
+    children: HashMap<String, Node>,
 }
 impl Node {
     pub fn new<S: Into<String>>(name: S, node_type: NodeType, git_branch: Option<S>) -> Self {
@@ -25,19 +23,21 @@ impl Node {
         }
     }
     fn add_child(&mut self, child: Node) {
-        self.children
-            .insert(child.name.clone(), Rc::new(RefCell::new(child)));
+        self.children.insert(child.name.clone(), child);
     }
-    fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<Rc<RefCell<Node>>> {
-        Some(self.children.get(&name.into())?.clone())
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
-    pub fn get_child<S: Into<String>>(&self, name: S) -> Option<Rc<RefCell<Node>>> {
-        Some(self.children.get(&name.into())?.clone())
+    pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Node> {
+        Some(self.children.get(&name.into())?)
+    }
+    fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
+        Some(self.children.get_mut(&name.into())?)
     }
     pub fn get_branch(&self) -> Option<&String> {
         self.git_branch.as_ref()
     }
-    pub fn get_from_path(&self, path: Vec<&str>) -> Option<Rc<RefCell<Node>>> {
+    pub fn get_from_path(&self, path: Vec<&str>) -> Option<&Node> {
         if path.is_empty() {
             return None;
         }
@@ -45,7 +45,7 @@ impl Node {
         match maybe_child {
             Some(child) => match path.len() {
                 1 => Some(child),
-                _ => child.borrow().get_from_path(path[1..].to_vec()),
+                _ => child.get_from_path(path[1..].to_vec()),
             },
             None => None,
         }
@@ -65,7 +65,7 @@ impl Node {
         match path.len() {
             1 => {
                 match self.get_child_mut(name) {
-                    Some(node) => node.borrow_mut().set_git_branch(branch),
+                    Some(node) => node.set_git_branch(branch),
                     None => {
                         self.add_child(Node::new(
                             name,
@@ -88,16 +88,14 @@ impl Node {
                         self.get_child_mut(name).unwrap()
                     }
                 };
-                next_child
-                    .borrow_mut()
-                    .insert_path(path[1..].to_vec(), branch);
+                next_child.insert_path(path[1..].to_vec(), branch);
             }
         }
     }
     fn build_display_tree(&self) -> Tree<String> {
         let mut tree = Tree::<String>::new(self.name.clone());
         for child in self.children.values() {
-            tree.leaves.push(child.borrow().build_display_tree());
+            tree.leaves.push(child.build_display_tree());
         }
         tree
     }

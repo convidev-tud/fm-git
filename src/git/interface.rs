@@ -1,10 +1,8 @@
 use crate::git::error::{GitError, GitInterfaceError};
 use crate::git::model::*;
 use crate::util::u8_to_string;
-use std::cell::RefCell;
 use std::io;
 use std::process::{Command, Output};
-use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 struct RawGitInterface;
@@ -57,28 +55,50 @@ impl GitInterface {
         ))
     }
     pub fn get_current_qualified_path(&self) -> Result<String, GitError> {
-        Ok(TreeDataModel::transform_to_qualified_path(self.get_current_branch()?))
+        Ok(TreeDataModel::transform_to_qualified_path(
+            self.get_current_branch()?,
+        ))
     }
-    pub fn get_current_area_node(&self) -> Result<Rc<RefCell<Node>>, GitError> {
+    pub fn get_current_area_node(&self) -> Result<&Node, GitError> {
         let current_branch = self.get_current_qualified_path()?;
         let current_split_branch = current_branch.split("/").collect::<Vec<&str>>();
         let current_area_name = current_split_branch.first().unwrap();
         Ok(self.model.get_area_node(current_area_name).unwrap())
     }
-    pub fn checkout(&self, qualified_path: &str) -> Result<Output, GitError> {
-        if !self.model.has_branch(qualified_path) {
-            return Err(GitError::GitInterface(GitInterfaceError::new(
-                format!("Cannot checkout branch {}: does not exist", qualified_path).as_str(),
-            )));
+    pub fn checkout<S: Into<String> + Copy>(
+        &self,
+        qualified_path: S,
+        create: bool,
+    ) -> Result<Output, GitError> {
+        if create {
+            Ok(self.raw_git_interface.run(vec![
+                "checkout",
+                "-b",
+                TreeDataModel::transform_to_branch(qualified_path).as_str(),
+            ])?)
+        } else {
+            if !self.model.has_branch(qualified_path) {
+                return Err(GitError::GitInterface(GitInterfaceError::new(
+                    format!(
+                        "Cannot checkout branch {}: does not exist",
+                        qualified_path.into()
+                    )
+                    .as_str(),
+                )));
+            }
+            Ok(self.raw_git_interface.run(vec![
+                "checkout",
+                self.model
+                    .get_node_from_qualified_path(qualified_path)
+                    .unwrap()
+                    .get_branch()
+                    .unwrap(),
+            ])?)
         }
-        Ok(self.raw_git_interface.run(vec![
-            "checkout",
-            self.model
-                .get_node_from_qualified_path(qualified_path)
-                .unwrap()
-                .borrow()
-                .get_branch()
-                .unwrap(),
-        ])?)
+    }
+    pub fn merge(&self, paths: Vec<&str>) -> Result<Output, GitError> {
+        let mut base = vec!["merge"];
+        base.extend(paths);
+        Ok(self.raw_git_interface.run(base)?)
     }
 }

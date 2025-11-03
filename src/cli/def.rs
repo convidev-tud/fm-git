@@ -1,7 +1,8 @@
+use crate::cli::ArgHelper;
 use crate::cli::completion::CompletionHelper;
 use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
-use clap::{ArgMatches, Command};
+use clap::Command;
 use std::error::Error;
 use std::fmt::Debug;
 use std::process::Output;
@@ -74,22 +75,22 @@ impl CommandMap {
 pub struct CommandContext<'a> {
     pub current_command: &'a CommandMap,
     pub root_command: &'a CommandMap,
-    pub arg_matches: &'a ArgMatches,
     pub git: &'a mut GitInterface,
+    pub arg_helper: ArgHelper<'a>,
 }
 
 impl CommandContext<'_> {
     pub fn new<'a>(
         current_command: &'a CommandMap,
         root_command: &'a CommandMap,
-        arg_matches: &'a ArgMatches,
         git: &'a mut GitInterface,
+        arg_helper: ArgHelper<'a>,
     ) -> CommandContext<'a> {
         CommandContext {
             current_command,
             root_command,
-            arg_matches,
             git,
+            arg_helper,
         }
     }
     pub fn log_from_output(&self, output: &Output) {

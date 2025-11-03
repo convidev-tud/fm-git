@@ -10,7 +10,7 @@ impl NodeTypeBehavior for Area {
         } else if first.to_string() == TreeDataModel::product_prefix() {
             NodeType::ProductRoot(ProductRoot)
         } else {
-            panic!()
+            panic!("'{}' is no valid child of an area node", first.to_string())
         }
     }
 }

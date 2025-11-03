@@ -1,4 +1,4 @@
-use crate::cli::{CommandContext, CommandImpl, CommandMap};
+use crate::cli::{ArgHelper, CommandContext, CommandImpl, CommandMap};
 use crate::git::interface::GitInterface;
 use std::ffi::OsString;
 
@@ -17,14 +17,14 @@ impl CommandRepository {
             Ok(_) => {}
             Err(err) => context.log_to_stderr(err.to_string()),
         };
-        match context.arg_matches.subcommand() {
+        match context.arg_helper.get_matches().subcommand() {
             Some((sub, sub_args)) => {
                 if let Some(child) = current.find_child(sub) {
                     self.execute_recursive(&mut CommandContext::new(
                         child,
                         context.root_command,
-                        sub_args,
                         context.git,
+                        ArgHelper::new(sub_args),
                     ))
                 } else {
                     let ext_args: Vec<_> = sub_args.get_many::<OsString>("").unwrap().collect();
@@ -42,8 +42,8 @@ impl CommandRepository {
         self.execute_recursive(&mut CommandContext::new(
             &self.command_map,
             &self.command_map,
-            &self.command_map.clap_command.clone().get_matches(),
             &mut GitInterface::new(),
+            ArgHelper::new(&self.command_map.clap_command.clone().get_matches()),
         ));
     }
 }

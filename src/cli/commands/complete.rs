@@ -17,12 +17,8 @@ impl CommandDefinition for HiddenCompletionCommand {
 
 impl CommandInterface for HiddenCompletionCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let to_complete = context
-            .arg_matches
-            .get_many::<String>("cli")
-            .unwrap()
-            .map(|s| s.as_str())
-            .collect::<Vec<&str>>();
+        let matches = context.arg_helper.get_argument_values::<String>("cli");
+        let to_complete = matches.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
         if to_complete.is_empty() {
             return Ok(());
         }

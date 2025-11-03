@@ -2,13 +2,15 @@ use crate::git::model::*;
 
 #[derive(Clone, Debug)]
 pub struct FeatureRoot {
-    features_with_branches: Vec<String>
+    features_with_branches: Vec<String>,
 }
 impl FeatureRoot {
     pub fn new() -> Self {
-        FeatureRoot { features_with_branches: Vec::new() }
+        FeatureRoot {
+            features_with_branches: Vec::new(),
+        }
     }
-    pub fn iter_features_with_branches(&self) -> impl Iterator<Item=&String> {
+    pub fn iter_features_with_branches(&self) -> impl Iterator<Item = &String> {
         self.features_with_branches.iter()
     }
 }
