@@ -47,7 +47,7 @@ impl CommandInterface for CheckoutCommand {
             "branch" => Ok(context
                 .git
                 .get_model()
-                .iter_all_qualified_paths()
+                .iter_qualified_paths_with_branches()
                 .filter(|s| s.starts_with(last))
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()),

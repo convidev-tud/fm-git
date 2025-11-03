@@ -1,8 +1,10 @@
 use crate::git::error::{GitError, GitInterfaceError};
 use crate::git::model::*;
 use crate::util::u8_to_string;
+use std::cell::RefCell;
 use std::io;
 use std::process::{Command, Output};
+use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 struct RawGitInterface;
@@ -46,29 +48,37 @@ impl GitInterface {
     pub fn get_model(&self) -> &TreeDataModel {
         &self.model
     }
-    pub fn get_current_qualified_branch_name(&self) -> Result<String, GitError> {
-        Ok(TreeDataModel::transform_to_qualified_path(u8_to_string(
+    pub fn get_current_branch(&self) -> Result<String, GitError> {
+        Ok(u8_to_string(
             &self
                 .raw_git_interface
                 .run(vec!["branch", "--show-current"])?
                 .stdout,
-        )))
+        ))
     }
-    pub fn get_current_area_node(&self) -> Result<&AreaNode, GitError> {
-        let current_branch = self.get_current_qualified_branch_name()?;
+    pub fn get_current_qualified_path(&self) -> Result<String, GitError> {
+        Ok(TreeDataModel::transform_to_qualified_path(self.get_current_branch()?))
+    }
+    pub fn get_current_area_node(&self) -> Result<Rc<RefCell<Node>>, GitError> {
+        let current_branch = self.get_current_qualified_path()?;
         let current_split_branch = current_branch.split("/").collect::<Vec<&str>>();
         let current_area_name = current_split_branch.first().unwrap();
         Ok(self.model.get_area_node(current_area_name).unwrap())
     }
     pub fn checkout(&self, qualified_path: &str) -> Result<Output, GitError> {
-        if !self.model.has_qualified_path(qualified_path) {
+        if !self.model.has_branch(qualified_path) {
             return Err(GitError::GitInterface(GitInterfaceError::new(
                 format!("Cannot checkout branch {}: does not exist", qualified_path).as_str(),
             )));
         }
         Ok(self.raw_git_interface.run(vec![
             "checkout",
-            self.model.get_git_branch(qualified_path).unwrap().as_str(),
+            self.model
+                .get_node_from_qualified_path(qualified_path)
+                .unwrap()
+                .borrow()
+                .get_branch()
+                .unwrap(),
         ])?)
     }
 }

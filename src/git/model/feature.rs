@@ -1,38 +1,28 @@
 use crate::git::model::*;
-use std::collections::HashMap;
-use std::rc::Rc;
 
-#[derive(Debug)]
-pub struct FeatureRoot;
+#[derive(Clone, Debug)]
+pub struct FeatureRoot {
+    features_with_branches: Vec<String>
+}
+impl FeatureRoot {
+    pub fn new() -> Self {
+        FeatureRoot { features_with_branches: Vec::new() }
+    }
+    pub fn iter_features_with_branches(&self) -> impl Iterator<Item=&String> {
+        self.features_with_branches.iter()
+    }
+}
+impl NodeTypeBehavior for FeatureRoot {
+    fn build_child_from_path(&mut self, path: &Vec<&str>) -> NodeType {
+        self.features_with_branches.push(path.join("/"));
+        NodeType::Feature(Feature)
+    }
+}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Feature;
-impl NodeTypeBehavior for Feature { type DirectChild = Node<Feature>; }
-
-impl Node<Feature> {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Self {
-            name: name.into(),
-            node_type: Feature,
-            children: HashMap::new(),
-        }
-    }
-}
-impl Into<NodeType> for Node<Feature> {
-    fn into(self) -> NodeType {
-        NodeType::Feature(Rc::new(self))
-    }
-}
-impl From<NodeType> for Node<Feature> {
-    fn from(value: NodeType) -> Self {
-        match value {
-            NodeType::Feature(node) => node.into(),
-            _ => unreachable!(),
-        }
-    }
-}
-impl NodeBuild for Node<Feature> {
-    fn build_node<S: Into<String>>(&self, name: S) -> Self {
-        Self::new(name.into())
+impl NodeTypeBehavior for Feature {
+    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+        NodeType::Feature(Self)
     }
 }

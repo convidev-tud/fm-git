@@ -1,23 +1,17 @@
-use crate::git::model::node::NodeTypeInterface;
 use crate::git::model::*;
-use std::collections::HashMap;
 
-#[derive(Debug)]
-pub struct Product;
-impl NodeTypeInterface for Product {
-    fn make_child_node<S: Into<String>>(&self, name: S) -> NodeType {
-        todo!()
-    }
-}
-impl Node<Product> {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Self {
-            name: name.into(),
-            node_type: Product,
-            children: HashMap::new(),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProductRoot;
+impl NodeTypeBehavior for ProductRoot {
+    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+        NodeType::Product(Product)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Product;
+impl NodeTypeBehavior for Product {
+    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+        NodeType::Product(Self)
+    }
+}

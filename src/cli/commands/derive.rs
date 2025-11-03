@@ -2,6 +2,7 @@ use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
 use clap::{Arg, ArgAction, Command};
 use std::error::Error;
+use crate::git::model::{NodeType, TreeDataModel};
 
 #[derive(Clone, Debug)]
 pub struct DeriveCommand {}
@@ -41,7 +42,20 @@ impl CommandInterface for DeriveCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let current_area = context.git.get_current_area_node()?;
+        let maybe_current_feature_root = context
+            .git
+            .get_current_area_node()?
+            .borrow().get_child(TreeDataModel::feature_prefix());
+        if maybe_current_feature_root.is_none() {
+            return Ok(vec![]);
+        }
+        let feature_root = maybe_current_feature_root.unwrap();
+        let borrowed = feature_root.borrow();
+        let feature_root_type = match borrowed.get_type() {
+            NodeType::FeatureRoot(t) => t,
+            _ => unreachable!(),
+        };
+        
         let appendix = completion_helper.get_appendix();
         let last = appendix[appendix.len() - 1];
         let current = completion_helper.currently_editing();
@@ -50,10 +64,8 @@ impl CommandInterface for DeriveCommand {
         }
         match current.unwrap().as_str() {
             "features" => {
-                let completion = context
-                    .git
-                    .get_model()
-                    .iter_all_features_with_branches_of(current_area.as_str())
+                let completion = feature_root_type
+                    .iter_features_with_branches()
                     .filter(|s| s.starts_with(last))
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
