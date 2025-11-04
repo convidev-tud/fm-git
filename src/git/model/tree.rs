@@ -3,12 +3,8 @@ use crate::git::model::*;
 const FEATURES_PREFIX: &str = "feature";
 const PRODUCTS_PREFIX: &str = "product";
 
-#[derive(Clone, Debug)]
-pub struct TreeDataModel {
-    virtual_root: Node,
-    qualified_paths_with_branch: Vec<String>,
-}
-impl TreeDataModel {
+pub struct ModelConstants;
+impl ModelConstants {
     pub fn feature_prefix() -> String {
         FEATURES_PREFIX.to_string()
     }
@@ -39,7 +35,14 @@ impl TreeDataModel {
             }
         }
     }
+}
 
+#[derive(Clone, Debug)]
+pub struct TreeDataModel {
+    virtual_root: Node,
+    qualified_paths_with_branch: Vec<String>,
+}
+impl TreeDataModel {
     pub fn new() -> Self {
         Self {
             virtual_root: Node::new("", NodeType::VirtualRoot(VirtualRoot), None),
@@ -48,7 +51,7 @@ impl TreeDataModel {
     }
     pub fn insert_from_git_native_branch(&mut self, branch: &str) {
         let without_star = branch.replace("*", "").trim().to_string();
-        let converted_branch = Self::transform_to_qualified_path(&without_star);
+        let converted_branch = ModelConstants::transform_to_qualified_path(&without_star);
         self.virtual_root.insert_path(
             converted_branch.split("/").collect::<Vec<&str>>(),
             without_star,

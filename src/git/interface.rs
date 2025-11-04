@@ -55,7 +55,7 @@ impl GitInterface {
         ))
     }
     pub fn get_current_qualified_path(&self) -> Result<String, GitError> {
-        Ok(TreeDataModel::transform_to_qualified_path(
+        Ok(ModelConstants::transform_to_qualified_path(
             self.get_current_branch()?,
         ))
     }
@@ -74,7 +74,7 @@ impl GitInterface {
             Ok(self.raw_git_interface.run(vec![
                 "checkout",
                 "-b",
-                TreeDataModel::transform_to_branch(qualified_path).as_str(),
+                ModelConstants::transform_to_branch(qualified_path).as_str(),
             ])?)
         } else {
             if !self.model.has_branch(qualified_path) {

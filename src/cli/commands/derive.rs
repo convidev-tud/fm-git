@@ -1,6 +1,6 @@
 use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use crate::git::model::{NodeType, TreeDataModel};
+use crate::git::model::{ModelConstants, NodeType, TreeDataModel};
 use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
@@ -30,7 +30,7 @@ impl CommandInterface for DeriveCommand {
         let current_area_node = context.git.get_current_area_node()?;
         let target_path = current_area_node.get_name().to_string()
             + "/"
-            + TreeDataModel::product_path_prefix().as_str()
+            + ModelConstants::product_path_prefix().as_str()
             + target_product_name.as_str();
         context.git.checkout(current_area_node.get_name(), false)?;
         context.git.checkout(target_path.as_str(), true)?;
@@ -46,7 +46,7 @@ impl CommandInterface for DeriveCommand {
         let maybe_current_feature_root = context
             .git
             .get_current_area_node()?
-            .get_child(TreeDataModel::feature_prefix());
+            .get_child(ModelConstants::feature_prefix());
         if maybe_current_feature_root.is_none() {
             return Ok(vec![]);
         }
