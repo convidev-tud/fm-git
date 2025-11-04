@@ -39,7 +39,10 @@ impl GitInterface {
             .map(|raw_string| raw_string.trim().to_string())
             .collect();
         for branch in all_branches {
-            self.model.insert_from_git_native_branch(&branch);
+            if !branch.is_empty() {
+                self.model
+                    .insert_qualified_path(QualifiedPath::from(branch));
+            }
         }
         Ok(())
     }
@@ -54,51 +57,34 @@ impl GitInterface {
                 .stdout,
         ))
     }
-    pub fn get_current_qualified_path(&self) -> Result<String, GitError> {
-        Ok(ModelConstants::transform_to_qualified_path(
-            self.get_current_branch()?,
-        ))
+    pub fn get_current_qualified_path(&self) -> Result<QualifiedPath, GitError> {
+        Ok(QualifiedPath::from(self.get_current_branch()?))
     }
-    pub fn get_current_area_node(&self) -> Result<&Node, GitError> {
+    pub fn get_current_area(&self) -> Result<QualifiedPath, GitError> {
         let current_branch = self.get_current_qualified_path()?;
-        let current_split_branch = current_branch.split("/").collect::<Vec<&str>>();
-        let current_area_name = current_split_branch.first().unwrap();
-        Ok(self.model.get_area_node(current_area_name).unwrap())
+        Ok(QualifiedPath::from(current_branch.first().unwrap().clone()))
     }
-    pub fn checkout<S: Into<String> + Copy>(
-        &self,
-        qualified_path: S,
-        create: bool,
-    ) -> Result<Output, GitError> {
+    pub fn checkout(&self, path: &QualifiedPath, create: bool) -> Result<Output, GitError> {
         if create {
-            Ok(self.raw_git_interface.run(vec![
-                "checkout",
-                "-b",
-                ModelConstants::transform_to_branch(qualified_path).as_str(),
-            ])?)
+            Ok(self
+                .raw_git_interface
+                .run(vec!["checkout", "-b", path.to_git_branch().as_str()])?)
         } else {
-            if !self.model.has_branch(qualified_path) {
+            if !self.model.has_branch(&path) {
                 return Err(GitError::GitInterface(GitInterfaceError::new(
-                    format!(
-                        "Cannot checkout branch {}: does not exist",
-                        qualified_path.into()
-                    )
-                    .as_str(),
+                    format!("Cannot checkout branch {}: does not exist", path).as_str(),
                 )));
             }
-            Ok(self.raw_git_interface.run(vec![
-                "checkout",
-                self.model
-                    .get_node_from_qualified_path(qualified_path)
-                    .unwrap()
-                    .get_branch()
-                    .unwrap(),
-            ])?)
+            Ok(self
+                .raw_git_interface
+                .run(vec!["checkout", path.to_git_branch().as_str()])?)
         }
     }
-    pub fn merge(&self, paths: Vec<&str>) -> Result<Output, GitError> {
+    pub fn merge(&self, paths: &Vec<QualifiedPath>) -> Result<Output, GitError> {
         let mut base = vec!["merge"];
-        base.extend(paths);
+        let new_paths: Vec<String> = paths.iter().map(|s| s.to_git_branch()).collect();
+        let converted_paths: Vec<&str> = new_paths.iter().map(|p| p.as_str()).collect();
+        base.extend(converted_paths);
         Ok(self.raw_git_interface.run(base)?)
     }
 }

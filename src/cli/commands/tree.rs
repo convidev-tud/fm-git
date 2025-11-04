@@ -17,12 +17,12 @@ impl CommandInterface for TreeCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let model = context.git.get_model();
         let current_branch = context.git.get_current_qualified_path()?;
-        let maybe_node = model.get_node_from_qualified_path(&current_branch);
-        if maybe_node.is_none() {
+        let maybe_node_path = model.get_node_path(&current_branch);
+        if maybe_node_path.is_none() {
             return Ok(());
         }
-        let node = maybe_node.unwrap();
-        let tree = node.display_tree();
+        let node_path = maybe_node_path.unwrap();
+        let tree = node_path.last().display_tree();
         context.log_to_stdout(tree);
         Ok(())
     }

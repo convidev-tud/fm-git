@@ -1,12 +1,12 @@
 use crate::git::model::*;
 
 pub trait NodeTypeBehavior {
-    fn build_child_from_path(&mut self, path: &Vec<&str>) -> NodeType;
+    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType;
 }
 
 #[derive(Clone, Debug)]
 pub struct FeatureRoot {
-    features_with_branches: Vec<String>,
+    features_with_branches: Vec<QualifiedPath>,
 }
 impl FeatureRoot {
     pub fn new() -> Self {
@@ -14,13 +14,13 @@ impl FeatureRoot {
             features_with_branches: Vec::new(),
         }
     }
-    pub fn iter_features_with_branches(&self) -> impl Iterator<Item = &String> {
+    pub fn iter_features_with_branches(&self) -> impl Iterator<Item = &QualifiedPath> {
         self.features_with_branches.iter()
     }
 }
 impl NodeTypeBehavior for FeatureRoot {
-    fn build_child_from_path(&mut self, path: &Vec<&str>) -> NodeType {
-        self.features_with_branches.push(path.join("/"));
+    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
+        self.features_with_branches.push(path.clone());
         NodeType::Feature(Feature)
     }
 }
@@ -28,7 +28,7 @@ impl NodeTypeBehavior for FeatureRoot {
 #[derive(Clone, Debug)]
 pub struct Feature;
 impl NodeTypeBehavior for Feature {
-    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
         NodeType::Feature(Self)
     }
 }
@@ -36,7 +36,7 @@ impl NodeTypeBehavior for Feature {
 #[derive(Clone, Debug)]
 pub struct ProductRoot;
 impl NodeTypeBehavior for ProductRoot {
-    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
         NodeType::Product(Product)
     }
 }
@@ -44,7 +44,7 @@ impl NodeTypeBehavior for ProductRoot {
 #[derive(Clone, Debug)]
 pub struct Product;
 impl NodeTypeBehavior for Product {
-    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
         NodeType::Product(Self)
     }
 }
@@ -52,7 +52,7 @@ impl NodeTypeBehavior for Product {
 #[derive(Clone, Debug)]
 pub struct Area;
 impl NodeTypeBehavior for Area {
-    fn build_child_from_path(&mut self, path: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
         let first = path.first().unwrap();
         if first.to_string() == ModelConstants::feature_prefix() {
             NodeType::FeatureRoot(FeatureRoot::new())
@@ -67,7 +67,7 @@ impl NodeTypeBehavior for Area {
 #[derive(Clone, Debug)]
 pub struct VirtualRoot;
 impl NodeTypeBehavior for VirtualRoot {
-    fn build_child_from_path(&mut self, _: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
         NodeType::Area(Area)
     }
 }
@@ -83,7 +83,7 @@ pub enum NodeType {
 }
 
 impl NodeTypeBehavior for NodeType {
-    fn build_child_from_path(&mut self, path: &Vec<&str>) -> NodeType {
+    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
         match self {
             Self::Feature(feature) => feature.build_child_from_path(path),
             Self::Product(product) => product.build_child_from_path(path),

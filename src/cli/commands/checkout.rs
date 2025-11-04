@@ -1,6 +1,7 @@
 use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use clap::{Arg, ArgAction, Command};
+use crate::git::model::QualifiedPath;
+use clap::{Arg, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
@@ -11,23 +12,14 @@ impl CommandDefinition for CheckoutCommand {
             .about("Switch branches")
             .disable_help_subcommand(true)
             .arg(Arg::new("branch"))
-            .arg(
-                Arg::new("new-feature")
-                    .short('f')
-                    .action(ArgAction::SetTrue)
-                    .help(
-                        "Creates a new feature branch as the child of the currently checked-out branch and checks it out. \
-                        If checked-out on default, the new feature will be a root feature. \
-                        Fails if checked-out on a product or working branch."
-                    ),
-            )
     }
 }
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let branch_any_name = context.arg_helper.get_argument_value::<String>("branch");
-        let new_feature = context.arg_helper.get_argument_value::<bool>("new-feature");
-        let result = context.git.checkout(branch_any_name.as_str(), false)?;
+        let branch_name = context.arg_helper.get_argument_value::<String>("branch");
+        let result = context
+            .git
+            .checkout(&QualifiedPath::from(branch_name), false)?;
         context.log_from_output(&result);
         Ok(())
     }
@@ -47,7 +39,7 @@ impl CommandInterface for CheckoutCommand {
                 .git
                 .get_model()
                 .iter_qualified_paths_with_branches()
-                .filter(|s| s.starts_with(last))
+                .filter(|s| s.to_string().starts_with(last))
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()),
             _ => Ok(vec![]),

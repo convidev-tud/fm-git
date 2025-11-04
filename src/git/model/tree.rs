@@ -17,61 +17,46 @@ impl ModelConstants {
     pub fn product_path_prefix() -> String {
         PRODUCTS_PREFIX.to_string() + "/"
     }
-    pub fn transform_to_qualified_path<S: Into<String>>(path: S) -> String {
-        path.into().trim().replace("*", "").replace("_", "")
-    }
-    pub fn transform_to_branch<S: Into<String>>(qualified_path: S) -> String {
-        let path = qualified_path.into();
-        let split = path.split('/').collect::<Vec<_>>();
-        match split.len() {
-            1 => split[0].to_string(),
-            _ => {
-                let mut prefix = split[..split.len() - 1]
-                    .iter()
-                    .map(|x| "_".to_string() + x)
-                    .collect::<Vec<_>>();
-                prefix.push(split[split.len() - 1].to_string());
-                prefix.join("/")
-            }
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct TreeDataModel {
     virtual_root: Node,
-    qualified_paths_with_branch: Vec<String>,
+    qualified_paths_with_branch: Vec<QualifiedPath>,
 }
 impl TreeDataModel {
     pub fn new() -> Self {
         Self {
-            virtual_root: Node::new("", NodeType::VirtualRoot(VirtualRoot), None),
+            virtual_root: Node::new("", NodeType::VirtualRoot(VirtualRoot)),
             qualified_paths_with_branch: vec![],
         }
     }
-    pub fn insert_from_git_native_branch(&mut self, branch: &str) {
-        let without_star = branch.replace("*", "").trim().to_string();
-        let converted_branch = ModelConstants::transform_to_qualified_path(&without_star);
-        self.virtual_root.insert_path(
-            converted_branch.split("/").collect::<Vec<&str>>(),
-            without_star,
-        );
-        self.qualified_paths_with_branch.push(converted_branch);
+    pub fn insert_qualified_path(&mut self, path: QualifiedPath) {
+        self.virtual_root.insert_path(&path);
+        self.qualified_paths_with_branch.push(path);
     }
-    pub fn get_area_node(&self, name: &str) -> Option<&Node> {
-        self.virtual_root.get_child(name)
+    pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<'_>> {
+        let area_node = self.virtual_root.get_child(path.first()?)?;
+        let mut node_path = area_node.to_node_path();
+        let new_path = path.strip_n(1);
+        match node_path.push_path(new_path) {
+            Ok(_) => Some(node_path),
+            Err(_) => None,
+        }
     }
-    pub fn has_branch<S: Into<String> + Copy>(&self, qualified_path: S) -> bool {
+    pub fn get_qualified_path_to_product_root(&self, area: &QualifiedPath) -> QualifiedPath {
+        area.clone() + QualifiedPath::from(ModelConstants::product_prefix())
+    }
+    pub fn get_qualified_path_to_feature_root(&self, area: &QualifiedPath) -> QualifiedPath {
+        area.clone() + QualifiedPath::from(ModelConstants::feature_prefix())
+    }
+    pub fn has_branch(&self, qualified_path: &QualifiedPath) -> bool {
         self.qualified_paths_with_branch
             .iter()
-            .find(|e| **e == qualified_path.into())
+            .find(|e| *e == qualified_path)
             .is_some()
     }
-    pub fn get_node_from_qualified_path<S: Into<String>>(&self, path: S) -> Option<&Node> {
-        self.virtual_root
-            .get_from_path(path.into().split("/").collect::<Vec<&str>>())
-    }
-    pub fn iter_qualified_paths_with_branches(&self) -> impl Iterator<Item = &String> {
+    pub fn iter_qualified_paths_with_branches(&self) -> impl Iterator<Item = &QualifiedPath> {
         self.qualified_paths_with_branch.iter()
     }
 }
