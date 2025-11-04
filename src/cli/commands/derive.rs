@@ -26,16 +26,10 @@ impl CommandInterface for DeriveCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let target_product_name = context.arg_helper.get_argument_value::<String>("product");
         let current_area = context.git.get_current_area()?;
-        let product_root = context
-            .git
-            .get_model()
-            .get_qualified_path_to_product_root(&current_area);
+        let feature_root = context.git.get_current_feature_root()?;
+        let product_root = context.git.get_current_product_root()?;
         let target_path = product_root + QualifiedPath::from(target_product_name);
 
-        let feature_root = context
-            .git
-            .get_model()
-            .get_qualified_path_to_feature_root(&current_area);
         let all_features = context
             .arg_helper
             .get_argument_values::<String>("features")
@@ -54,12 +48,9 @@ impl CommandInterface for DeriveCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let area = context.git.get_current_area()?;
-        let feature_root = context
-            .git
-            .get_model()
-            .get_qualified_path_to_feature_root(&area);
-        let maybe_feature_root_node = context.git.get_model().get_node_path(&feature_root);
+        let model = context.git.get_model();
+        let feature_root = context.git.get_current_feature_root()?;
+        let maybe_feature_root_node = model.get_node_path(&feature_root);
         if maybe_feature_root_node.is_none() {
             return Ok(vec![]);
         }

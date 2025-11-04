@@ -64,6 +64,14 @@ impl GitInterface {
         let current_branch = self.get_current_qualified_path()?;
         Ok(QualifiedPath::from(current_branch.first().unwrap().clone()))
     }
+    pub fn get_current_feature_root(&self) -> Result<QualifiedPath, GitError> {
+        let area = self.get_current_area()?;
+        Ok(self.model.get_qualified_path_to_feature_root(&area))
+    }
+    pub fn get_current_product_root(&self) -> Result<QualifiedPath, GitError> {
+        let area = self.get_current_area()?;
+        Ok(self.model.get_qualified_path_to_product_root(&area))
+    }
     pub fn checkout(&self, path: &QualifiedPath, create: bool) -> Result<Output, GitError> {
         if create {
             Ok(self

@@ -1,6 +1,7 @@
 use crate::git::model::*;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct NodePathError {
@@ -19,17 +20,17 @@ impl Display for NodePathError {
 impl Error for NodePathError {}
 
 pub struct NodePath<'a> {
-    path: Vec<&'a Node>,
+    path: Vec<Rc<&'a Node>>,
 }
 impl<'a> NodePath<'a> {
     pub fn new(root: &'a Node) -> NodePath<'a> {
-        Self { path: vec![root] }
+        Self { path: vec![Rc::new(root)] }
     }
     pub fn push_next<S: Into<String>>(&mut self, name: S) -> Result<(), NodePathError> {
         let real_name = name.into();
         match self.path.last().unwrap().get_child(real_name.clone()) {
             Some(child) => {
-                self.path.push(child);
+                self.path.push(Rc::new(child));
                 Ok(())
             }
             None => Err(NodePathError::new(format!(
@@ -52,7 +53,7 @@ impl<'a> NodePath<'a> {
         }
         path
     }
-    pub fn last(&self) -> &&'a Node {
+    pub fn last(&self) -> &'a Node {
         self.path.last().unwrap()
     }
 }
