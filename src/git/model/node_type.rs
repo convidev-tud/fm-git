@@ -17,9 +17,6 @@ impl FeatureRoot {
     pub fn get_features_with_branches(&self) -> &Vec<QualifiedPath> {
         &self.features_with_branches
     }
-    pub fn iter_features_with_branches(&self) -> impl Iterator<Item = &QualifiedPath> {
-        self.features_with_branches.iter()
-    }
 }
 impl NodeTypeBehavior for FeatureRoot {
     fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {

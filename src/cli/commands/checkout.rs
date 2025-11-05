@@ -26,6 +26,15 @@ impl CommandInterface for CheckoutCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        Ok(vec![])
+        let maybe_editing = completion_helper.currently_editing();
+        if maybe_editing.is_none() {
+            return Ok(vec![]);
+        }
+        let all_branches = context.git.get_model().get_qualified_paths_with_branches();
+        let result = match maybe_editing.unwrap().get_id().as_str() {
+            "branch" => completion_helper.complete_qualified_path_stepwise(all_branches, false),
+            _ => vec![],
+        };
+        Ok(result)
     }
 }

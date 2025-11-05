@@ -56,7 +56,7 @@ impl TreeDataModel {
             .find(|e| *e == qualified_path)
             .is_some()
     }
-    pub fn iter_qualified_paths_with_branches(&self) -> impl Iterator<Item = &QualifiedPath> {
-        self.qualified_paths_with_branch.iter()
+    pub fn get_qualified_paths_with_branches(&self) -> &Vec<QualifiedPath> {
+        &self.qualified_paths_with_branch
     }
 }
