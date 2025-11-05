@@ -95,4 +95,9 @@ impl GitInterface {
         base.extend(converted_paths);
         Ok(self.raw_git_interface.run(base)?)
     }
+    pub fn initialize_repo(&self) -> Result<Output, GitError> {
+        Ok(self
+            .raw_git_interface
+            .run(vec!["init", "--initial-branch=main"])?)
+    }
 }

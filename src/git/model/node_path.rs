@@ -24,7 +24,9 @@ pub struct NodePath<'a> {
 }
 impl<'a> NodePath<'a> {
     pub fn new(root: &'a Node) -> NodePath<'a> {
-        Self { path: vec![Rc::new(root)] }
+        Self {
+            path: vec![Rc::new(root)],
+        }
     }
     pub fn push_next<S: Into<String>>(&mut self, name: S) -> Result<(), NodePathError> {
         let real_name = name.into();
