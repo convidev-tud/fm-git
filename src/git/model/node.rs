@@ -35,16 +35,16 @@ impl Node {
         if path.is_empty() {
             return;
         }
-        let name = path.get(0).unwrap();
+        let name = path.get(0).unwrap().to_string();
         let next_type = self.node_type.build_child_from_path(&path);
-        let next_child = match self.get_child_mut(name) {
+        let next_child = match self.get_child_mut(&name) {
             Some(node) => node,
             None => {
-                self.add_child(Node::new(name, next_type));
-                self.get_child_mut(name).unwrap()
+                self.add_child(Node::new(name.clone(), next_type));
+                self.get_child_mut(&name).unwrap()
             }
         };
-        next_child.insert_path(&path.strip_n(1));
+        next_child.insert_path(&path.trim_n_left(1));
     }
     fn build_display_tree(&self) -> Tree<String> {
         let mut tree = Tree::<String>::new(self.name.clone());
@@ -56,7 +56,7 @@ impl Node {
     pub fn display_tree(&self) -> String {
         self.build_display_tree().to_string()
     }
-    pub fn to_node_path(&self) -> NodePath<'_> {
+    pub fn as_node_path(&self) -> NodePath<'_> {
         NodePath::new(&self)
     }
 }

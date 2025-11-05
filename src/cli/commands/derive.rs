@@ -37,8 +37,8 @@ impl CommandInterface for DeriveCommand {
             .map(|e| feature_root.clone() + QualifiedPath::from(e))
             .collect::<Vec<_>>();
 
-        context.git.checkout(&current_area, false)?;
-        context.git.checkout(&target_path, true)?;
+        context.git.checkout(&current_area)?;
+        context.git.checkout(&target_path)?;
         let output = context.git.merge(&all_features)?;
         context.log_from_output(&output);
         Ok(())
@@ -54,33 +54,23 @@ impl CommandInterface for DeriveCommand {
         if maybe_feature_root_node.is_none() {
             return Ok(vec![]);
         }
-        let path_to_feature_root = maybe_feature_root_node.unwrap();
-        let feature_root = path_to_feature_root.last();
+        let feature_root = maybe_feature_root_node.unwrap().get_node();
         let feature_root_type = match feature_root.get_type() {
             NodeType::FeatureRoot(t) => t,
             _ => unreachable!(),
         };
 
-        let appendix = completion_helper.get_appendix();
-        let last = appendix[appendix.len() - 1];
         let current = completion_helper.currently_editing();
-        if current.is_none() {
-            return Ok(vec![]);
-        }
-        match current.unwrap().as_str() {
-            "features" => {
-                let completion = feature_root_type
-                    .iter_features_with_branches()
-                    .filter(|s| s.to_string().starts_with(last))
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>();
-                Ok(completion
-                    .iter()
-                    .filter(|s| completion.len() < 2 || !appendix.contains(&s.as_str()))
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>())
-            }
-            _ => Ok(vec![]),
-        }
+        let result = match current {
+            Some(value) => match value.get_id().as_str() {
+                "features" => completion_helper.complete_qualified_path_stepwise(
+                    feature_root_type.get_features_with_branches(),
+                    true,
+                ),
+                _ => vec![],
+            },
+            None => vec![],
+        };
+        Ok(result)
     }
 }

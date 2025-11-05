@@ -82,13 +82,19 @@ impl QualifiedPath {
             .collect::<Vec<String>>();
         self.path.extend(split_path);
     }
-    pub fn strip_n(&self, n: usize) -> QualifiedPath {
-        QualifiedPath::from(self.path[n..].to_vec())
+    pub fn trim_n(&self, n_left: usize, n_right: usize) -> QualifiedPath {
+        QualifiedPath::from(self.path[n_left..n_right].to_vec())
+    }
+    pub fn trim_n_left(&self, n: usize) -> QualifiedPath {
+        self.trim_n(n, self.path.len())
+    }
+    pub fn trim_n_right(&self, n: usize) -> QualifiedPath {
+        self.trim_n(0, n)
     }
     pub fn first(&self) -> Option<&String> {
         self.path.first()
     }
-    pub fn last(&self) -> Option<&String> {
+    pub fn _last(&self) -> Option<&String> {
         self.path.last()
     }
     pub fn is_empty(&self) -> bool {
@@ -97,8 +103,11 @@ impl QualifiedPath {
     pub fn iter(&self) -> impl Iterator<Item = &String> {
         self.path.iter()
     }
-    pub fn get(&self, index: usize) -> Option<&String> {
-        self.path.get(index)
+    pub fn get(&self, index: usize) -> Option<QualifiedPath> {
+        Some(QualifiedPath::from(self.path.get(index)?.clone()))
+    }
+    pub fn starts_with(&self, prefix: &QualifiedPath) -> bool {
+        self.to_string().starts_with(&prefix.to_string())
     }
     pub fn len(&self) -> usize {
         self.path.len()

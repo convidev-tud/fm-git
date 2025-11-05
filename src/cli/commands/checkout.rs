@@ -17,9 +17,7 @@ impl CommandDefinition for CheckoutCommand {
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let branch_name = context.arg_helper.get_argument_value::<String>("branch");
-        let result = context
-            .git
-            .checkout(&QualifiedPath::from(branch_name), false)?;
+        let result = context.git.checkout(&QualifiedPath::from(branch_name))?;
         context.log_from_output(&result);
         Ok(())
     }
@@ -28,21 +26,6 @@ impl CommandInterface for CheckoutCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let appendix = completion_helper.get_appendix();
-        let last = appendix[appendix.len() - 1];
-        let current = completion_helper.currently_editing();
-        if current.is_none() {
-            return Ok(vec![]);
-        }
-        match current.unwrap().as_str() {
-            "branch" => Ok(context
-                .git
-                .get_model()
-                .iter_qualified_paths_with_branches()
-                .filter(|s| s.to_string().starts_with(last))
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()),
-            _ => Ok(vec![]),
-        }
+        Ok(vec![])
     }
 }

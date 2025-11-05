@@ -48,14 +48,14 @@ impl<'a> NodePath<'a> {
         }
         Ok(())
     }
-    pub fn to_path(&self) -> QualifiedPath {
+    pub fn _to_path(&self) -> QualifiedPath {
         let mut path = QualifiedPath::new();
         for p in self.path.iter() {
             path.push(p.get_name());
         }
         path
     }
-    pub fn last(&self) -> &'a Node {
+    pub fn get_node(&self) -> &'a Node {
         self.path.last().unwrap()
     }
 }

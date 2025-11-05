@@ -79,7 +79,7 @@ impl CommandInterface for HiddenCompletionCommand {
                 )?;
                 match completion.len() {
                     0 => {}
-                    _ => context.log_to_stdout(&*completion.join(" ")),
+                    _ => context.log_to_stdout(completion.join(" ")),
                 }
             }
             None => {}

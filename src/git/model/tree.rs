@@ -11,10 +11,10 @@ impl ModelConstants {
     pub fn product_prefix() -> String {
         PRODUCTS_PREFIX.to_string()
     }
-    pub fn feature_path_prefix() -> String {
+    pub fn _feature_path_prefix() -> String {
         FEATURES_PREFIX.to_string() + "/"
     }
-    pub fn product_path_prefix() -> String {
+    pub fn _product_path_prefix() -> String {
         PRODUCTS_PREFIX.to_string() + "/"
     }
 }
@@ -37,8 +37,8 @@ impl TreeDataModel {
     }
     pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<'_>> {
         let area_node = self.virtual_root.get_child(path.first()?)?;
-        let mut node_path = area_node.to_node_path();
-        let new_path = path.strip_n(1);
+        let mut node_path = area_node.as_node_path();
+        let new_path = path.trim_n_left(1);
         match node_path.push_path(new_path) {
             Ok(_) => Some(node_path),
             Err(_) => None,

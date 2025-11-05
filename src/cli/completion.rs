@@ -1,5 +1,7 @@
+use crate::git::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 
 #[derive(Debug, Clone)]
 pub struct CompletionHelper<'a> {
@@ -10,8 +12,8 @@ impl<'a> CompletionHelper<'a> {
     pub fn new(command: &'a Command, appendix: Vec<&'a str>) -> Self {
         Self { command, appendix }
     }
-    pub fn get_appendix(&self) -> &Vec<&str> {
-        &self.appendix
+    pub fn get_last(&self) -> Option<String> {
+        Some(self.appendix.last()?.to_string())
     }
     /// Returns if the passed target is the currently one edited on the console.
     ///
@@ -21,7 +23,7 @@ impl<'a> CompletionHelper<'a> {
     /// mytool foo bar // foo is edited, if curser remains on bar
     /// mytool foo bar abc // foo is not edited
     /// ```
-    pub fn currently_editing(&self) -> Option<String> {
+    fn currently_editing_with_range(&self) -> Option<(Range<usize>, &Arg)> {
         let mut current_option: Option<&Arg> = None;
         let mut current_option_start: usize = 0;
         let mut positionals = self.command.get_positionals();
@@ -112,12 +114,90 @@ impl<'a> CompletionHelper<'a> {
                 }
             })
             .collect();
-        Some(
-            cmd_to_index
-                .get(&(self.appendix.len() - 1))?
-                .get_id()
-                .to_string(),
-        )
+
+        let current_cmd = cmd_to_index.get(&(self.appendix.len() - 1))?;
+        let end: usize = self.appendix.len() - 1;
+        let mut start: usize = end;
+        for (i, arg) in cmd_to_index.iter() {
+            if arg == current_cmd && i < &start {
+                start = *i;
+            }
+        }
+        Some((Range { start, end }, current_cmd))
+    }
+    /// Returns if the passed target is the currently one edited on the console.
+    ///
+    /// Examples:
+    /// ```bash
+    /// mytool foo // foo is edited
+    /// mytool foo bar // foo is edited, if curser remains on bar
+    /// mytool foo bar abc // foo is not edited
+    /// ```
+    pub fn currently_editing(&self) -> Option<&Arg> {
+        Some(self.currently_editing_with_range()?.1)
+    }
+    pub fn get_appendix_of_currently_edited(&self) -> Vec<&str> {
+        if self.appendix.len() < 3 {
+            return vec![];
+        }
+        let maybe_currently_editing = self.currently_editing_with_range();
+        if maybe_currently_editing.is_none() {
+            return self.appendix[1..self.appendix.len() - 1].to_vec();
+        }
+        let currently_editing = maybe_currently_editing.unwrap().0;
+        self.appendix[currently_editing.start..self.appendix.len() - 1].to_vec()
+    }
+    pub fn complete_qualified_path_stepwise(
+        &self,
+        paths: &Vec<QualifiedPath>,
+        ignore_existing_occurrences: bool,
+    ) -> Vec<String> {
+        let currently_editing_appendix = self
+            .get_appendix_of_currently_edited()
+            .into_iter()
+            .map(|e| QualifiedPath::from(e))
+            .collect::<Vec<QualifiedPath>>();
+        let maybe_last = self.get_last();
+        if maybe_last.is_none() {
+            return vec![];
+        }
+        let prefix = QualifiedPath::from(maybe_last.unwrap());
+        let current_len = prefix.len();
+        let filtered = paths
+            .iter()
+            .filter(|path| {
+                let ignore = if ignore_existing_occurrences {
+                    currently_editing_appendix.contains(path)
+                } else {
+                    false
+                };
+                !ignore && path.starts_with(&prefix)
+            })
+            .collect::<Vec<&QualifiedPath>>();
+        match filtered.len() {
+            0 => vec![],
+            1 => vec![filtered[0].to_string()],
+            _ => {
+                let all = filtered
+                    .iter()
+                    .map(|path| {
+                        let to_index = path.trim_n_right(current_len);
+                        if path.len() == current_len {
+                            to_index.to_string()
+                        } else {
+                            to_index.to_string() + "/"
+                        }
+                    })
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<String>>();
+                if all.len() == 1 {
+                    filtered.iter().map(|path| path.to_string()).collect()
+                } else {
+                    all
+                }
+            }
+        }
     }
 }
 
@@ -137,6 +217,15 @@ mod tests {
             .arg(Arg::new("pos1"))
             .arg(Arg::new("pos2").action(ArgAction::Append))
     }
+    fn setup_qualified_paths() -> Vec<QualifiedPath> {
+        vec![
+            QualifiedPath::from("foo"),
+            QualifiedPath::from("foo/bar/baz1"),
+            QualifiedPath::from("foo/bar/baz2"),
+            QualifiedPath::from("foo/abc/def"),
+            QualifiedPath::from("foo/abc"),
+        ]
+    }
 
     #[test]
     fn test_currently_editing_empty() {
@@ -150,34 +239,178 @@ mod tests {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "--option1", ""];
         let helper = CompletionHelper::new(&cmd, appendix);
-        assert_eq!(helper.currently_editing(), Some("option1".to_string()));
+        assert_eq!(
+            helper.currently_editing().unwrap().get_id().as_str(),
+            "option1"
+        );
     }
     #[test]
     fn test_currently_editing_one_option_one_positional() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "--option1", "abc", ""];
         let helper = CompletionHelper::new(&cmd, appendix);
-        assert_eq!(helper.currently_editing(), Some("pos1".to_string()));
+        assert_eq!(
+            helper.currently_editing().unwrap().get_id().as_str(),
+            "pos1"
+        );
     }
     #[test]
     fn test_currently_editing_one_positional() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "abc"];
         let helper = CompletionHelper::new(&cmd, appendix);
-        assert_eq!(helper.currently_editing(), Some("pos1".to_string()));
+        assert_eq!(
+            helper.currently_editing().unwrap().get_id().as_str(),
+            "pos1".to_string()
+        );
     }
     #[test]
     fn test_currently_editing_append() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "abc", "a", "b", "c", "d"];
         let helper = CompletionHelper::new(&cmd, appendix);
-        assert_eq!(helper.currently_editing(), Some("pos2".to_string()));
+        assert_eq!(
+            helper.currently_editing().unwrap().get_id().as_str(),
+            "pos2"
+        );
     }
     #[test]
     fn test_currently_boolean() {
         let cmd = setup_test_command();
         let appendix = vec!["mytool", "-b", ""];
         let helper = CompletionHelper::new(&cmd, appendix);
-        assert_eq!(helper.currently_editing(), Some("pos1".to_string()));
+        assert_eq!(
+            helper.currently_editing().unwrap().get_id().as_str(),
+            "pos1".to_string()
+        );
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_none() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        assert_eq!(
+            helper.complete_qualified_path_stepwise(&paths, false),
+            Vec::<String>::new()
+        );
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_empty() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", ""];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo", "foo/",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_before_slash() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "foo"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo", "foo/",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_different_start() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "foo/"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo/abc", "foo/abc/", "foo/bar/",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_different_start_same_prefix() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "foo/a"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo/abc", "foo/abc/",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_same_start_different_end() {
+        let cmd = setup_test_command();
+
+        let appendix = vec!["mytool", "foo/b"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo/bar/baz1", "foo/bar/baz2",]);
+
+        let appendix = vec!["mytool", "foo/bar/baz"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo/bar/baz1", "foo/bar/baz2",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_only_one() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "foo/bar/baz1"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, false);
+        result.sort();
+        assert_eq!(result, vec!["foo/bar/baz1"]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_ignore_prior_occurrences() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "abc", "foo/bar/baz1", "foo/b"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, true);
+        result.sort();
+        assert_eq!(result, vec!["foo/bar/baz2",]);
+    }
+    #[test]
+    fn test_complete_qualified_path_stepwise_do_not_ignore_current_occurrences() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "abc", "foo/bar/baz1"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        let paths = setup_qualified_paths();
+        let mut result = helper.complete_qualified_path_stepwise(&paths, true);
+        result.sort();
+        assert_eq!(result, vec!["foo/bar/baz1",]);
+    }
+    #[test]
+    fn test_get_all_of_currently_edited() {
+        let cmd = setup_test_command();
+        let appendix = vec!["mytool", "foo", "a", "b", "c"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        assert_eq!(helper.get_appendix_of_currently_edited(), vec!["a", "b"],)
+    }
+    #[test]
+    fn test_get_all_of_currently_edited_root() {
+        let cmd = Command::new("mytool");
+        let appendix = vec!["mytool", "a", "b", "c"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        assert_eq!(helper.get_appendix_of_currently_edited(), vec!["a", "b"],)
+    }
+    #[test]
+    fn test_get_all_of_currently_edited_empty() {
+        let cmd = Command::new("mytool");
+        let appendix = vec!["mytool"];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        assert_eq!(
+            helper.get_appendix_of_currently_edited(),
+            Vec::<String>::new(),
+        );
+        let appendix = vec![];
+        let helper = CompletionHelper::new(&cmd, appendix);
+        assert_eq!(
+            helper.get_appendix_of_currently_edited(),
+            Vec::<String>::new(),
+        )
     }
 }

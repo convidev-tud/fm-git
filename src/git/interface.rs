@@ -49,7 +49,7 @@ impl GitInterface {
     pub fn get_model(&self) -> &TreeDataModel {
         &self.model
     }
-    pub fn get_current_branch(&self) -> Result<String, GitError> {
+    fn get_current_branch(&self) -> Result<String, GitError> {
         Ok(u8_to_string(
             &self
                 .raw_git_interface
@@ -72,21 +72,22 @@ impl GitInterface {
         let area = self.get_current_area()?;
         Ok(self.model.get_qualified_path_to_product_root(&area))
     }
-    pub fn checkout(&self, path: &QualifiedPath, create: bool) -> Result<Output, GitError> {
-        if create {
-            Ok(self
-                .raw_git_interface
-                .run(vec!["checkout", "-b", path.to_git_branch().as_str()])?)
-        } else {
-            if !self.model.has_branch(&path) {
-                return Err(GitError::GitInterface(GitInterfaceError::new(
-                    format!("Cannot checkout branch {}: does not exist", path).as_str(),
-                )));
-            }
-            Ok(self
-                .raw_git_interface
-                .run(vec!["checkout", path.to_git_branch().as_str()])?)
+
+    // all git commands
+    pub fn initialize_repo(&self) -> Result<Output, GitError> {
+        Ok(self
+            .raw_git_interface
+            .run(vec!["init", "--initial-branch=main"])?)
+    }
+    pub fn checkout(&self, path: &QualifiedPath) -> Result<Output, GitError> {
+        if !self.model.has_branch(&path) {
+            return Err(GitError::GitInterface(GitInterfaceError::new(
+                format!("Cannot checkout branch {}: does not exist", path).as_str(),
+            )));
         }
+        Ok(self
+            .raw_git_interface
+            .run(vec!["checkout", path.to_git_branch().as_str()])?)
     }
     pub fn merge(&self, paths: &Vec<QualifiedPath>) -> Result<Output, GitError> {
         let mut base = vec!["merge"];
@@ -94,10 +95,5 @@ impl GitInterface {
         let converted_paths: Vec<&str> = new_paths.iter().map(|p| p.as_str()).collect();
         base.extend(converted_paths);
         Ok(self.raw_git_interface.run(base)?)
-    }
-    pub fn initialize_repo(&self) -> Result<Output, GitError> {
-        Ok(self
-            .raw_git_interface
-            .run(vec!["init", "--initial-branch=main"])?)
     }
 }

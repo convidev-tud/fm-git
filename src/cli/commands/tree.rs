@@ -22,7 +22,7 @@ impl CommandInterface for TreeCommand {
             return Ok(());
         }
         let node_path = maybe_node_path.unwrap();
-        let tree = node_path.last().display_tree();
+        let tree = node_path.get_node().display_tree();
         context.log_to_stdout(tree);
         Ok(())
     }
