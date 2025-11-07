@@ -27,13 +27,14 @@ pub struct TreeDataModel {
 impl TreeDataModel {
     pub fn new() -> Self {
         Self {
-            virtual_root: Node::new("", NodeType::VirtualRoot(VirtualRoot)),
+            virtual_root: Node::new("", NodeType::VirtualRoot),
             qualified_paths_with_branch: vec![],
         }
     }
-    pub fn insert_qualified_path(&mut self, path: QualifiedPath) {
-        self.virtual_root.insert_path(&path);
+    pub fn insert_qualified_path(&mut self, path: QualifiedPath) -> Result<(), WrongNodeTypeError> {
+        self.virtual_root.insert_path(&path)?;
         self.qualified_paths_with_branch.push(path);
+        Ok(())
     }
     pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<'_>> {
         let area_node = self.virtual_root.get_child(path.first()?)?;

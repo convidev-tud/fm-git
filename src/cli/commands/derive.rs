@@ -55,10 +55,6 @@ impl CommandInterface for DeriveCommand {
             return Ok(vec![]);
         }
         let feature_root = maybe_feature_root_node.unwrap().get_node();
-        let feature_root_type = match feature_root.get_type() {
-            NodeType::FeatureRoot(t) => t,
-            _ => unreachable!(),
-        };
 
         let current = completion_helper.currently_editing();
         let result = match current {

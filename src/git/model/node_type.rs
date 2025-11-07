@@ -1,96 +1,60 @@
 use crate::git::model::*;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 
-pub trait NodeTypeBehavior {
-    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType;
+#[derive(Debug, Clone)]
+pub struct WrongNodeTypeError {
+    msg: String,
 }
-
-#[derive(Clone, Debug)]
-pub struct FeatureRoot {
-    features_with_branches: Vec<QualifiedPath>,
-}
-impl FeatureRoot {
-    pub fn new() -> Self {
-        FeatureRoot {
-            features_with_branches: Vec::new(),
-        }
-    }
-    pub fn get_features_with_branches(&self) -> &Vec<QualifiedPath> {
-        &self.features_with_branches
+impl WrongNodeTypeError {
+    pub fn new<S: Into<String>>(msg: S) -> WrongNodeTypeError {
+        WrongNodeTypeError { msg: msg.into() }
     }
 }
-impl NodeTypeBehavior for FeatureRoot {
-    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
-        self.features_with_branches.push(path.clone());
-        NodeType::Feature(Feature)
+impl Display for WrongNodeTypeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct Feature;
-impl NodeTypeBehavior for Feature {
-    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
-        NodeType::Feature(Self)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ProductRoot;
-impl NodeTypeBehavior for ProductRoot {
-    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
-        NodeType::Product(Product)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Product;
-impl NodeTypeBehavior for Product {
-    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
-        NodeType::Product(Self)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Area;
-impl NodeTypeBehavior for Area {
-    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
-        let first = path.first().unwrap();
-        if first.to_string() == ModelConstants::feature_prefix() {
-            NodeType::FeatureRoot(FeatureRoot::new())
-        } else if first.to_string() == ModelConstants::product_prefix() {
-            NodeType::ProductRoot(ProductRoot)
-        } else {
-            panic!("'{}' is no valid child of an area node", first.to_string())
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct VirtualRoot;
-impl NodeTypeBehavior for VirtualRoot {
-    fn build_child_from_path(&mut self, _: &QualifiedPath) -> NodeType {
-        NodeType::Area(Area)
-    }
-}
+impl Error for WrongNodeTypeError {}
 
 #[derive(Clone, Debug)]
 pub enum NodeType {
-    Feature(Feature),
-    Product(Product),
-    FeatureRoot(FeatureRoot),
-    ProductRoot(ProductRoot),
-    Area(Area),
-    VirtualRoot(VirtualRoot),
+    Feature,
+    Product,
+    FeatureRoot,
+    ProductRoot,
+    Area,
+    VirtualRoot,
 }
 
-impl NodeTypeBehavior for NodeType {
-    fn build_child_from_path(&mut self, path: &QualifiedPath) -> NodeType {
+impl NodeType {
+    pub fn build_child_from_name(
+        &mut self,
+        name: &str,
+    ) -> Result<NodeType, WrongNodeTypeError> {
         match self {
-            Self::Feature(feature) => feature.build_child_from_path(path),
-            Self::Product(product) => product.build_child_from_path(path),
-            Self::FeatureRoot(feature_root) => feature_root.build_child_from_path(path),
-            Self::ProductRoot(product_root) => product_root.build_child_from_path(path),
-            Self::Area(area) => area.build_child_from_path(path),
-            Self::VirtualRoot(virtual_root) => virtual_root.build_child_from_path(path),
+            Self::Feature => Ok(Self::Feature),
+            Self::Product => Ok(Self::Product),
+            Self::FeatureRoot => Ok(Self::Feature),
+            Self::ProductRoot => Ok(Self::Product),
+            Self::VirtualRoot => Ok(Self::Area),
+            Self::Area => {
+                if name
+                    .starts_with(ModelConstants::feature_prefix().as_str())
+                {
+                    Ok(Self::FeatureRoot)
+                } else if name
+                    .starts_with(ModelConstants::product_prefix().as_str())
+                {
+                    Ok(Self::ProductRoot)
+                } else {
+                    Err(WrongNodeTypeError::new(format!(
+                        "'{}' is no valid child of an area node. Valid childs include: feature, product",
+                        name
+                    )))
+                }
+            }
         }
     }
 }

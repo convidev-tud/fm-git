@@ -16,8 +16,11 @@ impl Node {
             children: HashMap::new(),
         }
     }
-    fn add_child(&mut self, child: Node) {
-        self.children.insert(child.name.clone(), child);
+    fn add_child<S: Into<String>>(&mut self, name: S) -> Result<(), WrongNodeTypeError> {
+        let real_name = name.into();
+        let new_type = self.node_type.build_child_from_name(real_name.as_str())?;
+        self.children.insert(real_name.clone(), Node::new(real_name, new_type));
+        Ok(())
     }
     pub fn get_name(&self) -> &String {
         &self.name
@@ -31,20 +34,19 @@ impl Node {
     pub fn get_type(&self) -> &NodeType {
         &self.node_type
     }
-    pub fn insert_path(&mut self, path: &QualifiedPath) {
+    pub fn insert_path(&mut self, path: &QualifiedPath) -> Result<(), WrongNodeTypeError> {
         if path.is_empty() {
-            return;
+            return Ok(());
         }
         let name = path.get(0).unwrap().to_string();
-        let next_type = self.node_type.build_child_from_path(&path);
         let next_child = match self.get_child_mut(&name) {
             Some(node) => node,
             None => {
-                self.add_child(Node::new(name.clone(), next_type));
+                self.add_child(name.clone())?;
                 self.get_child_mut(&name).unwrap()
             }
         };
-        next_child.insert_path(&path.trim_n_left(1));
+        next_child.insert_path(&path.trim_n_left(1))
     }
     fn build_display_tree(&self) -> Tree<String> {
         let mut tree = Tree::<String>::new(self.name.clone());
