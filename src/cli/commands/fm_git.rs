@@ -19,6 +19,7 @@ impl CommandDefinition for FMGitCommand {
             Box::new(DeriveCommand {}),
             Box::new(CheckoutCommand {}),
             Box::new(InitCommand {}),
+            Box::new(FeatureCommand),
             Box::new(HiddenCompletionCommand {}),
         ]
     }

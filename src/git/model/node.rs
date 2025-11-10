@@ -16,6 +16,10 @@ impl NodeMetadata {
     }
 }
 
+pub trait NodeTypeInterface {
+    fn get_type(&self) -> &NodeType;
+}
+
 #[derive(Clone, Debug)]
 pub struct Node {
     name: String,
@@ -23,6 +27,13 @@ pub struct Node {
     metadata: NodeMetadata,
     children: HashMap<String, Node>,
 }
+
+impl NodeTypeInterface for Node {
+    fn get_type(&self) -> &NodeType {
+        &self.node_type
+    }
+}
+
 impl Node {
     pub fn new<S: Into<String>>(name: S, node_type: NodeType, metadata: NodeMetadata) -> Self {
         Self {
@@ -49,9 +60,6 @@ impl Node {
     }
     fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
         Some(self.children.get_mut(&name.into())?)
-    }
-    pub fn get_type(&self) -> &NodeType {
-        &self.node_type
     }
     pub fn insert_path(&mut self, path: &QualifiedPath, metadata: NodeMetadata) -> Result<(), WrongNodeTypeError> {
         match path.len() {
@@ -116,10 +124,10 @@ impl Node {
         };
         result
     }
-    pub fn get_child_paths_with_branch(&self) -> Vec<QualifiedPath> {
-        fn predicate(node: &Node) -> bool {
-            node.metadata.has_branch
-        }
+    pub fn get_child_paths_by_branch(&self, has_branch: bool) -> Vec<QualifiedPath> {
+        let predicate = |node: &Node| -> bool {
+            node.metadata.has_branch == has_branch
+        };
         let mut map = HashMap::new();
         map.insert(0, predicate);
         self.get_qualified_paths_by(&QualifiedPath::new(), &map).get(&0).unwrap().clone()

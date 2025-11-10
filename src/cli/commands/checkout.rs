@@ -11,12 +11,12 @@ impl CommandDefinition for CheckoutCommand {
         Command::new("checkout")
             .about("Switch branches")
             .disable_help_subcommand(true)
-            .arg(Arg::new("branch"))
+            .arg(Arg::new("branch").required(true))
     }
 }
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let branch_name = context.arg_helper.get_argument_value::<String>("branch");
+        let branch_name = context.arg_helper.get_argument_value::<String>("branch").unwrap();
         let result = context.git.checkout(&QualifiedPath::from(branch_name))?;
         context.log_from_output(&result);
         Ok(())

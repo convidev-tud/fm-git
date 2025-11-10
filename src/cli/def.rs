@@ -4,7 +4,7 @@ use crate::git::interface::GitInterface;
 use crate::util::u8_to_string;
 use clap::Command;
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::process::Output;
 
 #[derive(Debug)]
@@ -133,3 +133,21 @@ pub trait CommandInterface: Debug {
 
 pub trait CommandImpl: CommandDefinition + CommandInterface + Debug {}
 impl<T: CommandDefinition + CommandInterface + Debug> CommandImpl for T {}
+
+#[derive(Debug, Clone)]
+pub struct CommandError {
+    msg: String,
+}
+impl CommandError {
+    pub fn new(msg: &str) -> CommandError {
+        CommandError {
+            msg: msg.to_string(),
+        }
+    }
+}
+impl Display for CommandError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+impl Error for CommandError {}

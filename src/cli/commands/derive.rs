@@ -24,7 +24,7 @@ impl CommandDefinition for DeriveCommand {
 
 impl CommandInterface for DeriveCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let target_product_name = context.arg_helper.get_argument_value::<String>("product");
+        let target_product_name = context.arg_helper.get_argument_value::<String>("product").unwrap();
         let current_area = context.git.get_current_area()?;
         let feature_root = context.git.get_current_feature_root()?;
         let product_root = context.git.get_current_product_root()?;
@@ -59,7 +59,7 @@ impl CommandInterface for DeriveCommand {
         let result = match current {
             Some(value) => match value.get_id().as_str() {
                 "features" => completion_helper.complete_qualified_path_stepwise(
-                    &feature_root.get_child_paths_with_branch(),
+                    &feature_root.get_child_paths_by_branch(true),
                     true,
                 ),
                 _ => vec![],

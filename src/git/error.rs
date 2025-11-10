@@ -19,6 +19,7 @@ impl Display for GitInterfaceError {
     }
 }
 impl Error for GitInterfaceError {}
+
 #[derive(Debug)]
 pub enum GitError {
     Io(io::Error),

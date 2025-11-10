@@ -54,6 +54,11 @@ impl Display for QualifiedPath {
         f.write_str(self.to_string().as_str())
     }
 }
+impl From<QualifiedPath> for String {
+    fn from(value: QualifiedPath) -> Self {
+        value.to_string()
+    }
+}
 impl QualifiedPath {
     pub fn new() -> Self {
         Self { path: Vec::new() }
