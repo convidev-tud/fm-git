@@ -1,6 +1,6 @@
 use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use crate::git::model::{NodeType, QualifiedPath};
+use crate::git::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
@@ -55,12 +55,11 @@ impl CommandInterface for DeriveCommand {
             return Ok(vec![]);
         }
         let feature_root = maybe_feature_root_node.unwrap().get_node();
-
         let current = completion_helper.currently_editing();
         let result = match current {
             Some(value) => match value.get_id().as_str() {
                 "features" => completion_helper.complete_qualified_path_stepwise(
-                    feature_root_type.get_features_with_branches(),
+                    &feature_root.get_child_paths_with_branch(),
                     true,
                 ),
                 _ => vec![],
