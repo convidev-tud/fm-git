@@ -1,7 +1,7 @@
+use crate::git::model::WrongNodeTypeError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
-use crate::git::model::WrongNodeTypeError;
 
 #[derive(Debug, Clone)]
 pub struct GitInterfaceError {

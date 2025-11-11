@@ -14,10 +14,15 @@ impl<'a> ArgHelper<'a> {
     pub fn get_argument_value<T: Clone + Send + Sync + 'static>(&self, id: &str) -> Option<T> {
         Some(self.args.get_one::<T>(id)?.clone())
     }
-    pub fn get_argument_values<T: Clone + Send + Sync + 'static>(&self, id: &str) -> Option<Vec<T>> {
-        Some(self.args
-            .get_many::<T>(id)?
-            .map(|s| s.clone())
-            .collect::<Vec<_>>())
+    pub fn get_argument_values<T: Clone + Send + Sync + 'static>(
+        &self,
+        id: &str,
+    ) -> Option<Vec<T>> {
+        Some(
+            self.args
+                .get_many::<T>(id)?
+                .map(|s| s.clone())
+                .collect::<Vec<_>>(),
+        )
     }
 }

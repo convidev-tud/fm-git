@@ -40,7 +40,8 @@ impl GitInterface {
             .collect();
         for branch in all_branches {
             if !branch.is_empty() {
-                self.model.insert_qualified_path(QualifiedPath::from(branch))?;
+                self.model
+                    .insert_qualified_path(QualifiedPath::from(branch))?;
             }
         }
         Ok(())
@@ -88,7 +89,14 @@ impl GitInterface {
     pub fn create_branch(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         let branch = path.to_git_branch();
         let commands = vec!["branch", branch.as_str()];
-        Ok(self.raw_git_interface.run(commands)?)
+        let output = self.raw_git_interface.run(commands)?;
+        if output.status.success() {
+            Ok(output)
+        } else {
+            Err(GitError::GitInterface(GitInterfaceError::new(
+                u8_to_string(&output.stderr).as_str(),
+            )))
+        }
     }
     pub fn delete_branch(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         let branch = path.to_git_branch();

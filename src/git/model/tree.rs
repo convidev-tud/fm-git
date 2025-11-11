@@ -16,12 +16,15 @@ impl TreeDataModel {
         }
     }
     pub fn insert_qualified_path(&mut self, path: QualifiedPath) -> Result<(), WrongNodeTypeError> {
-        self.virtual_root.insert_path(&path, NodeMetadata::new(true))?;
+        self.virtual_root
+            .insert_path(&path, NodeMetadata::new(true))?;
         self.qualified_paths_with_branch.push(path);
         Ok(())
     }
     pub fn get_area(&self, path: &QualifiedPath) -> Option<NodePath<Area>> {
-        Some(NodePath::<Area>::new(self.virtual_root.get_child(path.first()?)?.clone()))
+        Some(NodePath::<Area>::new(
+            self.virtual_root.get_child(path.first()?)?.clone(),
+        ))
     }
     pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<AnyNodeType>> {
         let mut initial_path = self.get_area(&path.first()?)?;

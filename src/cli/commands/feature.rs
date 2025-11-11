@@ -1,22 +1,27 @@
+use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
+use crate::git::model::*;
 use clap::{Arg, Command};
 use std::error::Error;
-use crate::cli::completion::CompletionHelper;
-use crate::git::model::*;
 
 fn add_feature(feature: QualifiedPath, context: &CommandContext) -> Result<(), Box<dyn Error>> {
     let node_path = context.git.get_current_node_path()?;
     let current_path = match node_path.concretize() {
-        NodePathType::Area(path) => {
-            path.get_path_to_feature_root()
+        NodePathType::Area(path) => path.get_path_to_feature_root(),
+        NodePathType::Feature(path) => path.get_qualified_path(),
+        _ => {
+            return Err(Box::new(CommandError::new(
+                "Cannot create feature: Current branch is not a feature or area branch",
+            )));
         }
-        NodePathType::Feature(path) => {
-            path.get_qualified_path()
-        }
-        _ => { return Err(Box::new(CommandError::new("Cannot create feature: Current branch is not a feature branch"))) }
     };
-    let output = context.git.create_branch(&(current_path + feature))?;
+    let target_path = current_path + feature;
+    let output = context.git.create_branch(&target_path)?;
     context.log_from_output(&output);
+    context.log_to_stdout(format!(
+        "Created new feature {}",
+        target_path.trim_n_left(1)
+    ));
     Ok(())
 }
 fn delete_feature(feature: QualifiedPath, context: &CommandContext) -> Result<(), Box<dyn Error>> {
@@ -29,7 +34,9 @@ fn delete_feature(feature: QualifiedPath, context: &CommandContext) -> Result<()
 fn print_feature_tree(context: &CommandContext) -> Result<(), Box<dyn Error>> {
     let area = context.git.get_current_area()?;
     match area.to_feature_root() {
-        Some(path) => { context.log_to_stdout(path.display_tree()); }
+        Some(path) => {
+            context.log_to_stdout(path.display_tree());
+        }
         None => {}
     }
     Ok(())
@@ -53,7 +60,7 @@ impl CommandInterface for FeatureCommand {
         match maybe_delete {
             Some(delete) => {
                 delete_feature(QualifiedPath::from(delete), &context)?;
-                return Ok(())
+                return Ok(());
             }
             None => {}
         }
@@ -72,28 +79,57 @@ impl CommandInterface for FeatureCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let maybe_feature_root = context.git.get_current_area()?.to_feature_root();
-        if maybe_feature_root.is_none() { return Ok(Vec::new()) }
-        let feature_root = maybe_feature_root.unwrap();
+        let current_branch = context.git.get_current_node_path()?;
+        let maybe_concrete_path = match current_branch.concretize() {
+            NodePathType::Area(path) => match path.to_feature_root() {
+                Some(path) => Some(path.to_any_type()),
+                None => None,
+            },
+            NodePathType::FeatureRoot(path) => Some(path.to_any_type()),
+            NodePathType::Feature(path) => Some(path.to_any_type()),
+            _ => None,
+        };
+        if maybe_concrete_path.is_none() {
+            return Ok(vec![]);
+        }
+        let path = maybe_concrete_path.unwrap();
         let result = match completion_helper.currently_editing() {
-            Some(arg) => {
-                match arg.get_id().as_str() {
-                    "feature" => {
-                        completion_helper.complete_qualified_path_stepwise(
-                            &feature_root.get_child_paths_by_branch(false),
-                            false
-                        )
+            Some(arg) => match arg.get_id().as_str() {
+                "feature" => {
+                    let total = path.get_child_paths_by_branch();
+                    if total.is_empty() {
+                        return Ok(vec![]);
                     }
-                    "delete" => {
-                        completion_helper.complete_qualified_path_stepwise(
-                            &feature_root.get_child_paths_by_branch(true),
-                            false
-                        )
-                    }
-                    _ => { vec![] }
+                    let has_branch = total.get(&true).unwrap();
+                    let has_no_branch = total.get(&false).unwrap();
+                    let has_branch_completion =
+                        completion_helper.complete_qualified_path_stepwise(has_branch, false);
+                    let has_no_branch_completion =
+                        completion_helper.complete_qualified_path_stepwise(has_no_branch, false);
+                    let mut result = has_branch_completion
+                        .into_iter()
+                        .map(|path| {
+                            if !path.ends_with("/") {
+                                path + "/"
+                            } else {
+                                path
+                            }
+                        })
+                        .collect::<Vec<String>>();
+                    result.extend(has_no_branch_completion);
+                    result
                 }
+                "delete" => completion_helper.complete_qualified_path_stepwise(
+                    &path.get_child_paths_by_branch().get(&true).unwrap(),
+                    false,
+                ),
+                _ => {
+                    vec![]
+                }
+            },
+            None => {
+                vec![]
             }
-            None => { vec![] }
         };
         Ok(result)
     }

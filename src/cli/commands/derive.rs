@@ -12,7 +12,11 @@ impl CommandDefinition for DeriveCommand {
         Command::new("derive")
             .about("Derive a product")
             .disable_help_subcommand(true)
-            .arg(Arg::new("features").action(ArgAction::Append).required(true))
+            .arg(
+                Arg::new("features")
+                    .action(ArgAction::Append)
+                    .required(true),
+            )
             .arg(
                 Arg::new("product")
                     .short('p')
@@ -24,9 +28,13 @@ impl CommandDefinition for DeriveCommand {
 
 impl CommandInterface for DeriveCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let target_product_name = context.arg_helper.get_argument_value::<String>("product").unwrap();
+        let target_product_name = context
+            .arg_helper
+            .get_argument_value::<String>("product")
+            .unwrap();
         let current_area = context.git.get_current_area()?;
-        let target_path = current_area.get_path_to_product_root() + QualifiedPath::from(target_product_name);
+        let target_path =
+            current_area.get_path_to_product_root() + QualifiedPath::from(target_product_name);
 
         let all_features = context
             .arg_helper
@@ -56,7 +64,7 @@ impl CommandInterface for DeriveCommand {
         let result = match current {
             Some(value) => match value.get_id().as_str() {
                 "features" => completion_helper.complete_qualified_path_stepwise(
-                    &feature_root.get_child_paths_by_branch(true),
+                    &feature_root.get_child_paths_by_branch().get(&true).unwrap(),
                     true,
                 ),
                 _ => vec![],

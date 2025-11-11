@@ -40,10 +40,7 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn build_child_from_name(
-        &mut self,
-        name: &str,
-    ) -> Result<NodeType, WrongNodeTypeError> {
+    pub fn build_child_from_name(&mut self, name: &str) -> Result<NodeType, WrongNodeTypeError> {
         match self {
             Self::Feature => Ok(Self::Feature),
             Self::Product => Ok(Self::Product),
@@ -51,13 +48,9 @@ impl NodeType {
             Self::ProductRoot => Ok(Self::Product),
             Self::VirtualRoot => Ok(Self::Area),
             Self::Area => {
-                if name
-                    .starts_with(FEATURES_PREFIX)
-                {
+                if name.starts_with(FEATURES_PREFIX) {
                     Ok(Self::FeatureRoot)
-                } else if name
-                    .starts_with(PRODUCTS_PREFIX)
-                {
+                } else if name.starts_with(PRODUCTS_PREFIX) {
                     Ok(Self::ProductRoot)
                 } else {
                     Err(WrongNodeTypeError::new(format!(
@@ -110,15 +103,25 @@ impl Node {
     }
     fn build_display_tree(&self) -> Tree<String> {
         let mut tree = Tree::<String>::new(self.name.clone());
-        for child in self.children.values() {
+        let mut sorted_children = self.children.iter().collect::<Vec<_>>();
+        sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
+        sorted_children.reverse();
+        for (_, child) in sorted_children {
             tree.leaves.push(child.build_display_tree());
         }
         tree
     }
-    fn add_child<S: Into<String>>(&mut self, name: S, metadata: NodeMetadata) -> Result<(), WrongNodeTypeError> {
+    fn add_child<S: Into<String>>(
+        &mut self,
+        name: S,
+        metadata: NodeMetadata,
+    ) -> Result<(), WrongNodeTypeError> {
         let real_name = name.into();
         let new_type = self.node_type.build_child_from_name(real_name.as_str())?;
-        self.children.insert(real_name.clone(), Rc::new(Node::new(real_name, new_type, metadata)));
+        self.children.insert(
+            real_name.clone(),
+            Rc::new(Node::new(real_name, new_type, metadata)),
+        );
         Ok(())
     }
     fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
@@ -145,7 +148,11 @@ impl Node {
     pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Rc<Node>> {
         Some(self.children.get(&name.into())?)
     }
-    pub fn insert_path(&mut self, path: &QualifiedPath, metadata: NodeMetadata) -> Result<(), WrongNodeTypeError> {
+    pub fn insert_path(
+        &mut self,
+        path: &QualifiedPath,
+        metadata: NodeMetadata,
+    ) -> Result<(), WrongNodeTypeError> {
         match path.len() {
             0 => Ok(()),
             1 => {
@@ -157,7 +164,7 @@ impl Node {
                     }
                 };
                 Ok(())
-            },
+            }
             _ => {
                 let name = path.get(0).unwrap().to_string();
                 let next_child = match self.get_child_mut(&name) {
@@ -174,15 +181,21 @@ impl Node {
     pub fn as_qualified_path(&self) -> QualifiedPath {
         QualifiedPath::from(self.name.clone())
     }
-    pub fn get_qualified_paths_by<T, P>(&self, initial_path: &QualifiedPath, predicates: &HashMap<T, P>) -> HashMap<T, Vec<QualifiedPath>>
-    where P: Fn(&Node) -> bool,
-          T: Hash + Eq + Clone + Debug,
+    pub fn get_qualified_paths_by<T, P>(
+        &self,
+        initial_path: &QualifiedPath,
+        predicate: &P,
+        categories: &Vec<T>,
+    ) -> HashMap<T, Vec<QualifiedPath>>
+    where
+        P: Fn(&T, &Node) -> bool,
+        T: Hash + Eq + Clone + Debug,
     {
         let mut result: HashMap<T, Vec<QualifiedPath>> = HashMap::new();
         for child in self.children.values() {
             let path = initial_path.clone() + child.as_qualified_path();
-            for (t, predicate) in predicates {
-                let to_insert = if predicate(child) {
+            for t in categories {
+                let to_insert = if predicate(t, child) {
                     vec![path.clone()]
                 } else {
                     vec![]
@@ -193,11 +206,11 @@ impl Node {
                     result.insert(t.clone(), to_insert);
                 }
             }
-            let from_child = child.get_qualified_paths_by(&path, predicates);
+            let from_child = child.get_qualified_paths_by(&path, predicate, categories);
             for (t, value) in from_child {
                 result.get_mut(&t).unwrap().extend(value);
             }
-        };
+        }
         result
     }
     pub fn display_tree(&self) -> String {
@@ -211,20 +224,22 @@ mod tests {
 
     fn prepare_node() -> Node {
         let mut node = Node::new("root", NodeType::Feature, NodeMetadata::default());
-        node.insert_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default()).unwrap();
-        node.insert_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default()).unwrap();
+        node.insert_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default())
+            .unwrap();
+        node.insert_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default())
+            .unwrap();
         node
     }
 
     #[test]
     fn test_get_qualified_paths_by() {
-        let predicate = |node: &Node| -> bool {
-            !node.get_metadata().has_branch
-        };
-        let mut map = HashMap::new();
-        map.insert(0, predicate);
+        let predicate = |_: &i32, node: &Node| -> bool { !node.get_metadata().has_branch };
         let node = prepare_node();
-        let result = node.get_qualified_paths_by(&QualifiedPath::new(), &map).get(&0).unwrap().clone();
+        let result = node
+            .get_qualified_paths_by(&QualifiedPath::new(), &predicate, &vec![0])
+            .get(&0)
+            .unwrap()
+            .clone();
         assert!(result.contains(&QualifiedPath::from("foo")));
         assert!(result.contains(&QualifiedPath::from("bar")));
         assert!(result.contains(&QualifiedPath::from("foo/f1")));

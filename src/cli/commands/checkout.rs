@@ -16,7 +16,10 @@ impl CommandDefinition for CheckoutCommand {
 }
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let branch_name = context.arg_helper.get_argument_value::<String>("branch").unwrap();
+        let branch_name = context
+            .arg_helper
+            .get_argument_value::<String>("branch")
+            .unwrap();
         let result = context.git.checkout(&QualifiedPath::from(branch_name))?;
         context.log_from_output(&result);
         Ok(())

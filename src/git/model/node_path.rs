@@ -21,6 +21,9 @@ impl NodePath<AnyNodeType> {
     fn to_concrete_type<T>(self) -> NodePath<T> {
         NodePath::<T>::from_path(self.path)
     }
+    pub fn from_concrete<T>(other: NodePath<T>) -> Self {
+        Self::from_path(other.path)
+    }
     pub fn concretize(self) -> NodePathType {
         match self.get_node().get_type() {
             NodeType::Feature => NodePathType::Feature(self.to_concrete_type()),
@@ -70,10 +73,13 @@ impl<T> NodePath<T> {
     fn get_node(&self) -> &Node {
         self.path.last().unwrap()
     }
+    pub fn to_any_type(self) -> NodePath<AnyNodeType> {
+        NodePath::<AnyNodeType>::from_concrete(self)
+    }
     pub fn to(mut self, path: &QualifiedPath) -> Option<NodePath<AnyNodeType>> {
         for p in path.iter() {
             self.path.push(self.get_node().get_child(p)?.clone());
-        };
+        }
         Some(NodePath::<AnyNodeType>::from_path(self.path))
     }
     pub fn to_parent_area(self) -> NodePath<Area> {
@@ -86,13 +92,18 @@ impl<T> NodePath<T> {
         }
         path
     }
-    pub fn get_child_paths_by_branch(&self, has_branch: bool) -> Vec<QualifiedPath> {
-        let predicate = |node: &Node| -> bool {
-            node.get_metadata().has_branch() == has_branch
+    pub fn get_child_paths_by_branch(&self) -> HashMap<bool, Vec<QualifiedPath>> {
+        let has_branch = |node: &Node| -> bool { node.get_metadata().has_branch() };
+        let has_no_branch = |node: &Node| -> bool { !node.get_metadata().has_branch() };
+        let check = |flag: &bool, node: &Node| -> bool {
+            if *flag {
+                has_branch(node)
+            } else {
+                has_no_branch(node)
+            }
         };
-        let mut map = HashMap::new();
-        map.insert(0, predicate);
-        self.get_node().get_qualified_paths_by(&QualifiedPath::new(), &map).get(&0).unwrap().clone()
+        self.get_node()
+            .get_qualified_paths_by(&QualifiedPath::new(), &check, &vec![true, false])
     }
     pub fn display_tree(&self) -> String {
         self.get_node().display_tree()
