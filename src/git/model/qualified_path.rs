@@ -96,8 +96,8 @@ impl QualifiedPath {
     pub fn trim_n_right(&self, n: usize) -> QualifiedPath {
         self.trim_n(0, n)
     }
-    pub fn first(&self) -> Option<&String> {
-        self.path.first()
+    pub fn first(&self) -> Option<QualifiedPath> {
+        Some(QualifiedPath::from(self.path.first()?.clone()))
     }
     pub fn _last(&self) -> Option<&String> {
         self.path.last()

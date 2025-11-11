@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;
+use crate::git::model::WrongNodeTypeError;
 
 #[derive(Debug, Clone)]
 pub struct GitInterfaceError {
@@ -24,12 +25,14 @@ impl Error for GitInterfaceError {}
 pub enum GitError {
     Io(io::Error),
     GitInterface(GitInterfaceError),
+    WrongNodeType(WrongNodeTypeError),
 }
 impl Display for GitError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             GitError::Io(err) => err.fmt(f),
             GitError::GitInterface(err) => err.fmt(f),
+            GitError::WrongNodeType(err) => err.fmt(f),
         }
     }
 }
@@ -37,5 +40,15 @@ impl Error for GitError {}
 impl From<io::Error> for GitError {
     fn from(err: io::Error) -> GitError {
         GitError::Io(err)
+    }
+}
+impl From<GitInterfaceError> for GitError {
+    fn from(value: GitInterfaceError) -> Self {
+        GitError::GitInterface(value)
+    }
+}
+impl From<WrongNodeTypeError> for GitError {
+    fn from(value: WrongNodeTypeError) -> Self {
+        GitError::WrongNodeType(value)
     }
 }

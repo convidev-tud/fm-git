@@ -1,23 +1,7 @@
 use crate::git::model::*;
 
-const FEATURES_PREFIX: &str = "feature";
-const PRODUCTS_PREFIX: &str = "product";
-
-pub struct ModelConstants;
-impl ModelConstants {
-    pub fn feature_prefix() -> String {
-        FEATURES_PREFIX.to_string()
-    }
-    pub fn product_prefix() -> String {
-        PRODUCTS_PREFIX.to_string()
-    }
-    pub fn _feature_path_prefix() -> String {
-        FEATURES_PREFIX.to_string() + "/"
-    }
-    pub fn _product_path_prefix() -> String {
-        PRODUCTS_PREFIX.to_string() + "/"
-    }
-}
+pub const FEATURES_PREFIX: &str = "feature";
+pub const PRODUCTS_PREFIX: &str = "product";
 
 #[derive(Clone, Debug)]
 pub struct TreeDataModel {
@@ -36,20 +20,13 @@ impl TreeDataModel {
         self.qualified_paths_with_branch.push(path);
         Ok(())
     }
-    pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<'_>> {
-        let area_node = self.virtual_root.get_child(path.first()?)?;
-        let mut node_path = area_node.as_node_path();
+    pub fn get_area(&self, path: &QualifiedPath) -> Option<NodePath<Area>> {
+        Some(NodePath::<Area>::new(self.virtual_root.get_child(path.first()?)?.clone()))
+    }
+    pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<AnyNodeType>> {
+        let mut initial_path = self.get_area(&path.first()?)?;
         let new_path = path.trim_n_left(1);
-        match node_path.push_path(new_path) {
-            Ok(_) => Some(node_path),
-            Err(_) => None,
-        }
-    }
-    pub fn get_qualified_path_to_product_root(&self, area: &QualifiedPath) -> QualifiedPath {
-        area.clone() + QualifiedPath::from(ModelConstants::product_prefix())
-    }
-    pub fn get_qualified_path_to_feature_root(&self, area: &QualifiedPath) -> QualifiedPath {
-        area.clone() + QualifiedPath::from(ModelConstants::feature_prefix())
+        initial_path.to(&new_path)
     }
     pub fn has_branch(&self, qualified_path: &QualifiedPath) -> bool {
         self.qualified_paths_with_branch

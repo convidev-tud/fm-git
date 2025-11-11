@@ -1,7 +1,74 @@
 use crate::git::model::*;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::rc::Rc;
 use termtree::Tree;
+
+#[derive(Debug, Clone)]
+pub struct WrongNodeTypeError {
+    msg: String,
+}
+impl WrongNodeTypeError {
+    pub fn new<S: Into<String>>(msg: S) -> WrongNodeTypeError {
+        WrongNodeTypeError { msg: msg.into() }
+    }
+}
+impl Display for WrongNodeTypeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+impl Error for WrongNodeTypeError {}
+
+pub struct Feature;
+pub struct FeatureRoot;
+pub struct Product;
+pub struct ProductRoot;
+pub struct Area;
+pub struct VirtualRoot;
+pub struct AnyNodeType;
+#[derive(Clone, Debug)]
+pub enum NodeType {
+    Feature,
+    Product,
+    FeatureRoot,
+    ProductRoot,
+    Area,
+    VirtualRoot,
+}
+
+impl NodeType {
+    pub fn build_child_from_name(
+        &mut self,
+        name: &str,
+    ) -> Result<NodeType, WrongNodeTypeError> {
+        match self {
+            Self::Feature => Ok(Self::Feature),
+            Self::Product => Ok(Self::Product),
+            Self::FeatureRoot => Ok(Self::Feature),
+            Self::ProductRoot => Ok(Self::Product),
+            Self::VirtualRoot => Ok(Self::Area),
+            Self::Area => {
+                if name
+                    .starts_with(FEATURES_PREFIX)
+                {
+                    Ok(Self::FeatureRoot)
+                } else if name
+                    .starts_with(PRODUCTS_PREFIX)
+                {
+                    Ok(Self::ProductRoot)
+                } else {
+                    Err(WrongNodeTypeError::new(format!(
+                        "'{}' is no valid child of an area node. Valid childs include: feature, product",
+                        name
+                    )))
+                }
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct NodeMetadata {
@@ -12,12 +79,13 @@ impl NodeMetadata {
         Self { has_branch }
     }
     pub fn default() -> Self {
+        let i = "".to_string();
+        drop(i);
         Self { has_branch: false }
     }
-}
-
-pub trait NodeTypeInterface {
-    fn get_type(&self) -> &NodeType;
+    pub fn has_branch(&self) -> bool {
+        self.has_branch
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -25,13 +93,7 @@ pub struct Node {
     name: String,
     node_type: NodeType,
     metadata: NodeMetadata,
-    children: HashMap<String, Node>,
-}
-
-impl NodeTypeInterface for Node {
-    fn get_type(&self) -> &NodeType {
-        &self.node_type
-    }
+    children: HashMap<String, Rc<Node>>,
 }
 
 impl Node {
@@ -46,20 +108,42 @@ impl Node {
     pub fn update_metadata(&mut self, metadata: NodeMetadata) {
         self.metadata = metadata;
     }
+    fn build_display_tree(&self) -> Tree<String> {
+        let mut tree = Tree::<String>::new(self.name.clone());
+        for child in self.children.values() {
+            tree.leaves.push(child.build_display_tree());
+        }
+        tree
+    }
     fn add_child<S: Into<String>>(&mut self, name: S, metadata: NodeMetadata) -> Result<(), WrongNodeTypeError> {
         let real_name = name.into();
         let new_type = self.node_type.build_child_from_name(real_name.as_str())?;
-        self.children.insert(real_name.clone(), Node::new(real_name, new_type, metadata));
+        self.children.insert(real_name.clone(), Rc::new(Node::new(real_name, new_type, metadata)));
         Ok(())
+    }
+    fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
+        let real_name = name.into();
+        let maybe_mut = Rc::get_mut(self.children.get_mut(&real_name)?);
+        match maybe_mut {
+            Some(node) => Some(node),
+            None => panic!(
+                "Tried to get child '{}' as mutable but failed: shared references exist\n\
+                Make sure to drop all references to the node tree if you attempt modifications",
+                real_name
+            ),
+        }
     }
     pub fn get_name(&self) -> &String {
         &self.name
     }
-    pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Node> {
-        Some(self.children.get(&name.into())?)
+    pub fn get_type(&self) -> &NodeType {
+        &self.node_type
     }
-    fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
-        Some(self.children.get_mut(&name.into())?)
+    pub fn get_metadata(&self) -> &NodeMetadata {
+        &self.metadata
+    }
+    pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Rc<Node>> {
+        Some(self.children.get(&name.into())?)
     }
     pub fn insert_path(&mut self, path: &QualifiedPath, metadata: NodeMetadata) -> Result<(), WrongNodeTypeError> {
         match path.len() {
@@ -87,34 +171,26 @@ impl Node {
             }
         }
     }
-    fn build_display_tree(&self) -> Tree<String> {
-        let mut tree = Tree::<String>::new(self.name.clone());
-        for child in self.children.values() {
-            tree.leaves.push(child.build_display_tree());
-        }
-        tree
-    }
-    pub fn display_tree(&self) -> String {
-        self.build_display_tree().to_string()
-    }
-    pub fn as_node_path(&self) -> NodePath<'_> {
-        NodePath::new(&self)
-    }
     pub fn as_qualified_path(&self) -> QualifiedPath {
         QualifiedPath::from(self.name.clone())
     }
     pub fn get_qualified_paths_by<T, P>(&self, initial_path: &QualifiedPath, predicates: &HashMap<T, P>) -> HashMap<T, Vec<QualifiedPath>>
     where P: Fn(&Node) -> bool,
-          T: Hash + Eq + Clone,
+          T: Hash + Eq + Clone + Debug,
     {
         let mut result: HashMap<T, Vec<QualifiedPath>> = HashMap::new();
         for child in self.children.values() {
             let path = initial_path.clone() + child.as_qualified_path();
             for (t, predicate) in predicates {
-                if predicate(child) {
-                    result.insert(t.clone(), vec![path.clone()]);
+                let to_insert = if predicate(child) {
+                    vec![path.clone()]
                 } else {
-                    result.insert(t.clone(), vec![]);
+                    vec![]
+                };
+                if result.contains_key(t) {
+                    result.get_mut(t).unwrap().extend(to_insert);
+                } else {
+                    result.insert(t.clone(), to_insert);
                 }
             }
             let from_child = child.get_qualified_paths_by(&path, predicates);
@@ -124,12 +200,34 @@ impl Node {
         };
         result
     }
-    pub fn get_child_paths_by_branch(&self, has_branch: bool) -> Vec<QualifiedPath> {
+    pub fn display_tree(&self) -> String {
+        self.build_display_tree().to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prepare_node() -> Node {
+        let mut node = Node::new("root", NodeType::Feature, NodeMetadata::default());
+        node.insert_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default()).unwrap();
+        node.insert_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default()).unwrap();
+        node
+    }
+
+    #[test]
+    fn test_get_qualified_paths_by() {
         let predicate = |node: &Node| -> bool {
-            node.metadata.has_branch == has_branch
+            !node.get_metadata().has_branch
         };
         let mut map = HashMap::new();
         map.insert(0, predicate);
-        self.get_qualified_paths_by(&QualifiedPath::new(), &map).get(&0).unwrap().clone()
+        let node = prepare_node();
+        let result = node.get_qualified_paths_by(&QualifiedPath::new(), &map).get(&0).unwrap().clone();
+        assert!(result.contains(&QualifiedPath::from("foo")));
+        assert!(result.contains(&QualifiedPath::from("bar")));
+        assert!(result.contains(&QualifiedPath::from("foo/f1")));
+        assert!(result.contains(&QualifiedPath::from("bar/b1")));
     }
 }

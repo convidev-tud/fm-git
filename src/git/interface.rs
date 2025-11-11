@@ -32,7 +32,7 @@ impl GitInterface {
             Err(e) => panic!("{:?}", e),
         }
     }
-    fn update_complete_model(&mut self) -> Result<(), io::Error> {
+    fn update_complete_model(&mut self) -> Result<(), GitError> {
         let output = self.raw_git_interface.run(vec!["branch"])?;
         let all_branches: Vec<String> = u8_to_string(&output.stdout)
             .split("\n")
@@ -40,8 +40,7 @@ impl GitInterface {
             .collect();
         for branch in all_branches {
             if !branch.is_empty() {
-                self.model
-                    .insert_qualified_path(QualifiedPath::from(branch));
+                self.model.insert_qualified_path(QualifiedPath::from(branch))?;
             }
         }
         Ok(())
@@ -60,17 +59,14 @@ impl GitInterface {
     pub fn get_current_qualified_path(&self) -> Result<QualifiedPath, GitError> {
         Ok(QualifiedPath::from(self.get_current_branch()?))
     }
-    pub fn get_current_area(&self) -> Result<QualifiedPath, GitError> {
-        let current_branch = self.get_current_qualified_path()?;
-        Ok(QualifiedPath::from(current_branch.first().unwrap().clone()))
+    pub fn get_current_node_path(&self) -> Result<NodePath<AnyNodeType>, GitError> {
+        let current_qualified_path = self.get_current_qualified_path()?;
+        Ok(self.model.get_node_path(&current_qualified_path).unwrap())
     }
-    pub fn get_current_feature_root(&self) -> Result<QualifiedPath, GitError> {
-        let area = self.get_current_area()?;
-        Ok(self.model.get_qualified_path_to_feature_root(&area))
-    }
-    pub fn get_current_product_root(&self) -> Result<QualifiedPath, GitError> {
-        let area = self.get_current_area()?;
-        Ok(self.model.get_qualified_path_to_product_root(&area))
+    pub fn get_current_area(&self) -> Result<NodePath<Area>, GitError> {
+        let current_qualified_path = self.get_current_qualified_path()?;
+        let qualified_path = QualifiedPath::from(current_qualified_path.first().unwrap().clone());
+        Ok(self.model.get_area(&qualified_path).unwrap())
     }
 
     // all git commands
@@ -88,6 +84,16 @@ impl GitInterface {
         Ok(self
             .raw_git_interface
             .run(vec!["checkout", path.to_git_branch().as_str()])?)
+    }
+    pub fn create_branch(&self, path: &QualifiedPath) -> Result<Output, GitError> {
+        let branch = path.to_git_branch();
+        let commands = vec!["branch", branch.as_str()];
+        Ok(self.raw_git_interface.run(commands)?)
+    }
+    pub fn delete_branch(&self, path: &QualifiedPath) -> Result<Output, GitError> {
+        let branch = path.to_git_branch();
+        let commands = vec!["branch", "-D", branch.as_str()];
+        Ok(self.raw_git_interface.run(commands)?)
     }
     pub fn merge(&self, paths: &Vec<QualifiedPath>) -> Result<Output, GitError> {
         let mut base = vec!["merge"];
