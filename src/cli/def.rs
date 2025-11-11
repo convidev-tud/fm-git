@@ -93,6 +93,13 @@ impl CommandContext<'_> {
             arg_helper,
         }
     }
+    fn transform_branch_names<S: Into<String>>(&self, to_print: S) -> String {
+        let mut result = to_print.into();
+        for branch in self.git.get_model().get_qualified_paths_with_branches() {
+            result = result.replace(branch.to_git_branch().as_str(), branch.to_string().as_str());
+        };
+        result
+    }
     pub fn log_from_output(&self, output: &Output) {
         self.log_to_stdout(u8_to_string(&output.stdout));
         self.log_to_stderr(u8_to_string(&output.stderr));
@@ -100,13 +107,13 @@ impl CommandContext<'_> {
     pub fn log_to_stdout<S: Into<String>>(&self, stdout: S) {
         let converted = stdout.into();
         if converted.len() > 0 {
-            println!("{}", converted.trim_end())
+            println!("{}", self.transform_branch_names(converted.trim_end()))
         }
     }
     pub fn log_to_stderr<S: Into<String>>(&self, stderr: S) {
         let converted = stderr.into();
         if converted.len() > 0 {
-            println!("{}", converted.trim_end())
+            println!("{}", self.transform_branch_names(converted.trim_end()))
         }
     }
 }

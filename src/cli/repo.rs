@@ -28,11 +28,12 @@ impl CommandRepository {
                     ))
                 } else {
                     let ext_args: Vec<_> = sub_args.get_many::<OsString>("").unwrap().collect();
-                    std::process::Command::new("git")
+                    let output = std::process::Command::new("git")
                         .arg(sub)
                         .args(ext_args)
-                        .status()
+                        .output()
                         .expect("failed to execute git");
+                    context.log_from_output(&output);
                 }
             }
             _ => {}

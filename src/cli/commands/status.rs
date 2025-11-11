@@ -16,10 +16,7 @@ impl CommandDefinition for StatusCommand {
 
 impl CommandInterface for StatusCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let output = std::process::Command::new("git")
-            .args(["status"])
-            .output()
-            .expect("failed to execute process");
+        let output = context.git.status()?;
         context.log_from_output(&output);
         Ok(())
     }
