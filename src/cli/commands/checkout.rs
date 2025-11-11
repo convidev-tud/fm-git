@@ -1,6 +1,6 @@
 use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use crate::git::model::QualifiedPath;
+use crate::model::QualifiedPath;
 use clap::{Arg, Command};
 use std::error::Error;
 

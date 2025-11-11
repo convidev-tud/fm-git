@@ -1,4 +1,4 @@
-use crate::git::model::*;
+use crate::model::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};

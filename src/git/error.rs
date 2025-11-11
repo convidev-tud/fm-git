@@ -1,4 +1,4 @@
-use crate::git::model::WrongNodeTypeError;
+use crate::model::WrongNodeTypeError;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io;

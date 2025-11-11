@@ -1,6 +1,6 @@
 use crate::cli::completion::CompletionHelper;
 use crate::cli::*;
-use crate::git::model::*;
+use crate::model::*;
 use clap::{Arg, Command};
 use std::error::Error;
 

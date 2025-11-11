@@ -1,4 +1,4 @@
-use crate::git::model::*;
+use crate::model::*;
 
 pub const FEATURES_PREFIX: &str = "feature";
 pub const PRODUCTS_PREFIX: &str = "product";

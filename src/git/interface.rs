@@ -1,5 +1,5 @@
 use crate::git::error::{GitError, GitInterfaceError};
-use crate::git::model::*;
+use crate::model::*;
 use crate::util::u8_to_string;
 use std::io;
 use std::process::{Command, Output};

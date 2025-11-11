@@ -1,4 +1,4 @@
-use crate::git::model::QualifiedPath;
+use crate::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
