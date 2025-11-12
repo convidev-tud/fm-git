@@ -44,8 +44,11 @@ impl CommandInterface for DeriveCommand {
             .map(|e| current_area.get_path_to_feature_root() + QualifiedPath::from(e))
             .collect::<Vec<_>>();
 
-        context.git.checkout(&current_area.get_qualified_path())?;
+        let area_path = current_area.get_qualified_path();
+        drop(current_area);
+        context.git.checkout(&area_path)?;
         context.git.create_branch(&target_path)?;
+        context.git.checkout(&target_path)?;
         let output = context.git.merge(&all_features)?;
         context.log_from_output(&output);
         Ok(())

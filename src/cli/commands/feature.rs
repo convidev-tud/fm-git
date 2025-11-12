@@ -4,7 +4,7 @@ use crate::model::*;
 use clap::{Arg, Command};
 use std::error::Error;
 
-fn add_feature(feature: QualifiedPath, context: &CommandContext) -> Result<(), Box<dyn Error>> {
+fn add_feature(feature: QualifiedPath, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
     let node_path = context.git.get_current_node_path()?;
     let current_path = match node_path.concretize() {
         NodePathType::Area(path) => path.get_path_to_feature_root(),

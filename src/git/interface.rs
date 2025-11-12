@@ -91,11 +91,12 @@ impl GitInterface {
             .raw_git_interface
             .run(vec!["checkout", path.to_git_branch().as_str()])?)
     }
-    pub fn create_branch(&self, path: &QualifiedPath) -> Result<Output, GitError> {
+    pub fn create_branch(&mut self, path: &QualifiedPath) -> Result<Output, GitError> {
         let branch = path.to_git_branch();
         let commands = vec!["branch", branch.as_str()];
         let output = self.raw_git_interface.run(commands)?;
         if output.status.success() {
+            self.model.insert_qualified_path(path.clone())?;
             Ok(output)
         } else {
             Err(GitError::GitInterface(GitInterfaceError::new(
