@@ -1,4 +1,4 @@
-use crate::cli::completion::CompletionHelper;
+use crate::cli::completion::*;
 use crate::cli::*;
 use crate::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
@@ -66,7 +66,8 @@ impl CommandInterface for DeriveCommand {
         let current = completion_helper.currently_editing();
         let result = match current {
             Some(value) => match value.get_id().as_str() {
-                "features" => completion_helper.complete_qualified_path_stepwise(
+                "features" => completion_helper.complete_qualified_path(
+                    AbsolutePathCompletion,
                     &feature_root.get_child_paths_by_branch().get(&true).unwrap(),
                     true,
                 ),

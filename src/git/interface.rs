@@ -77,9 +77,7 @@ impl GitInterface {
             .run(vec!["init", "--initial-branch=main"])?)
     }
     pub fn status(&self) -> Result<Output, GitError> {
-        Ok(self
-            .raw_git_interface
-            .run(vec!["status"])?)
+        Ok(self.raw_git_interface.run(vec!["status"])?)
     }
     pub fn checkout(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         if !self.model.has_branch(&path) {

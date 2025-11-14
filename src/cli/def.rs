@@ -97,7 +97,7 @@ impl CommandContext<'_> {
         let mut result = to_print.into();
         for branch in self.git.get_model().get_qualified_paths_with_branches() {
             result = result.replace(branch.to_git_branch().as_str(), branch.to_string().as_str());
-        };
+        }
         result
     }
     pub fn log_from_output(&self, output: &Output) {

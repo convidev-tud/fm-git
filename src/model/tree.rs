@@ -28,7 +28,7 @@ impl TreeDataModel {
     }
     pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<AnyNodeType>> {
         let mut initial_path = self.get_area(&path.first()?)?;
-        let new_path = path.trim_n_left(1);
+        let new_path = path.strip_n_left(1);
         initial_path.to(&new_path)
     }
     pub fn has_branch(&self, qualified_path: &QualifiedPath) -> bool {

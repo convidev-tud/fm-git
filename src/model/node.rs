@@ -174,7 +174,7 @@ impl Node {
                         self.get_child_mut(&name).unwrap()
                     }
                 };
-                next_child.insert_path(&path.trim_n_left(1), metadata)
+                next_child.insert_path(&path.strip_n_left(1), metadata)
             }
         }
     }

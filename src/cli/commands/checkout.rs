@@ -1,4 +1,4 @@
-use crate::cli::completion::CompletionHelper;
+use crate::cli::completion::*;
 use crate::cli::*;
 use crate::model::QualifiedPath;
 use clap::{Arg, Command};
@@ -16,11 +16,16 @@ impl CommandDefinition for CheckoutCommand {
 }
 impl CommandInterface for CheckoutCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
-        let branch_name = context
+        let branch = context
             .arg_helper
             .get_argument_value::<String>("branch")
             .unwrap();
-        let result = context.git.checkout(&QualifiedPath::from(branch_name))?;
+        let full_target = if branch.starts_with("/") {
+            QualifiedPath::from(branch)
+        } else {
+            context.git.get_current_qualified_path()? + QualifiedPath::from(branch)
+        };
+        let result = context.git.checkout(&full_target)?;
         context.log_from_output(&result);
         Ok(())
     }
@@ -35,7 +40,27 @@ impl CommandInterface for CheckoutCommand {
         }
         let all_branches = context.git.get_model().get_qualified_paths_with_branches();
         let result = match maybe_editing.unwrap().get_id().as_str() {
-            "branch" => completion_helper.complete_qualified_path_stepwise(all_branches, false),
+            "branch" => match completion_helper.get_last() {
+                Some(last) => {
+                    if last.starts_with("/") {
+                        completion_helper.complete_qualified_path(
+                            RelativePathCompletion::new(QualifiedPath::new()),
+                            &all_branches
+                                .iter()
+                                .map(|path| QualifiedPath::from("") + path.clone())
+                                .collect(),
+                            false,
+                        )
+                    } else {
+                        completion_helper.complete_qualified_path(
+                            RelativePathCompletion::new(context.git.get_current_qualified_path()?),
+                            all_branches,
+                            false,
+                        )
+                    }
+                }
+                None => vec![],
+            },
             _ => vec![],
         };
         Ok(result)

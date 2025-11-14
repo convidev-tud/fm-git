@@ -1,4 +1,4 @@
-use crate::cli::completion::CompletionHelper;
+use crate::cli::completion::*;
 use crate::cli::*;
 use crate::model::*;
 use clap::{Arg, Command};
@@ -20,7 +20,7 @@ fn add_feature(feature: QualifiedPath, context: &mut CommandContext) -> Result<(
     context.log_from_output(&output);
     context.log_to_stdout(format!(
         "Created new feature {}",
-        target_path.trim_n_left(1)
+        target_path.strip_n_left(1)
     ));
     Ok(())
 }
@@ -79,33 +79,40 @@ impl CommandInterface for FeatureCommand {
         completion_helper: CompletionHelper,
         context: &mut CommandContext,
     ) -> Result<Vec<String>, Box<dyn Error>> {
-        let current_branch = context.git.get_current_node_path()?;
-        let maybe_concrete_path = match current_branch.concretize() {
-            NodePathType::Area(path) => match path.to_feature_root() {
-                Some(path) => Some(path.to_any_type()),
-                None => None,
-            },
-            NodePathType::FeatureRoot(path) => Some(path.to_any_type()),
-            NodePathType::Feature(path) => Some(path.to_any_type()),
-            _ => None,
-        };
-        if maybe_concrete_path.is_none() {
-            return Ok(vec![]);
-        }
-        let path = maybe_concrete_path.unwrap();
         let result = match completion_helper.currently_editing() {
             Some(arg) => match arg.get_id().as_str() {
                 "feature" => {
+                    let current_branch = context.git.get_current_node_path()?;
+                    let maybe_concrete_path = match current_branch.concretize() {
+                        NodePathType::Area(path) => match path.to_feature_root() {
+                            Some(path) => Some(path.to_any_type()),
+                            None => None,
+                        },
+                        NodePathType::FeatureRoot(path) => Some(path.to_any_type()),
+                        NodePathType::Feature(path) => Some(path.to_any_type()),
+                        _ => None,
+                    };
+                    if maybe_concrete_path.is_none() {
+                        return Ok(vec![]);
+                    }
+
+                    let path = maybe_concrete_path.unwrap();
                     let total = path.get_child_paths_by_branch();
                     if total.is_empty() {
                         return Ok(vec![]);
                     }
                     let has_branch = total.get(&true).unwrap();
                     let has_no_branch = total.get(&false).unwrap();
-                    let has_branch_completion =
-                        completion_helper.complete_qualified_path_stepwise(has_branch, false);
-                    let has_no_branch_completion =
-                        completion_helper.complete_qualified_path_stepwise(has_no_branch, false);
+                    let has_branch_completion = completion_helper.complete_qualified_path(
+                        AbsolutePathCompletion,
+                        has_branch,
+                        false,
+                    );
+                    let has_no_branch_completion = completion_helper.complete_qualified_path(
+                        AbsolutePathCompletion,
+                        has_no_branch,
+                        false,
+                    );
                     let mut result = has_branch_completion
                         .into_iter()
                         .map(|path| {
@@ -119,10 +126,19 @@ impl CommandInterface for FeatureCommand {
                     result.extend(has_no_branch_completion);
                     result
                 }
-                "delete" => completion_helper.complete_qualified_path_stepwise(
-                    &path.get_child_paths_by_branch().get(&true).unwrap(),
-                    false,
-                ),
+                "delete" => {
+                    let maybe_feature_root = context.git.get_current_area()?.to_feature_root();
+                    match maybe_feature_root {
+                        Some(path) => completion_helper.complete_qualified_path(
+                            AbsolutePathCompletion,
+                            path.get_child_paths_by_branch().get(&true).unwrap(),
+                            false,
+                        ),
+                        None => {
+                            vec![]
+                        }
+                    }
+                }
                 _ => {
                     vec![]
                 }

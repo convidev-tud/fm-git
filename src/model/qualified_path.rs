@@ -10,16 +10,14 @@ pub struct QualifiedPath {
 impl From<String> for QualifiedPath {
     fn from(value: String) -> Self {
         let qualified_str = value.replace("*", "").replace("_", "");
-        let mut git_path = Self::new();
-        git_path.push(qualified_str.trim().to_string());
-        git_path
+        let mut qualified_path = Self::new();
+        qualified_path.push(qualified_str.trim().to_string());
+        qualified_path
     }
 }
 impl From<&str> for QualifiedPath {
     fn from(value: &str) -> Self {
-        let mut git_path = Self::new();
-        git_path.push(value.to_string());
-        git_path
+        Self::from(value.to_string())
     }
 }
 impl From<Vec<String>> for QualifiedPath {
@@ -44,9 +42,32 @@ impl Add for QualifiedPath {
     type Output = QualifiedPath;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut new_path = self.path;
-        new_path.extend(rhs.path);
-        Self::from(new_path)
+        let mut next_index = self.len();
+        let mut new_path = self;
+        if new_path.last_is(&QualifiedPath::from("")) && new_path.len() > 1 {
+            new_path = new_path.strip_n_right(new_path.len() - 1);
+        }
+        for (i, part) in rhs.iter().enumerate() {
+            match part.as_str() {
+                "." => {}
+                ".." => {
+                    if next_index > 0 {
+                        next_index -= 1;
+                        new_path = new_path.strip_n_right(next_index);
+                    }
+                }
+                "" => {
+                    if i == rhs.len() - 1 || new_path.is_empty() {
+                        new_path.push(part.to_string())
+                    }
+                }
+                _ => {
+                    new_path.push(part.to_string());
+                    next_index += 1;
+                }
+            }
+        }
+        new_path
     }
 }
 impl Display for QualifiedPath {
@@ -64,14 +85,16 @@ impl QualifiedPath {
         Self { path: Vec::new() }
     }
     pub fn to_git_branch(&self) -> String {
-        match self.path.len() {
-            1 => self.path[0].to_string(),
+        let trimmed_path = self.trim_whitespaces();
+        let path = trimmed_path.path;
+        match path.len() {
+            1 => path[0].to_string(),
             _ => {
-                let mut prefix = self.path[..self.path.len() - 1]
+                let mut prefix = path[..path.len() - 1]
                     .iter()
                     .map(|x| "_".to_string() + x)
                     .collect::<Vec<_>>();
-                prefix.push(self.path[self.path.len() - 1].to_string());
+                prefix.push(path[path.len() - 1].to_string());
                 prefix.join("/")
             }
         }
@@ -87,19 +110,44 @@ impl QualifiedPath {
             .collect::<Vec<String>>();
         self.path.extend(split_path);
     }
-    pub fn trim_n(&self, n_left: usize, n_right: usize) -> QualifiedPath {
+    pub fn strip_n(&self, n_left: usize, n_right: usize) -> QualifiedPath {
         QualifiedPath::from(self.path[n_left..n_right].to_vec())
     }
-    pub fn trim_n_left(&self, n: usize) -> QualifiedPath {
-        self.trim_n(n, self.path.len())
+    pub fn strip_n_left(&self, n: usize) -> QualifiedPath {
+        self.strip_n(n, self.path.len())
     }
-    pub fn trim_n_right(&self, n: usize) -> QualifiedPath {
-        self.trim_n(0, n)
+    pub fn strip_n_right(&self, n: usize) -> QualifiedPath {
+        self.strip_n(0, n)
+    }
+    pub fn trim_whitespaces(&self) -> QualifiedPath {
+        let mut new_path = self.path.clone();
+        match new_path.first() {
+            Some(value) => {
+                if value == "" {
+                    new_path.remove(0);
+                }
+            }
+            None => {}
+        }
+        match new_path.last() {
+            Some(value) => {
+                if value == "" {
+                    new_path.remove(new_path.len() - 1);
+                }
+            }
+            None => {}
+        }
+        QualifiedPath::from(new_path)
+    }
+    pub fn replace<S: Into<String>>(&self, index: usize, value: S) -> QualifiedPath {
+        let mut new_path = self.path.clone();
+        new_path.insert(index, value.into());
+        QualifiedPath::from(new_path)
     }
     pub fn first(&self) -> Option<QualifiedPath> {
         Some(QualifiedPath::from(self.path.first()?.clone()))
     }
-    pub fn _last(&self) -> Option<&String> {
+    pub fn last(&self) -> Option<&String> {
         self.path.last()
     }
     pub fn is_empty(&self) -> bool {
@@ -114,7 +162,128 @@ impl QualifiedPath {
     pub fn starts_with(&self, prefix: &QualifiedPath) -> bool {
         self.to_string().starts_with(&prefix.to_string())
     }
+    pub fn last_is(&self, suffix: &QualifiedPath) -> bool {
+        self.last() == suffix.last()
+    }
+    pub fn is_absolute(&self) -> bool {
+        self.path.iter().find(|e| *e == "." || *e == "..").is_none()
+    }
     pub fn len(&self) -> usize {
         self.path.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_qualified_path_from_qualified() {
+        assert_eq!(QualifiedPath::from("foo/bar").path, vec!["foo", "bar"]);
+        assert_eq!(QualifiedPath::from("/foo/bar").path, vec!["", "foo", "bar"]);
+        assert_eq!(QualifiedPath::from("/foo/bar").to_string(), "/foo/bar");
+        assert_eq!(QualifiedPath::from("foo/").path, vec!["foo", ""]);
+        assert_eq!(QualifiedPath::from("/").path, vec!["", ""]);
+    }
+
+    #[test]
+    fn test_qualified_path_from_git_branch() {
+        assert_eq!(QualifiedPath::from("_foo/bar").path, vec!["foo", "bar"]);
+        assert_eq!(
+            QualifiedPath::from("_foo/bar".to_string()).path,
+            vec!["foo", "bar"]
+        );
+        assert_eq!(
+            QualifiedPath::from("_foo/_bar/baz").path,
+            vec!["foo", "bar", "baz"]
+        );
+    }
+
+    #[test]
+    fn test_qualified_path_to_git_branch() {
+        assert_eq!(QualifiedPath::from("foo/bar").to_git_branch(), "_foo/bar");
+        assert_eq!(QualifiedPath::from("/foo/bar").to_git_branch(), "_foo/bar");
+    }
+
+    #[test]
+    fn test_qualified_path_add_empty() {
+        let r = QualifiedPath::new();
+        let l = QualifiedPath::from("foo/bar");
+        assert_eq!(r + l, QualifiedPath::from("foo/bar"));
+
+        let r = QualifiedPath::new();
+        let l = QualifiedPath::from("/foo/bar");
+        assert_eq!(r + l, QualifiedPath::from("/foo/bar"));
+    }
+
+    #[test]
+    fn test_qualified_path_add_absolute() {
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("bar/baz");
+        assert_eq!(r + l, QualifiedPath::from("foo/bar/baz"));
+
+        let r = QualifiedPath::from("");
+        let l = QualifiedPath::from("bar/baz");
+        assert_eq!((r + l).path, vec!["", "bar", "baz"]);
+
+        let r = QualifiedPath::from("foo/");
+        let l = QualifiedPath::from("bar/baz");
+        assert_eq!(r + l, QualifiedPath::from("foo/bar/baz"));
+
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("/bar/baz");
+        assert_eq!((r + l).path, vec!["foo", "bar", "baz"]);
+    }
+
+    #[test]
+    fn test_qualified_path_add_relative() {
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("..");
+        assert_eq!(r + l, QualifiedPath::new());
+
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("./bar");
+        assert_eq!(r + l, QualifiedPath::from("foo/bar"));
+
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("./");
+        assert_eq!(r + l, QualifiedPath::from("foo/"));
+
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("../bar");
+        assert_eq!(r + l, QualifiedPath::from("bar"));
+
+        let r = QualifiedPath::from("foo/bar");
+        let l = QualifiedPath::from("../baz");
+        assert_eq!(r + l, QualifiedPath::from("foo/baz"));
+
+        let r = QualifiedPath::from("foo/bar");
+        let l = QualifiedPath::from("../../baz");
+        assert_eq!(r + l, QualifiedPath::from("baz"));
+
+        let r = QualifiedPath::from("foo/bar");
+        let l = QualifiedPath::from("../../../../../../baz");
+        assert_eq!(r + l, QualifiedPath::from("baz"));
+
+        let r = QualifiedPath::from("foo/bar");
+        let l = QualifiedPath::from("baz/../baz/../baz/../baz");
+        assert_eq!(r + l, QualifiedPath::from("foo/bar/baz"));
+
+        let r = QualifiedPath::from("foo/bar");
+        let l = QualifiedPath::from("../baz/../baz/../baz");
+        assert_eq!(r + l, QualifiedPath::from("foo/baz"));
+    }
+
+    #[test]
+    fn test_qualified_path_add_whitespaces() {
+        let r = QualifiedPath::from("foo");
+        let l = QualifiedPath::from("");
+        assert_eq!(r + l, QualifiedPath::from("foo/"));
+    }
+
+    #[test]
+    fn test_qualified_path_trim() {
+        let path = QualifiedPath::from("foo/bar");
+        assert_eq!(path.strip_n(0, path.len() - 1).path, vec!["foo"]);
     }
 }
