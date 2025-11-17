@@ -21,7 +21,7 @@ impl CommandInterface for CheckoutCommand {
             .get_argument_value::<String>("branch")
             .unwrap();
         let full_target = if branch.starts_with("/") {
-            QualifiedPath::from(branch)
+            QualifiedPath::from(branch).strip_n_left(1)
         } else {
             context.git.get_current_qualified_path()? + QualifiedPath::from(branch)
         };
