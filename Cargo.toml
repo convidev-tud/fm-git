@@ -8,6 +8,3 @@ edition = "2024"
 clap = { version = "4", features = ["derive"]}
 termtree = "0"
 colored = "3"
-
-[build-dependencies]
-clap_complete = "4"

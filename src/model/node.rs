@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
+use colored::Colorize;
 use termtree::Tree;
 
 #[derive(Debug, Clone)]
@@ -61,6 +62,14 @@ impl NodeType {
             }
         }
     }
+    pub fn display_node<S: Into<String>>(&self, name: S) -> String {
+        let real_name = name.into();
+        match self {
+            Self::FeatureRoot => real_name.green().to_string(),
+            Self::ProductRoot => real_name.yellow().to_string(),
+            _ => real_name,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -102,7 +111,11 @@ impl Node {
         self.metadata = metadata;
     }
     fn build_display_tree(&self) -> Tree<String> {
-        let mut tree = Tree::<String>::new(self.name.clone());
+        let mut formatted = self.node_type.display_node(&self.name);
+        if self.metadata.has_branch {
+            formatted = formatted.blue().to_string();
+        }
+        let mut tree = Tree::<String>::new(formatted);
         let mut sorted_children = self.children.iter().collect::<Vec<_>>();
         sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
         sorted_children.reverse();
