@@ -5,7 +5,7 @@ use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
-pub struct DeriveCommand {}
+pub struct DeriveCommand;
 
 impl CommandDefinition for DeriveCommand {
     fn build_command(&self) -> Command {

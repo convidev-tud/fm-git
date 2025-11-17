@@ -3,7 +3,7 @@ use clap::Command;
 use std::error::Error;
 
 #[derive(Clone, Debug)]
-pub struct StatusCommand {}
+pub struct StatusCommand;
 
 impl CommandDefinition for StatusCommand {
     fn build_command(&self) -> Command {

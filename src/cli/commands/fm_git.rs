@@ -14,13 +14,14 @@ impl CommandDefinition for FMGitCommand {
     }
     fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl>> {
         vec![
-            Box::new(StatusCommand {}),
-            Box::new(TreeCommand {}),
-            Box::new(DeriveCommand {}),
-            Box::new(CheckoutCommand {}),
-            Box::new(InitCommand {}),
+            Box::new(StatusCommand),
+            Box::new(TreeCommand),
+            Box::new(DeriveCommand),
+            Box::new(CheckoutCommand),
+            Box::new(InitCommand),
             Box::new(FeatureCommand),
-            Box::new(HiddenCompletionCommand {}),
+            Box::new(ProductCommand),
+            Box::new(HiddenCompletionCommand),
         ]
     }
 }

@@ -4,7 +4,7 @@ use clap::{Arg, ArgAction, Command};
 use std::error::Error;
 
 #[derive(Clone, Debug)]
-pub struct HiddenCompletionCommand {}
+pub struct HiddenCompletionCommand;
 
 impl CommandDefinition for HiddenCompletionCommand {
     fn build_command(&self) -> Command {
