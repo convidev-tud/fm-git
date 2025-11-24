@@ -15,14 +15,15 @@ impl TreeDataModel {
             qualified_paths_with_branch: vec![],
         }
     }
-    pub fn insert_qualified_path(&mut self, path: QualifiedPath) -> Result<(), WrongNodeTypeError> {
+    pub fn insert_qualified_path(
+        &mut self,
+        path: QualifiedPath,
+        is_tag: bool,
+    ) -> Result<(), WrongNodeTypeError> {
         self.virtual_root
-            .insert_node_path(&path, NodeMetadata::new(true))?;
+            .insert_node_path(&path, NodeMetadata::new(true), is_tag)?;
         self.qualified_paths_with_branch.push(path);
         Ok(())
-    }
-    pub fn insert_tag_path(&mut self, path: QualifiedPath) {
-        self.virtual_root.insert_tag_path(&path)
     }
     pub fn get_area(&self, path: &QualifiedPath) -> Option<NodePath<Area>> {
         Some(NodePath::<Area>::new(
@@ -30,7 +31,7 @@ impl TreeDataModel {
         ))
     }
     pub fn get_node_path(&self, path: &QualifiedPath) -> Option<NodePath<AnyNodeType>> {
-        let mut initial_path = self.get_area(&path.first()?)?;
+        let initial_path = self.get_area(&path.first()?)?;
         let new_path = path.strip_n_left(1);
         initial_path.to(&new_path)
     }

@@ -58,7 +58,10 @@ impl CommandInterface for FeatureCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let maybe_feature_name = context.arg_helper.get_argument_value::<String>("feature");
         let maybe_delete = context.arg_helper.get_argument_value::<String>("delete");
-        let show_tags = context.arg_helper.get_argument_value::<bool>("show_tags").unwrap();
+        let show_tags = context
+            .arg_helper
+            .get_argument_value::<bool>("show_tags")
+            .unwrap();
         match maybe_delete {
             Some(delete) => {
                 delete_feature(QualifiedPath::from(delete), &context)?;

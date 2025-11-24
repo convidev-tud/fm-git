@@ -6,6 +6,7 @@ mod fm_git;
 mod init;
 mod product;
 mod status;
+mod tag;
 mod tree;
 
 pub use checkout::*;
@@ -16,4 +17,5 @@ pub use fm_git::*;
 pub use init::*;
 pub use product::*;
 pub use status::*;
+pub use tag::*;
 pub use tree::*;

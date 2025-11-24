@@ -1,4 +1,5 @@
 use crate::model::QualifiedPath;
+use colored::Colorize;
 use std::collections::HashSet;
 
 pub trait PathCompletion {

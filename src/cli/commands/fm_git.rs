@@ -7,8 +7,6 @@ pub struct FMGitCommand {}
 impl CommandDefinition for FMGitCommand {
     fn build_command(&self) -> Command {
         Command::new("fm-git")
-            .long_about("More detail")
-            .after_long_help("Test")
             .arg_required_else_help(true)
             .allow_external_subcommands(true)
     }
@@ -21,6 +19,7 @@ impl CommandDefinition for FMGitCommand {
             Box::new(InitCommand),
             Box::new(FeatureCommand),
             Box::new(ProductCommand),
+            Box::new(TagCommand),
             Box::new(HiddenCompletionCommand),
         ]
     }

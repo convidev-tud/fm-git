@@ -41,7 +41,7 @@ impl GitInterface {
         for branch in all_branches {
             if !branch.is_empty() {
                 self.model
-                    .insert_qualified_path(QualifiedPath::from(branch))?;
+                    .insert_qualified_path(QualifiedPath::from(branch), false)?;
             }
         }
         let tag_output = self.raw_git_interface.run(vec!["tag"])?;
@@ -51,7 +51,8 @@ impl GitInterface {
             .collect();
         for tag in all_tags {
             if !tag.is_empty() {
-                self.model.insert_tag_path(QualifiedPath::from(tag))
+                self.model
+                    .insert_qualified_path(QualifiedPath::from(tag), true)?;
             }
         }
         Ok(())
@@ -104,7 +105,7 @@ impl GitInterface {
         let commands = vec!["branch", branch.as_str()];
         let output = self.raw_git_interface.run(commands)?;
         if output.status.success() {
-            self.model.insert_qualified_path(path.clone())?;
+            self.model.insert_qualified_path(path.clone(), false)?;
             Ok(output)
         } else {
             Err(GitError::GitInterface(GitInterfaceError::new(
@@ -123,5 +124,19 @@ impl GitInterface {
         let converted_paths: Vec<&str> = new_paths.iter().map(|p| p.as_str()).collect();
         base.extend(converted_paths);
         Ok(self.raw_git_interface.run(base)?)
+    }
+    pub fn create_tag(&self, tag: &QualifiedPath) -> Result<Output, GitError> {
+        let current_branch = self.get_current_qualified_path()?;
+        let tagged = current_branch + tag.clone();
+        Ok(self
+            .raw_git_interface
+            .run(vec!["tag", tagged.to_git_branch().as_str()])?)
+    }
+    pub fn delete_tag(&self, tag: &QualifiedPath) -> Result<Output, GitError> {
+        let current_branch = self.get_current_qualified_path()?;
+        let tagged = current_branch + tag.clone();
+        Ok(self
+            .raw_git_interface
+            .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
     }
 }

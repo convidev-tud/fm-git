@@ -10,6 +10,7 @@ pub enum NodePathType {
     ProductRoot(NodePath<ProductRoot>),
     Area(NodePath<Area>),
     VirtualRoot(NodePath<VirtualRoot>),
+    Tag(NodePath<Tag>),
 }
 
 pub struct NodePath<T> {
@@ -32,6 +33,7 @@ impl NodePath<AnyNodeType> {
             NodeType::ProductRoot => NodePathType::ProductRoot(self.to_concrete_type()),
             NodeType::Area => NodePathType::Area(self.to_concrete_type()),
             NodeType::VirtualRoot => NodePathType::VirtualRoot(self.to_concrete_type()),
+            NodeType::Tag => NodePathType::Tag(self.to_concrete_type()),
         }
     }
 }
@@ -72,6 +74,15 @@ impl<T> NodePath<T> {
     }
     fn get_node(&self) -> &Node {
         self.path.last().unwrap()
+    }
+    pub fn get_tags(&self) -> Vec<QualifiedPath> {
+        self.get_node()
+            .iter_children()
+            .filter_map(|(name, child)| match child.get_type() {
+                NodeType::Tag => Some(QualifiedPath::from(name.clone())),
+                _ => None,
+            })
+            .collect()
     }
     pub fn to_any_type(self) -> NodePath<AnyNodeType> {
         NodePath::<AnyNodeType>::from_concrete(self)

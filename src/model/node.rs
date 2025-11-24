@@ -1,5 +1,5 @@
 use crate::model::*;
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
@@ -29,6 +29,7 @@ pub struct Product;
 pub struct ProductRoot;
 pub struct Area;
 pub struct VirtualRoot;
+pub struct Tag;
 pub struct AnyNodeType;
 #[derive(Clone, Debug)]
 pub enum NodeType {
@@ -38,6 +39,7 @@ pub enum NodeType {
     ProductRoot,
     Area,
     VirtualRoot,
+    Tag,
 }
 
 impl NodeType {
@@ -60,14 +62,15 @@ impl NodeType {
                     )))
                 }
             }
+            Self::Tag => Err(WrongNodeTypeError::new("Tags cannot have children")),
         }
     }
-    pub fn display_node<S: Into<String>>(&self, name: S) -> String {
-        let real_name = name.into();
+    pub fn format_node_display(&self, name: ColoredString) -> ColoredString {
         match self {
-            Self::FeatureRoot => real_name.bright_purple().to_string(),
-            Self::ProductRoot => real_name.red().to_string(),
-            _ => real_name,
+            Self::FeatureRoot => name.bright_purple().bold(),
+            Self::ProductRoot => name.red().bold(),
+            Self::Tag => name.green(),
+            _ => name,
         }
     }
 }
@@ -95,7 +98,6 @@ pub struct Node {
     name: String,
     node_type: NodeType,
     metadata: NodeMetadata,
-    tags: Vec<QualifiedPath>,
     children: HashMap<String, Rc<Node>>,
 }
 
@@ -105,7 +107,6 @@ impl Node {
             name: name.into(),
             node_type,
             metadata,
-            tags: Vec::new(),
             children: HashMap::new(),
         }
     }
@@ -113,22 +114,25 @@ impl Node {
         self.metadata = metadata;
     }
     fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
-        let mut formatted = self.node_type.display_node(&self.name);
+        let mut formatted = ColoredString::from(self.name.clone());
         if self.metadata.has_branch {
-            formatted = formatted.blue().to_string();
+            formatted = formatted.blue()
         }
-        let mut tree = Tree::<String>::new(formatted);
+        formatted = self.node_type.format_node_display(formatted);
+        let mut tree = Tree::<String>::new(formatted.to_string());
         let mut sorted_children = self.children.iter().collect::<Vec<_>>();
         sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
         sorted_children.reverse();
         for (_, child) in sorted_children {
-            tree.leaves.push(child.build_display_tree(show_tags));
-        }
-        if show_tags {
-            for tag in &self.tags {
-                tree.leaves
-                    .push(Tree::new(tag.to_string().green().to_string()));
+            match child.node_type {
+                NodeType::Tag => {
+                    if !show_tags {
+                        continue;
+                    }
+                }
+                _ => {}
             }
+            tree.leaves.push(child.build_display_tree(show_tags));
         }
         tree
     }
@@ -136,17 +140,19 @@ impl Node {
         &mut self,
         name: S,
         metadata: NodeMetadata,
+        is_tag: bool,
     ) -> Result<(), WrongNodeTypeError> {
         let real_name = name.into();
-        let new_type = self.node_type.build_child_from_name(real_name.as_str())?;
+        let new_type = if is_tag {
+            NodeType::Tag
+        } else {
+            self.node_type.build_child_from_name(real_name.as_str())?
+        };
         self.children.insert(
             real_name.clone(),
             Rc::new(Node::new(real_name, new_type, metadata)),
         );
         Ok(())
-    }
-    fn add_tag(&mut self, tag: QualifiedPath) {
-        self.tags.push(tag);
     }
     fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
         let real_name = name.into();
@@ -172,13 +178,14 @@ impl Node {
     pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Rc<Node>> {
         Some(self.children.get(&name.into())?)
     }
-    pub fn get_tags(&self) -> &Vec<QualifiedPath> {
-        &self.tags
+    pub fn iter_children(&self) -> impl Iterator<Item = (&String, &Rc<Node>)> {
+        self.children.iter()
     }
     pub fn insert_node_path(
         &mut self,
         path: &QualifiedPath,
         metadata: NodeMetadata,
+        is_tag: bool,
     ) -> Result<(), WrongNodeTypeError> {
         let name = path.get(0).unwrap().to_string();
         match path.len() {
@@ -187,7 +194,7 @@ impl Node {
                 match self.get_child_mut(&name) {
                     Some(node) => node.update_metadata(metadata),
                     None => {
-                        self.add_child(name.clone(), metadata)?;
+                        self.add_child(name.clone(), metadata, is_tag)?;
                     }
                 };
                 Ok(())
@@ -196,24 +203,11 @@ impl Node {
                 let next_child = match self.get_child_mut(&name) {
                     Some(node) => node,
                     None => {
-                        self.add_child(name.clone(), NodeMetadata::default())?;
+                        self.add_child(name.clone(), NodeMetadata::default(), false)?;
                         self.get_child_mut(&name).unwrap()
                     }
                 };
-                next_child.insert_node_path(&path.strip_n_left(1), metadata)
-            }
-        }
-    }
-    pub fn insert_tag_path(&mut self, tag: &QualifiedPath) {
-        match tag.len() {
-            0 => {}
-            1 => self.add_tag(tag.clone()),
-            _ => {
-                let name = tag.get(0).unwrap().to_string();
-                match self.get_child_mut(&name) {
-                    Some(node) => node.insert_tag_path(&tag.strip_n_left(1)),
-                    None => {}
-                };
+                next_child.insert_node_path(&path.strip_n_left(1), metadata, is_tag)
             }
         }
     }
@@ -263,10 +257,18 @@ mod tests {
 
     fn prepare_node() -> Node {
         let mut node = Node::new("root", NodeType::Feature, NodeMetadata::default());
-        node.insert_node_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default())
-            .unwrap();
-        node.insert_node_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default())
-            .unwrap();
+        node.insert_node_path(
+            &QualifiedPath::from("foo/f1"),
+            NodeMetadata::default(),
+            false,
+        )
+        .unwrap();
+        node.insert_node_path(
+            &QualifiedPath::from("bar/b1"),
+            NodeMetadata::default(),
+            false,
+        )
+        .unwrap();
         node
     }
 
