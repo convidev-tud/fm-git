@@ -1,4 +1,3 @@
-use crate::cli::completion::*;
 use crate::cli::*;
 use crate::model::QualifiedPath;
 use clap::{Arg, Command};
