@@ -15,7 +15,7 @@ fn print_product_tree(context: &CommandContext) -> Result<(), Box<dyn Error>> {
     let area = context.git.get_current_area()?;
     match area.to_product_root() {
         Some(path) => {
-            context.log_to_stdout(path.display_tree());
+            context.log_to_stdout(path.display_tree(false));
         }
         None => {}
     }
@@ -29,7 +29,11 @@ impl CommandDefinition for ProductCommand {
         Command::new("product")
             .about("Manage products")
             .disable_help_subcommand(true)
-            .arg(Arg::new("delete").short('D').help("Deletes a product branch"))
+            .arg(
+                Arg::new("delete")
+                    .short('D')
+                    .help("Deletes a product branch"),
+            )
     }
 }
 impl CommandInterface for ProductCommand {

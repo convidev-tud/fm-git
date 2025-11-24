@@ -105,7 +105,7 @@ impl<T> NodePath<T> {
         self.get_node()
             .get_qualified_paths_by(&QualifiedPath::new(), &check, &vec![true, false])
     }
-    pub fn display_tree(&self) -> String {
-        self.get_node().display_tree()
+    pub fn display_tree(&self, show_tags: bool) -> String {
+        self.get_node().display_tree(show_tags)
     }
 }

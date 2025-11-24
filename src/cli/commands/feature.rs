@@ -31,11 +31,11 @@ fn delete_feature(feature: QualifiedPath, context: &CommandContext) -> Result<()
     context.log_from_output(&output);
     Ok(())
 }
-fn print_feature_tree(context: &CommandContext) -> Result<(), Box<dyn Error>> {
+fn print_feature_tree(context: &CommandContext, show_tags: bool) -> Result<(), Box<dyn Error>> {
     let area = context.git.get_current_area()?;
     match area.to_feature_root() {
         Some(path) => {
-            context.log_to_stdout(path.display_tree());
+            context.log_to_stdout(path.display_tree(show_tags));
         }
         None => {}
     }
@@ -51,12 +51,14 @@ impl CommandDefinition for FeatureCommand {
             .disable_help_subcommand(true)
             .arg(Arg::new("feature").help("Creates new feature as the child of the current one. Requires to be checked out on a feature branch."))
             .arg(Arg::new("delete").short('D').help("Deletes a feature branch"))
+            .arg(make_show_tags())
     }
 }
 impl CommandInterface for FeatureCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let maybe_feature_name = context.arg_helper.get_argument_value::<String>("feature");
         let maybe_delete = context.arg_helper.get_argument_value::<String>("delete");
+        let show_tags = context.arg_helper.get_argument_value::<bool>("show_tags").unwrap();
         match maybe_delete {
             Some(delete) => {
                 delete_feature(QualifiedPath::from(delete), &context)?;
@@ -69,7 +71,7 @@ impl CommandInterface for FeatureCommand {
                 add_feature(QualifiedPath::from(feature_name), context)?;
             }
             None => {
-                print_feature_tree(context)?;
+                print_feature_tree(context, show_tags)?;
             }
         }
         Ok(())

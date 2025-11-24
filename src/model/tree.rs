@@ -17,9 +17,12 @@ impl TreeDataModel {
     }
     pub fn insert_qualified_path(&mut self, path: QualifiedPath) -> Result<(), WrongNodeTypeError> {
         self.virtual_root
-            .insert_path(&path, NodeMetadata::new(true))?;
+            .insert_node_path(&path, NodeMetadata::new(true))?;
         self.qualified_paths_with_branch.push(path);
         Ok(())
+    }
+    pub fn insert_tag_path(&mut self, path: QualifiedPath) {
+        self.virtual_root.insert_tag_path(&path)
     }
     pub fn get_area(&self, path: &QualifiedPath) -> Option<NodePath<Area>> {
         Some(NodePath::<Area>::new(

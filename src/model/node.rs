@@ -1,10 +1,10 @@
 use crate::model::*;
+use colored::Colorize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
-use colored::Colorize;
 use termtree::Tree;
 
 #[derive(Debug, Clone)]
@@ -65,8 +65,8 @@ impl NodeType {
     pub fn display_node<S: Into<String>>(&self, name: S) -> String {
         let real_name = name.into();
         match self {
-            Self::FeatureRoot => real_name.green().to_string(),
-            Self::ProductRoot => real_name.yellow().to_string(),
+            Self::FeatureRoot => real_name.bright_purple().to_string(),
+            Self::ProductRoot => real_name.red().to_string(),
             _ => real_name,
         }
     }
@@ -95,6 +95,7 @@ pub struct Node {
     name: String,
     node_type: NodeType,
     metadata: NodeMetadata,
+    tags: Vec<QualifiedPath>,
     children: HashMap<String, Rc<Node>>,
 }
 
@@ -104,13 +105,14 @@ impl Node {
             name: name.into(),
             node_type,
             metadata,
+            tags: Vec::new(),
             children: HashMap::new(),
         }
     }
     pub fn update_metadata(&mut self, metadata: NodeMetadata) {
         self.metadata = metadata;
     }
-    fn build_display_tree(&self) -> Tree<String> {
+    fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
         let mut formatted = self.node_type.display_node(&self.name);
         if self.metadata.has_branch {
             formatted = formatted.blue().to_string();
@@ -120,7 +122,13 @@ impl Node {
         sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
         sorted_children.reverse();
         for (_, child) in sorted_children {
-            tree.leaves.push(child.build_display_tree());
+            tree.leaves.push(child.build_display_tree(show_tags));
+        }
+        if show_tags {
+            for tag in &self.tags {
+                tree.leaves
+                    .push(Tree::new(tag.to_string().green().to_string()));
+            }
         }
         tree
     }
@@ -136,6 +144,9 @@ impl Node {
             Rc::new(Node::new(real_name, new_type, metadata)),
         );
         Ok(())
+    }
+    fn add_tag(&mut self, tag: QualifiedPath) {
+        self.tags.push(tag);
     }
     fn get_child_mut<S: Into<String>>(&mut self, name: S) -> Option<&mut Node> {
         let real_name = name.into();
@@ -161,15 +172,18 @@ impl Node {
     pub fn get_child<S: Into<String>>(&self, name: S) -> Option<&Rc<Node>> {
         Some(self.children.get(&name.into())?)
     }
-    pub fn insert_path(
+    pub fn get_tags(&self) -> &Vec<QualifiedPath> {
+        &self.tags
+    }
+    pub fn insert_node_path(
         &mut self,
         path: &QualifiedPath,
         metadata: NodeMetadata,
     ) -> Result<(), WrongNodeTypeError> {
+        let name = path.get(0).unwrap().to_string();
         match path.len() {
             0 => Ok(()),
             1 => {
-                let name = path.get(0).unwrap().to_string();
                 match self.get_child_mut(&name) {
                     Some(node) => node.update_metadata(metadata),
                     None => {
@@ -179,7 +193,6 @@ impl Node {
                 Ok(())
             }
             _ => {
-                let name = path.get(0).unwrap().to_string();
                 let next_child = match self.get_child_mut(&name) {
                     Some(node) => node,
                     None => {
@@ -187,7 +200,20 @@ impl Node {
                         self.get_child_mut(&name).unwrap()
                     }
                 };
-                next_child.insert_path(&path.strip_n_left(1), metadata)
+                next_child.insert_node_path(&path.strip_n_left(1), metadata)
+            }
+        }
+    }
+    pub fn insert_tag_path(&mut self, tag: &QualifiedPath) {
+        match tag.len() {
+            0 => {}
+            1 => self.add_tag(tag.clone()),
+            _ => {
+                let name = tag.get(0).unwrap().to_string();
+                match self.get_child_mut(&name) {
+                    Some(node) => node.insert_tag_path(&tag.strip_n_left(1)),
+                    None => {}
+                };
             }
         }
     }
@@ -226,8 +252,8 @@ impl Node {
         }
         result
     }
-    pub fn display_tree(&self) -> String {
-        self.build_display_tree().to_string()
+    pub fn display_tree(&self, show_tags: bool) -> String {
+        self.build_display_tree(show_tags).to_string()
     }
 }
 
@@ -237,9 +263,9 @@ mod tests {
 
     fn prepare_node() -> Node {
         let mut node = Node::new("root", NodeType::Feature, NodeMetadata::default());
-        node.insert_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default())
+        node.insert_node_path(&QualifiedPath::from("foo/f1"), NodeMetadata::default())
             .unwrap();
-        node.insert_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default())
+        node.insert_node_path(&QualifiedPath::from("bar/b1"), NodeMetadata::default())
             .unwrap();
         node
     }

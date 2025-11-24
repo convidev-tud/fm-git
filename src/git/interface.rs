@@ -33,8 +33,8 @@ impl GitInterface {
         }
     }
     fn update_complete_model(&mut self) -> Result<(), GitError> {
-        let output = self.raw_git_interface.run(vec!["branch"])?;
-        let all_branches: Vec<String> = u8_to_string(&output.stdout)
+        let branch_output = self.raw_git_interface.run(vec!["branch"])?;
+        let all_branches: Vec<String> = u8_to_string(&branch_output.stdout)
             .split("\n")
             .map(|raw_string| raw_string.trim().to_string())
             .collect();
@@ -42,6 +42,16 @@ impl GitInterface {
             if !branch.is_empty() {
                 self.model
                     .insert_qualified_path(QualifiedPath::from(branch))?;
+            }
+        }
+        let tag_output = self.raw_git_interface.run(vec!["tag"])?;
+        let all_tags: Vec<String> = u8_to_string(&tag_output.stdout)
+            .split("\n")
+            .map(|raw_string| raw_string.trim().to_string())
+            .collect();
+        for tag in all_tags {
+            if !tag.is_empty() {
+                self.model.insert_tag_path(QualifiedPath::from(tag))
             }
         }
         Ok(())

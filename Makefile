@@ -1,5 +1,5 @@
 install:
-	cargo install --path .
+	cargo install --frozen --path .
 	mkdir --parents ~/.local/share/bash-completion/completions
 	cp completion.sh ~/.local/share/bash-completion/completions/fm-git
 

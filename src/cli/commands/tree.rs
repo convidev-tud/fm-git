@@ -10,13 +10,18 @@ impl CommandDefinition for TreeCommand {
         Command::new("tree")
             .about("Displays the tree structure")
             .disable_help_subcommand(true)
+            .arg(make_show_tags())
     }
 }
 
 impl CommandInterface for TreeCommand {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
+        let show_tags = context
+            .arg_helper
+            .get_argument_value::<bool>("show_tags")
+            .unwrap();
         let current_node_path = context.git.get_current_node_path()?;
-        let tree = current_node_path.display_tree();
+        let tree = current_node_path.display_tree(show_tags);
         context.log_to_stdout(tree);
         Ok(())
     }
