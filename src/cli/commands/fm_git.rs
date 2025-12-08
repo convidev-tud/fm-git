@@ -20,6 +20,7 @@ impl CommandDefinition for FMGitCommand {
             Box::new(FeatureCommand),
             Box::new(ProductCommand),
             Box::new(TagCommand),
+            Box::new(SpreadCommand),
             Box::new(HiddenCompletionCommand),
         ]
     }

@@ -1,5 +1,6 @@
 use crate::model::*;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -13,16 +14,17 @@ pub enum NodePathType {
     Tag(NodePath<Tag>),
 }
 
-pub struct NodePath<T> {
+#[derive(Clone, Debug)]
+pub struct NodePath<T: Clone + Debug> {
     path: Vec<Rc<Node>>,
     _phantom: PhantomData<T>,
 }
 
 impl NodePath<AnyNodeType> {
-    fn to_concrete_type<T>(self) -> NodePath<T> {
+    fn to_concrete_type<T: Clone + Debug>(self) -> NodePath<T> {
         NodePath::<T>::from_path(self.path)
     }
-    pub fn from_concrete<T>(other: NodePath<T>) -> Self {
+    pub fn from_concrete<T: Clone + Debug>(other: NodePath<T>) -> Self {
         Self::from_path(other.path)
     }
     pub fn concretize(self) -> NodePathType {
@@ -59,12 +61,15 @@ impl NodePath<Area> {
     }
 }
 
-impl<T> NodePath<T> {
+impl<T: Clone + Debug> NodePath<T> {
     fn from_path(path: Vec<Rc<Node>>) -> Self {
         Self {
             path,
             _phantom: PhantomData,
         }
+    }
+    fn get_node(&self) -> &Node {
+        self.path.last().unwrap()
     }
     pub fn new(area: Rc<Node>) -> NodePath<T> {
         Self {
@@ -72,8 +77,18 @@ impl<T> NodePath<T> {
             _phantom: PhantomData,
         }
     }
-    fn get_node(&self) -> &Node {
-        self.path.last().unwrap()
+    pub fn iter_children(&self) -> impl Iterator<Item = NodePath<AnyNodeType>> {
+        self.get_node()
+            .iter_children()
+            .map(|(name, _)| self.clone().to(&QualifiedPath::from(name.clone())).unwrap())
+    }
+    pub fn iter_children_req(&self) -> impl Iterator<Item = NodePath<AnyNodeType>> {
+        self.iter_children().flat_map(|path| {
+            let mut to_iter = Vec::new();
+            to_iter.push(path.clone());
+            to_iter.extend(path.iter_children_req());
+            to_iter
+        })
     }
     pub fn get_tags(&self) -> Vec<QualifiedPath> {
         self.get_node()

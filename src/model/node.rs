@@ -23,13 +23,21 @@ impl Display for WrongNodeTypeError {
 }
 impl Error for WrongNodeTypeError {}
 
+#[derive(Clone, Debug)]
 pub struct Feature;
+#[derive(Clone, Debug)]
 pub struct FeatureRoot;
+#[derive(Clone, Debug)]
 pub struct Product;
+#[derive(Clone, Debug)]
 pub struct ProductRoot;
+#[derive(Clone, Debug)]
 pub struct Area;
+#[derive(Clone, Debug)]
 pub struct VirtualRoot;
+#[derive(Clone, Debug)]
 pub struct Tag;
+#[derive(Clone, Debug)]
 pub struct AnyNodeType;
 #[derive(Clone, Debug)]
 pub enum NodeType {
