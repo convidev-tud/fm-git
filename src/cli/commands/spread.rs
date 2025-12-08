@@ -1,6 +1,7 @@
 use crate::cli::*;
 use clap::Command;
 use std::error::Error;
+use crate::model::NodePathType;
 
 #[derive(Clone, Debug)]
 pub struct SpreadCommand;
@@ -20,9 +21,14 @@ impl CommandInterface for SpreadCommand {
         let merge_argument = vec![current_branch.clone()];
         for path in current_path.iter_children_req() {
             let qualified_path = path.get_qualified_path();
-            context.log_to_stdout(format!("Spreading to {}", qualified_path));
-            context.git.checkout(&qualified_path)?;
-            context.git.merge(&merge_argument)?;
+            match path.concretize() {
+                NodePathType::Tag(_) => {}
+                _ => {
+                    context.log_to_stdout(format!("Spreading to {}", qualified_path));
+                    context.git.checkout(&qualified_path)?;
+                    context.git.merge(&merge_argument)?;
+                }
+            }
         }
         context.git.checkout(&current_branch)?;
         context.log_to_stdout("Success");
