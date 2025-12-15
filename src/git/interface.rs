@@ -5,6 +5,20 @@ use std::io;
 use std::process::{Command, Output};
 
 #[derive(Clone, Debug)]
+struct ConflictStatistics {
+    branches: (QualifiedPath, QualifiedPath),
+    has_conflict: bool,
+}
+impl ConflictStatistics {
+    pub fn new(branches: (QualifiedPath, QualifiedPath), has_conflict: bool) -> Self {
+        Self { branches, has_conflict }
+    }
+    pub fn has_conflict(&self) -> bool {
+        self.has_conflict
+    }
+}
+
+#[derive(Clone, Debug)]
 struct RawGitInterface;
 impl RawGitInterface {
     fn build_git_command(&self) -> Command {
@@ -100,10 +114,13 @@ impl GitInterface {
             .raw_git_interface
             .run(vec!["checkout", path.to_git_branch().as_str()])?)
     }
-    pub fn create_branch(&mut self, path: &QualifiedPath) -> Result<Output, GitError> {
+    fn create_branch_internal(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         let branch = path.to_git_branch();
         let commands = vec!["branch", branch.as_str()];
-        let output = self.raw_git_interface.run(commands)?;
+        Ok(self.raw_git_interface.run(commands)?)
+    }
+    pub fn create_branch(&mut self, path: &QualifiedPath) -> Result<Output, GitError> {
+        let output = self.create_branch_internal(path)?;
         if output.status.success() {
             self.model.insert_qualified_path(path.clone(), false)?;
             Ok(output)
@@ -138,5 +155,10 @@ impl GitInterface {
         Ok(self
             .raw_git_interface
             .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
+    }
+    pub fn check_for_conflicts(&self, paths: &Vec<QualifiedPath>) -> Result<Output, GitError> {
+        let temporary = QualifiedPath::from("tmp");
+        self.create_branch_internal(&temporary)?;
+        self.delete_branch(&temporary)?;
     }
 }
