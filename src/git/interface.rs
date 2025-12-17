@@ -1,11 +1,12 @@
 use crate::git::error::{GitError, GitInterfaceError};
 use crate::model::*;
 use crate::util::u8_to_string;
+use colored::Colorize;
 use std::io;
 use std::process::{Command, Output};
 
 #[derive(Clone, Debug)]
-struct ConflictStatistics {
+pub struct ConflictStatistics {
     branches: (QualifiedPath, QualifiedPath),
     has_conflict: bool,
 }
@@ -104,15 +105,18 @@ impl GitInterface {
     pub fn status(&self) -> Result<Output, GitError> {
         Ok(self.raw_git_interface.run(vec!["status"])?)
     }
+    fn checkout_raw(&self, path: &QualifiedPath) -> Result<Output, GitError> {
+        Ok(self
+            .raw_git_interface
+            .run(vec!["checkout", path.to_git_branch().as_str()])?)
+    }
     pub fn checkout(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         if !self.model.has_branch(&path) {
             return Err(GitError::GitInterface(GitInterfaceError::new(
                 format!("Cannot checkout branch {}: does not exist", path).as_str(),
             )));
         }
-        Ok(self
-            .raw_git_interface
-            .run(vec!["checkout", path.to_git_branch().as_str()])?)
+        self.checkout_raw(&path)
     }
     fn create_branch_internal(&self, path: &QualifiedPath) -> Result<Output, GitError> {
         let branch = path.to_git_branch();
@@ -156,9 +160,34 @@ impl GitInterface {
             .raw_git_interface
             .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
     }
-    pub fn check_for_conflicts(&self, paths: &Vec<QualifiedPath>) -> Result<Output, GitError> {
+    pub fn check_for_conflicts(&self, paths: &Vec<QualifiedPath>) -> Result<Vec<ConflictStatistics>, GitError> {
+        let current_area = self.get_current_area()?;
+        self.checkout(&current_area.get_qualified_path())?;
         let temporary = QualifiedPath::from("tmp");
-        self.create_branch_internal(&temporary)?;
-        self.delete_branch(&temporary)?;
+
+        let mut statistics = Vec::new();
+        for (i, path) in paths.iter().enumerate() {
+            for part in paths[i+1..].iter() {
+                self.create_branch_internal(&temporary)?;
+                self.checkout_raw(&temporary)?;
+                let mut status = format!("Trying merge {} and {} ", path, part);
+                let statistic = match self.merge(&vec![path.clone(), part.clone()])?.status.success() {
+                    true => {
+                        status += "OK".green().to_string().as_str();
+                        ConflictStatistics::new((path.clone(), part.clone()), false)
+                    }
+                    false => {
+                        self.raw_git_interface.run(vec!["merge", "--abort"])?;
+                        status += "Conflict".red().to_string().as_str();
+                        ConflictStatistics::new((path.clone(), part.clone()), true)
+                    }
+                };
+                println!("{}", status);
+                statistics.push(statistic);
+                self.checkout(&current_area.get_qualified_path())?;
+                self.delete_branch(&temporary)?;
+            }
+        }
+        Ok(statistics)
     }
 }
