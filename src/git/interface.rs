@@ -14,6 +14,9 @@ impl ConflictStatistics {
     pub fn new(branches: (QualifiedPath, QualifiedPath), has_conflict: bool) -> Self {
         Self { branches, has_conflict }
     }
+    pub fn branches(&self) -> &(QualifiedPath, QualifiedPath) {
+        &self.branches
+    }
     pub fn has_conflict(&self) -> bool {
         self.has_conflict
     }

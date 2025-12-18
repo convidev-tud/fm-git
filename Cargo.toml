@@ -8,3 +8,4 @@ edition = "2024"
 clap = { version = "4", features = ["derive"]}
 termtree = "0"
 colored = "3"
+petgraph = "0.8"
