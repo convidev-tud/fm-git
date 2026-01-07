@@ -1,30 +1,33 @@
 use crate::cli::completion::*;
 use crate::cli::*;
+use crate::git::interface::ConflictStatistics;
 use crate::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
+use petgraph::algo::maximal_cliques;
 use petgraph::graph::UnGraph;
 use std::collections::HashMap;
 use std::error::Error;
-use petgraph::algo::maximal_cliques;
-use crate::git::interface::ConflictStatistics;
+use colored::Colorize;
 
-fn map_paths_to_id(paths: &Vec<QualifiedPath>) -> HashMap<i32, QualifiedPath> {
-    let mut map: HashMap<i32, QualifiedPath> = HashMap::new();
+fn map_paths_to_id(paths: &Vec<QualifiedPath>) -> (HashMap<usize, QualifiedPath>, HashMap<QualifiedPath, usize>) {
+    let mut id_to_path: HashMap<usize, QualifiedPath> = HashMap::new();
+    let mut path_to_id: HashMap<QualifiedPath, usize> = HashMap::new();
     let mut i = 0;
     for path in paths.iter() {
-        map.insert(i, path.clone());
+        id_to_path.insert(i, path.clone());
+        path_to_id.insert(path.clone(), i);
         i += 1;
     }
-    map
+    (id_to_path, path_to_id)
 }
 
-fn build_edges(conflict_data: &Vec<ConflictStatistics>, id_to_path: &HashMap<QualifiedPath, i32>) -> Vec<(u32, u32)> {
+fn build_edges(conflict_data: &Vec<ConflictStatistics>, path_to_id: &HashMap<QualifiedPath, usize>) -> Vec<(u32, u32)> {
     conflict_data
         .iter()
         .filter_map(|element| {
             if !element.has_conflict() {
-                let left = element.branches().0;
-                let right = element.branches().1;
+                let left = path_to_id.get(&element.branches().0).unwrap().clone() as u32;
+                let right = path_to_id.get(&element.branches().1).unwrap().clone() as u32;
                 Some((left, right))
             } else { None }
         })
@@ -40,6 +43,22 @@ fn get_max_clique(graph: &UnGraph<usize, ()>) -> Vec<usize> {
         }
     };
     max_clique
+}
+
+fn clique_to_paths(clique: Vec<usize>, id_to_path: &HashMap<usize, QualifiedPath>) -> Vec<QualifiedPath> {
+    let mut paths: Vec<QualifiedPath> = Vec::new();
+    for path in clique {
+        paths.push(id_to_path.get(&path).unwrap().clone());
+    }
+    paths
+}
+
+fn make_no_conflict_log() -> String {
+    "without conflicts".green().to_string()
+}
+
+fn make_conflict_log() -> String {
+    "will produce conflicts".red().to_string()
 }
 
 #[derive(Clone, Debug)]
@@ -82,19 +101,26 @@ impl CommandInterface for DeriveCommand {
             .map(|e| current_area.get_path_to_feature_root() + QualifiedPath::from(e))
             .collect::<Vec<_>>();
 
-        let id_to_path = map_paths_to_id(&all_features);
+        context.log_to_stdout("Checking for conflicts");
+        let (id_to_path, path_to_id) = map_paths_to_id(&all_features);
         let conflicts = context.git.check_for_conflicts(&all_features)?;
-        let edges = build_edges();
+        let edges = build_edges(&conflicts, &path_to_id);
         let graph = UnGraph::<usize, ()>::from_edges(&edges);
         let max_clique = get_max_clique(&graph);
-
-        let area_path = current_area.get_qualified_path();
-        drop(current_area);
-        context.git.checkout(&area_path)?;
-        context.git.create_branch(&target_path)?;
-        context.git.checkout(&target_path)?;
-        let output = context.git.merge(&all_features)?;
-        context.log_from_output(&output);
+        let mergeable_features = clique_to_paths(max_clique, &id_to_path);
+        if mergeable_features.len() == all_features.len() {
+            let area_path = current_area.get_qualified_path();
+            drop(current_area);
+            context.git.checkout(&area_path)?;
+            context.git.create_branch(&target_path)?;
+            context.git.checkout(&target_path)?;
+            context.git.merge(&all_features)?;
+            context.log_to_stdout("Derivation finished ".to_string() + make_no_conflict_log().as_str() + ".");
+        } else {
+            context.log_to_stdout(format!("Can merge {} features ", mergeable_features.len()) + make_no_conflict_log().as_str() + ".");
+            context.log_to_stdout(format!("{} features ", all_features.len() - mergeable_features.len()) + make_conflict_log().as_str() + ".");
+            context.log_to_stdout("A partial derivation will be performed with all conflict-free features.")
+        }
         Ok(())
     }
     fn shell_complete(

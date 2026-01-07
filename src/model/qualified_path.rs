@@ -3,7 +3,7 @@ use std::ops::Add;
 
 const SEPARATOR: char = '/';
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq)]
 pub struct QualifiedPath {
     path: Vec<String>,
 }
