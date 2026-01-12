@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
+use colored::Colorize;
 
 const SEPARATOR: char = '/';
 
@@ -72,7 +73,7 @@ impl Add for QualifiedPath {
 }
 impl Display for QualifiedPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.to_string().as_str())
+        f.write_str(self.to_string().blue().to_string().as_str())
     }
 }
 impl From<QualifiedPath> for String {

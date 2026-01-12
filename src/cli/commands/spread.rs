@@ -1,7 +1,7 @@
 use crate::cli::*;
+use crate::model::NodePathType;
 use clap::Command;
 use std::error::Error;
-use crate::model::NodePathType;
 
 #[derive(Clone, Debug)]
 pub struct SpreadCommand;

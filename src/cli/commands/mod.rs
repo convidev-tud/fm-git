@@ -1,3 +1,4 @@
+mod check;
 mod checkout;
 mod complete;
 mod derive;
@@ -10,6 +11,7 @@ mod status;
 mod tag;
 mod tree;
 
+pub use check::*;
 pub use checkout::*;
 pub use complete::*;
 pub use derive::*;

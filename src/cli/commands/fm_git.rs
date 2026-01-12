@@ -15,6 +15,7 @@ impl CommandDefinition for FMGitCommand {
             Box::new(StatusCommand),
             Box::new(TreeCommand),
             Box::new(DeriveCommand),
+            Box::new(CheckCommand),
             Box::new(CheckoutCommand),
             Box::new(InitCommand),
             Box::new(FeatureCommand),
