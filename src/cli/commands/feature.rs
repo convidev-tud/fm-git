@@ -86,57 +86,14 @@ impl CommandInterface for FeatureCommand {
     ) -> Result<Vec<String>, Box<dyn Error>> {
         let result = match completion_helper.currently_editing() {
             Some(arg) => match arg.get_id().as_str() {
-                "feature" => {
-                    let current_branch = context.git.get_current_node_path()?;
-                    let maybe_concrete_path = match current_branch.concretize() {
-                        NodePathType::Area(path) => match path.to_feature_root() {
-                            Some(path) => Some(path.to_any_type()),
-                            None => None,
-                        },
-                        NodePathType::FeatureRoot(path) => Some(path.to_any_type()),
-                        NodePathType::Feature(path) => Some(path.to_any_type()),
-                        _ => None,
-                    };
-                    if maybe_concrete_path.is_none() {
-                        return Ok(vec![]);
-                    }
-
-                    let path = maybe_concrete_path.unwrap();
-                    let total = path.get_child_paths_by_branch();
-                    if total.is_empty() {
-                        return Ok(vec![]);
-                    }
-                    let has_branch = total.get(&true).unwrap();
-                    let has_no_branch = total.get(&false).unwrap();
-                    let has_branch_completion = completion_helper.complete_qualified_paths(
-                        AbsolutePathCompletion,
-                        has_branch,
-                        false,
-                    );
-                    let has_no_branch_completion = completion_helper.complete_qualified_paths(
-                        AbsolutePathCompletion,
-                        has_no_branch,
-                        false,
-                    );
-                    let mut result = has_branch_completion
-                        .into_iter()
-                        .map(|path| {
-                            if !path.ends_with("/") {
-                                path + "/"
-                            } else {
-                                path
-                            }
-                        })
-                        .collect::<Vec<String>>();
-                    result.extend(has_no_branch_completion);
-                    result
-                }
                 "delete" => {
                     let maybe_feature_root = context.git.get_current_area()?.to_feature_root();
                     match maybe_feature_root {
                         Some(path) => completion_helper.complete_qualified_paths(
-                            AbsolutePathCompletion,
-                            path.get_child_paths_by_branch().get(&true).unwrap(),
+                            QualifiedPath::new(),
+                            HasBranchFilteringNodePathTransformer::new(true)
+                                .transform(path.iter_children_req())
+                                .map(|path| path.get_qualified_path()),
                             false,
                         ),
                         None => {

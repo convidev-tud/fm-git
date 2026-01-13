@@ -150,16 +150,16 @@ impl<'a> CompletionHelper<'a> {
     }
     pub fn complete_qualified_paths(
         &self,
-        reference: &QualifiedPath,
-        paths: &Vec<QualifiedPath>,
+        reference: QualifiedPath,
+        paths: impl Iterator<Item = QualifiedPath>,
         ignore_existing_occurrences: bool,
-    ) -> Vec<QualifiedPath> {
+    ) -> Vec<String> {
         let maybe_last = self.get_last();
         if maybe_last.is_none() {
             return vec![];
         }
-        let to_complete = RelativePathCompleter::new(reference.clone())
-            .complete(&QualifiedPath::from(maybe_last.unwrap()), paths);
+        let to_complete = RelativePathCompleter::new(reference)
+            .complete(QualifiedPath::from(maybe_last.unwrap()), paths);
         if ignore_existing_occurrences {
             let currently_editing_appendix = self.get_appendix_of_currently_edited();
             to_complete
@@ -168,7 +168,7 @@ impl<'a> CompletionHelper<'a> {
                     if currently_editing_appendix.contains(&path.to_string().as_str()) {
                         None
                     } else {
-                        Some(path.clone())
+                        Some(path.to_string())
                     }
                 })
                 .collect()
@@ -267,7 +267,8 @@ mod tests {
         let appendix = vec!["mytool", "abc", "foo/bar/baz1", "foo/b"];
         let helper = CompletionHelper::new(&cmd, appendix);
         let paths = setup_qualified_paths();
-        let mut result = helper.complete_qualified_paths(&QualifiedPath::from(""), &paths, true);
+        let mut result =
+            helper.complete_qualified_paths(QualifiedPath::new(), paths.into_iter(), true);
         result.sort();
         assert_eq!(result, vec!["foo/bar/baz2",]);
     }
@@ -277,7 +278,8 @@ mod tests {
         let appendix = vec!["mytool", "abc", "foo/bar/baz1"];
         let helper = CompletionHelper::new(&cmd, appendix);
         let paths = setup_qualified_paths();
-        let mut result = helper.complete_qualified_paths(&QualifiedPath::from(""), &paths, true);
+        let mut result =
+            helper.complete_qualified_paths(QualifiedPath::new(), paths.into_iter(), true);
         result.sort();
         assert_eq!(result, vec!["foo/bar/baz1",]);
     }

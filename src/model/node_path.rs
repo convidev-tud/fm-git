@@ -1,5 +1,4 @@
 use crate::model::*;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::rc::Rc;
@@ -99,6 +98,9 @@ impl<T: Clone + Debug> NodePath<T> {
             })
             .collect()
     }
+    pub fn get_metadata(&self) -> &NodeMetadata {
+        self.get_node().get_metadata()
+    }
     pub fn to_any_type(self) -> NodePath<AnyNodeType> {
         NodePath::<AnyNodeType>::from_concrete(self)
     }
@@ -118,20 +120,39 @@ impl<T: Clone + Debug> NodePath<T> {
         }
         path
     }
-    pub fn get_child_paths_by_branch(&self) -> HashMap<bool, Vec<QualifiedPath>> {
-        let has_branch = |node: &Node| -> bool { node.get_metadata().has_branch() };
-        let has_no_branch = |node: &Node| -> bool { !node.get_metadata().has_branch() };
-        let check = |flag: &bool, node: &Node| -> bool {
-            if *flag {
-                has_branch(node)
-            } else {
-                has_no_branch(node)
-            }
-        };
-        self.get_node()
-            .get_qualified_paths_by(&QualifiedPath::new(), &check, &vec![true, false])
-    }
     pub fn display_tree(&self, show_tags: bool) -> String {
         self.get_node().display_tree(show_tags)
+    }
+}
+
+pub trait NodePathTransformer<A, B>
+where
+    A: Clone + Debug,
+    B: Clone + Debug,
+{
+    fn apply(&self, node_path: NodePath<A>) -> Option<NodePath<B>>;
+    fn transform(
+        &self,
+        node_paths: impl Iterator<Item = NodePath<A>>,
+    ) -> impl Iterator<Item = NodePath<B>> {
+        node_paths.filter_map(|path| self.apply(path))
+    }
+}
+
+pub struct HasBranchFilteringNodePathTransformer {
+    has_branch: bool,
+}
+impl HasBranchFilteringNodePathTransformer {
+    pub fn new(has_branch: bool) -> HasBranchFilteringNodePathTransformer {
+        Self { has_branch }
+    }
+}
+impl<A: Clone + Debug> NodePathTransformer<A, A> for HasBranchFilteringNodePathTransformer {
+    fn apply(&self, node_path: NodePath<A>) -> Option<NodePath<A>> {
+        if node_path.get_metadata().has_branch() == self.has_branch {
+            Some(node_path)
+        } else {
+            None
+        }
     }
 }

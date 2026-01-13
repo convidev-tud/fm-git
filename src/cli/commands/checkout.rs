@@ -44,17 +44,16 @@ impl CommandInterface for CheckoutCommand {
                 Some(last) => {
                     if last.starts_with("/") {
                         completion_helper.complete_qualified_paths(
-                            &QualifiedPath::new(),
-                            &all_branches
+                            QualifiedPath::new(),
+                            all_branches
                                 .iter()
-                                .map(|path| QualifiedPath::from("") + path.clone())
-                                .collect(),
+                                .map(|path| QualifiedPath::from("") + path.clone()),
                             false,
                         )
                     } else {
                         completion_helper.complete_qualified_paths(
-                            &QualifiedPath::new(),
-                            all_branches,
+                            context.git.get_current_qualified_path()?,
+                            all_branches.iter().map(|path| path.clone()),
                             false,
                         )
                     }

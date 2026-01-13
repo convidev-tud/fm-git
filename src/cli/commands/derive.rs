@@ -1,7 +1,7 @@
 use crate::cli::completion::*;
 use crate::cli::*;
 use crate::git::conflict::{ConflictChecker, ConflictStatistic, ConflictStatistics};
-use crate::model::QualifiedPath;
+use crate::model::{HasBranchFilteringNodePathTransformer, NodePathTransformer, QualifiedPath};
 use clap::{Arg, ArgAction, Command};
 use colored::Colorize;
 use petgraph::algo::maximal_cliques;
@@ -165,8 +165,10 @@ impl CommandInterface for DeriveCommand {
         let result = match current {
             Some(value) => match value.get_id().as_str() {
                 "features" => completion_helper.complete_qualified_paths(
-                    AbsolutePathCompletion,
-                    &feature_root.get_child_paths_by_branch().get(&true).unwrap(),
+                    QualifiedPath::new(),
+                    HasBranchFilteringNodePathTransformer::new(true)
+                        .transform(feature_root.iter_children_req())
+                        .map(|path| path.get_qualified_path()),
                     true,
                 ),
                 _ => vec![],
