@@ -131,6 +131,9 @@ impl GitInterface {
         base.extend(converted_paths);
         Ok(self.raw_git_interface.run(base)?)
     }
+    pub fn abort_merge(&self) -> Result<Output, GitError> {
+        Ok(self.raw_git_interface.run(vec!["merge", "--abort"])?)
+    }
     pub fn create_tag(&self, tag: &QualifiedPath) -> Result<Output, GitError> {
         let current_branch = self.get_current_qualified_path()?;
         let tagged = current_branch + tag.clone();

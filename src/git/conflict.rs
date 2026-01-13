@@ -124,6 +124,9 @@ impl<'a> ConflictChecker<'a> {
         self.interface.create_branch_no_mut(&temporary)?;
         self.interface.checkout_raw(&temporary)?;
         let success = self.interface.merge(&vec![l, r])?.status.success();
+        if !success {
+            self.interface.abort_merge()?;
+        }
         self.interface
             .checkout(&current_area.get_qualified_path())?;
         self.interface.delete_branch(&temporary)?;

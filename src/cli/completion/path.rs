@@ -11,9 +11,11 @@ impl RelativePathCompleter {
     pub fn complete(
         &self,
         prefix: QualifiedPath,
-        paths: impl Iterator<Item=QualifiedPath>,
+        paths: impl Iterator<Item = QualifiedPath>,
     ) -> Vec<String> {
-        let filtered: Vec<QualifiedPath> = self.transform_and_filter_path(prefix.clone(), paths).collect();
+        let filtered: Vec<QualifiedPath> = self
+            .transform_and_filter_path(prefix.clone(), paths)
+            .collect();
         match filtered.len() {
             0 => vec![],
             1 => vec![filtered[0].to_string()],
@@ -190,9 +192,6 @@ mod tests {
 
         let mut direct = completion.complete(QualifiedPath::from(""), paths.clone().into_iter());
         direct.sort();
-        assert_eq!(
-            direct,
-            vec!["foo", "foo/"]
-        );
+        assert_eq!(direct, vec!["foo", "foo/"]);
     }
 }
