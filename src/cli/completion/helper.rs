@@ -158,23 +158,31 @@ impl<'a> CompletionHelper<'a> {
         if maybe_last.is_none() {
             return vec![];
         }
-        let to_complete = RelativePathCompleter::new(reference)
-            .complete(QualifiedPath::from(maybe_last.unwrap()), paths);
         if ignore_existing_occurrences {
-            let currently_editing_appendix = self.get_appendix_of_currently_edited();
-            to_complete
-                .iter()
-                .filter_map(|path| {
-                    if currently_editing_appendix.contains(&path.to_string().as_str()) {
-                        None
-                    } else {
-                        Some(path.to_string())
-                    }
-                })
-                .collect()
+            RelativePathCompleter::new(reference.clone()).complete(
+                QualifiedPath::from(maybe_last.unwrap()),
+                self.treat_existing_occurrences(&reference, paths),
+            )
         } else {
-            to_complete
+            RelativePathCompleter::new(reference)
+                .complete(QualifiedPath::from(maybe_last.unwrap()), paths)
         }
+    }
+    fn treat_existing_occurrences(
+        &self,
+        reference: &QualifiedPath,
+        paths: impl Iterator<Item = QualifiedPath>,
+    ) -> impl Iterator<Item = QualifiedPath> {
+        let currently_editing_appendix = self.get_appendix_of_currently_edited();
+        paths.filter_map(move |path| {
+            if currently_editing_appendix
+                .contains(&path.strip_n_left(reference.len()).to_string().as_str())
+            {
+                None
+            } else {
+                Some(path)
+            }
+        })
     }
 }
 

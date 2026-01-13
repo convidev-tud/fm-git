@@ -165,7 +165,7 @@ impl CommandInterface for DeriveCommand {
         let result = match current {
             Some(value) => match value.get_id().as_str() {
                 "features" => completion_helper.complete_qualified_paths(
-                    QualifiedPath::new(),
+                    feature_root.get_qualified_path(),
                     HasBranchFilteringNodePathTransformer::new(true)
                         .transform(feature_root.iter_children_req())
                         .map(|path| path.get_qualified_path()),
