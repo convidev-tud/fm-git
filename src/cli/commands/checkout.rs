@@ -43,8 +43,8 @@ impl CommandInterface for CheckoutCommand {
             "branch" => match completion_helper.get_last() {
                 Some(last) => {
                     if last.starts_with("/") {
-                        completion_helper.complete_qualified_path(
-                            RelativePathCompletion::new(QualifiedPath::new()),
+                        completion_helper.complete_qualified_paths(
+                            &QualifiedPath::new(),
                             &all_branches
                                 .iter()
                                 .map(|path| QualifiedPath::from("") + path.clone())
@@ -52,8 +52,8 @@ impl CommandInterface for CheckoutCommand {
                             false,
                         )
                     } else {
-                        completion_helper.complete_qualified_path(
-                            RelativePathCompletion::new(context.git.get_current_qualified_path()?),
+                        completion_helper.complete_qualified_paths(
+                            &QualifiedPath::new(),
                             all_branches,
                             false,
                         )

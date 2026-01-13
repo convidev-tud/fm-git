@@ -108,12 +108,12 @@ impl CommandInterface for FeatureCommand {
                     }
                     let has_branch = total.get(&true).unwrap();
                     let has_no_branch = total.get(&false).unwrap();
-                    let has_branch_completion = completion_helper.complete_qualified_path(
+                    let has_branch_completion = completion_helper.complete_qualified_paths(
                         AbsolutePathCompletion,
                         has_branch,
                         false,
                     );
-                    let has_no_branch_completion = completion_helper.complete_qualified_path(
+                    let has_no_branch_completion = completion_helper.complete_qualified_paths(
                         AbsolutePathCompletion,
                         has_no_branch,
                         false,
@@ -134,7 +134,7 @@ impl CommandInterface for FeatureCommand {
                 "delete" => {
                     let maybe_feature_root = context.git.get_current_area()?.to_feature_root();
                     match maybe_feature_root {
-                        Some(path) => completion_helper.complete_qualified_path(
+                        Some(path) => completion_helper.complete_qualified_paths(
                             AbsolutePathCompletion,
                             path.get_child_paths_by_branch().get(&true).unwrap(),
                             false,

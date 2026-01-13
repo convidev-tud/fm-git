@@ -1,4 +1,4 @@
-use crate::cli::completion::PathCompletion;
+use crate::cli::completion::RelativePathCompleter;
 use crate::model::QualifiedPath;
 use clap::{Arg, ArgAction, Command};
 use std::collections::HashMap;
@@ -148,26 +148,27 @@ impl<'a> CompletionHelper<'a> {
         let currently_editing = maybe_currently_editing.unwrap().0;
         self.appendix[currently_editing.start..self.appendix.len() - 1].to_vec()
     }
-    pub fn complete_qualified_path(
+    pub fn complete_qualified_paths(
         &self,
-        strategy: impl PathCompletion,
+        reference: &QualifiedPath,
         paths: &Vec<QualifiedPath>,
         ignore_existing_occurrences: bool,
-    ) -> Vec<String> {
+    ) -> Vec<QualifiedPath> {
         let maybe_last = self.get_last();
         if maybe_last.is_none() {
             return vec![];
         }
-        let to_complete = strategy.complete(&QualifiedPath::from(maybe_last.unwrap()), paths);
+        let to_complete = RelativePathCompleter::new(reference.clone())
+            .complete(&QualifiedPath::from(maybe_last.unwrap()), paths);
         if ignore_existing_occurrences {
             let currently_editing_appendix = self.get_appendix_of_currently_edited();
             to_complete
                 .iter()
                 .filter_map(|path| {
-                    if currently_editing_appendix.contains(&path.as_str()) {
+                    if currently_editing_appendix.contains(&path.to_string().as_str()) {
                         None
                     } else {
-                        Some(path.to_string())
+                        Some(path.clone())
                     }
                 })
                 .collect()
@@ -180,7 +181,6 @@ impl<'a> CompletionHelper<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::completion::AbsolutePathCompletion;
 
     fn setup_test_command() -> Command {
         Command::new("mytool")
@@ -267,7 +267,7 @@ mod tests {
         let appendix = vec!["mytool", "abc", "foo/bar/baz1", "foo/b"];
         let helper = CompletionHelper::new(&cmd, appendix);
         let paths = setup_qualified_paths();
-        let mut result = helper.complete_qualified_path(AbsolutePathCompletion, &paths, true);
+        let mut result = helper.complete_qualified_paths(&QualifiedPath::from(""), &paths, true);
         result.sort();
         assert_eq!(result, vec!["foo/bar/baz2",]);
     }
@@ -277,7 +277,7 @@ mod tests {
         let appendix = vec!["mytool", "abc", "foo/bar/baz1"];
         let helper = CompletionHelper::new(&cmd, appendix);
         let paths = setup_qualified_paths();
-        let mut result = helper.complete_qualified_path(AbsolutePathCompletion, &paths, true);
+        let mut result = helper.complete_qualified_paths(&QualifiedPath::from(""), &paths, true);
         result.sort();
         assert_eq!(result, vec!["foo/bar/baz1",]);
     }

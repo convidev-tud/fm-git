@@ -2,17 +2,22 @@ use crate::model::QualifiedPath;
 use colored::Colorize;
 use std::collections::HashSet;
 
-pub trait PathCompletion {
-    fn transform_and_filter_path(
+pub struct RelativePathCompleter {
+    reference_path: QualifiedPath,
+}
+impl RelativePathCompleter {
+    pub fn new(reference_path: QualifiedPath) -> Self {
+        Self { reference_path }
+    }
+    pub fn complete(
         &self,
         prefix: &QualifiedPath,
         paths: &Vec<QualifiedPath>,
-    ) -> Vec<QualifiedPath>;
-    fn complete(&self, prefix: &QualifiedPath, paths: &Vec<QualifiedPath>) -> Vec<String> {
+    ) -> Vec<QualifiedPath> {
         let filtered = self.transform_and_filter_path(prefix, paths);
         match filtered.len() {
             0 => vec![],
-            1 => vec![filtered[0].to_string()],
+            1 => vec![filtered[0].clone()],
             _ => {
                 let current_index = prefix.len();
                 let all = filtered
@@ -20,53 +25,22 @@ pub trait PathCompletion {
                     .map(|path| {
                         let to_index = path.strip_n_right(current_index);
                         if path.len() == current_index {
-                            to_index.to_string()
+                            to_index
                         } else {
-                            to_index.to_string() + "/"
+                            to_index + QualifiedPath::from("")
                         }
                     })
                     .collect::<HashSet<_>>()
                     .into_iter()
-                    .collect::<Vec<String>>();
+                    .collect::<Vec<QualifiedPath>>();
                 if all.len() == 1 {
-                    filtered.iter().map(|path| path.to_string()).collect()
+                    filtered.iter().map(|path| path.clone()).collect()
                 } else {
                     all
                 }
             }
         }
     }
-}
-
-pub struct AbsolutePathCompletion;
-impl PathCompletion for AbsolutePathCompletion {
-    fn transform_and_filter_path(
-        &self,
-        prefix: &QualifiedPath,
-        paths: &Vec<QualifiedPath>,
-    ) -> Vec<QualifiedPath> {
-        paths
-            .iter()
-            .filter_map(|path| {
-                if path.starts_with(prefix) {
-                    Some(path.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-pub struct RelativePathCompletion {
-    current_path: QualifiedPath,
-}
-impl RelativePathCompletion {
-    pub fn new(current_path: QualifiedPath) -> Self {
-        Self { current_path }
-    }
-}
-impl PathCompletion for RelativePathCompletion {
     fn transform_and_filter_path(
         &self,
         prefix: &QualifiedPath,
@@ -80,7 +54,7 @@ impl PathCompletion for RelativePathCompletion {
         } else {
             prefix.clone()
         };
-        let current_position = self.current_path.clone() + transformed_prefix.clone();
+        let current_position = self.reference_path.clone() + transformed_prefix.clone();
         let current_index = current_position.len() - 1;
         paths
             .iter()
@@ -120,7 +94,7 @@ mod tests {
             .map(|path| QualifiedPath::from("") + path)
             .collect::<Vec<QualifiedPath>>();
         paths.push(QualifiedPath::from("/bar"));
-        let completion = RelativePathCompletion::new(QualifiedPath::new());
+        let completion = RelativePathCompleter::new(QualifiedPath::new());
 
         let mut direct = completion.complete(&QualifiedPath::from(""), &paths);
         direct.sort();
@@ -144,7 +118,7 @@ mod tests {
     #[test]
     fn test_relative_path_completion_relative_identifier_current_path() {
         let paths = setup_qualified_paths();
-        let completion = RelativePathCompletion::new(QualifiedPath::from("foo"));
+        let completion = RelativePathCompleter::new(QualifiedPath::from("foo"));
 
         let mut direct = completion.complete(&QualifiedPath::from("."), &paths);
         direct.sort();
@@ -169,7 +143,7 @@ mod tests {
     #[test]
     fn test_relative_path_completion_relative_identifier_previous_path() {
         let paths = setup_qualified_paths();
-        let completion = RelativePathCompletion::new(QualifiedPath::from("foo"));
+        let completion = RelativePathCompleter::new(QualifiedPath::from("foo"));
 
         let mut direct = completion.complete(&QualifiedPath::from("../"), &paths);
         direct.sort();
@@ -194,7 +168,7 @@ mod tests {
     #[test]
     fn test_relative_path_completion_current_path() {
         let paths = setup_qualified_paths();
-        let completion = RelativePathCompletion::new(QualifiedPath::from("foo"));
+        let completion = RelativePathCompleter::new(QualifiedPath::from("foo"));
 
         let mut direct = completion.complete(&QualifiedPath::from(""), &paths);
         direct.sort();

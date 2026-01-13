@@ -1,10 +1,10 @@
+use colored::Colorize;
 use std::fmt::{Display, Formatter};
 use std::ops::Add;
-use colored::Colorize;
 
 const SEPARATOR: char = '/';
 
-#[derive(Clone, Debug, Hash, Eq)]
+#[derive(Clone, Debug, Hash, Eq, Ord, PartialOrd)]
 pub struct QualifiedPath {
     path: Vec<String>,
 }
@@ -37,6 +37,24 @@ impl PartialEq for QualifiedPath {
 
     fn ne(&self, other: &Self) -> bool {
         self.path != other.path
+    }
+}
+impl PartialEq<String> for QualifiedPath {
+    fn eq(&self, other: &String) -> bool {
+        self.to_string() == *other
+    }
+
+    fn ne(&self, other: &String) -> bool {
+        self.to_string() != *other
+    }
+}
+impl PartialEq<&str> for QualifiedPath {
+    fn eq(&self, other: &&str) -> bool {
+        self.to_string() == *other
+    }
+
+    fn ne(&self, other: &&str) -> bool {
+        self.to_string() != *other
     }
 }
 impl Add for QualifiedPath {
