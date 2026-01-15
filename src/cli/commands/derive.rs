@@ -139,7 +139,9 @@ impl CommandInterface for DeriveCommand {
             context.git.create_branch(&target_path)?;
             context.git.checkout(&target_path)?;
             context.git.merge(&all_features)?;
-            context.git.empty_commit(make_post_derivation_message(&all_features).as_str())?;
+            context
+                .git
+                .empty_commit(make_post_derivation_message(&all_features).as_str())?;
             context.git.checkout(&current_path)?;
             context.log_to_stdout(
                 "Derivation finished ".to_string() + make_no_conflict_log().as_str() + ".",

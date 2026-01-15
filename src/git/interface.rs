@@ -5,7 +5,7 @@ use std::io;
 use std::process::{Command, Output};
 
 #[derive(Clone, Debug)]
-struct RawGitInterface;
+pub(super) struct RawGitInterface;
 impl RawGitInterface {
     fn build_git_command(&self) -> Command {
         Command::new("git")
@@ -161,8 +161,12 @@ impl GitInterface {
             .collect())
     }
     pub fn get_files_managed(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
-        let out = self.raw_git_interface
-            .run(vec!["ls-tree", "-r", "--name-only", branch.to_git_branch().as_str()])?;
+        let out = self.raw_git_interface.run(vec![
+            "ls-tree",
+            "-r",
+            "--name-only",
+            branch.to_git_branch().as_str(),
+        ])?;
         Ok(u8_to_string(&out.stdout)
             .split("\n")
             .map(|e| e.to_string())
@@ -172,6 +176,8 @@ impl GitInterface {
         Ok(self.raw_git_interface.run(vec!["commit", "-m", message])?)
     }
     pub fn empty_commit(&self, message: &str) -> Result<Output, GitError> {
-        Ok(self.raw_git_interface.run(vec!["commit", "--allow-empty", "-m", message])?)
+        Ok(self
+            .raw_git_interface
+            .run(vec!["commit", "--allow-empty", "-m", message])?)
     }
 }

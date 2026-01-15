@@ -9,3 +9,5 @@ clap = { version = "4", features = ["derive"]}
 termtree = "0"
 colored = "3"
 petgraph = "0.8"
+serde = "1"
+serde_json = "1"
