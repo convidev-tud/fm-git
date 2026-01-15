@@ -62,6 +62,15 @@ fn clique_to_paths(
     paths
 }
 
+fn make_post_derivation_message(features: &Vec<QualifiedPath>) -> String {
+    let mut base = "# DO NOT EDIT OR REMOVE THIS COMMIT\nDERIVATION FINISHED\n".to_string();
+    for feature in features.iter() {
+        base.push_str(feature.to_string().as_str());
+        base.push('\n');
+    }
+    base
+}
+
 fn make_no_conflict_log() -> String {
     "without conflicts".green().to_string()
 }
@@ -98,6 +107,7 @@ impl CommandInterface for DeriveCommand {
             .arg_helper
             .get_argument_value::<String>("product")
             .unwrap();
+        let current_path = context.git.get_current_qualified_path()?;
         let current_area = context.git.get_current_area()?;
         let target_path =
             current_area.get_path_to_product_root() + QualifiedPath::from(target_product_name);
@@ -129,6 +139,8 @@ impl CommandInterface for DeriveCommand {
             context.git.create_branch(&target_path)?;
             context.git.checkout(&target_path)?;
             context.git.merge(&all_features)?;
+            context.git.empty_commit(make_post_derivation_message(&all_features).as_str())?;
+            context.git.checkout(&current_path)?;
             context.log_to_stdout(
                 "Derivation finished ".to_string() + make_no_conflict_log().as_str() + ".",
             );

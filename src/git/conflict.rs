@@ -94,10 +94,6 @@ impl<'a> ConflictChecker<'a> {
         &self,
         paths: &Vec<QualifiedPath>,
     ) -> Result<impl Iterator<Item = ConflictStatistic>, GitError> {
-        let current_area = self.interface.get_current_area()?;
-        self.interface
-            .checkout(&current_area.get_qualified_path())?;
-
         let mut feature_combinations: Vec<(&QualifiedPath, &QualifiedPath)> = Vec::new();
         for (i, path) in paths.iter().enumerate() {
             for part in paths[i + 1..].iter() {
@@ -119,7 +115,9 @@ impl<'a> ConflictChecker<'a> {
     }
 
     fn check_two(&self, l: QualifiedPath, r: QualifiedPath) -> Result<bool, GitError> {
+        let current_path = self.interface.get_current_qualified_path()?;
         let current_area = self.interface.get_current_area()?;
+        self.interface.checkout(&current_area.get_qualified_path())?;
         let temporary = QualifiedPath::from("tmp");
         self.interface.create_branch_no_mut(&temporary)?;
         self.interface.checkout_raw(&temporary)?;
@@ -127,8 +125,7 @@ impl<'a> ConflictChecker<'a> {
         if !success {
             self.interface.abort_merge()?;
         }
-        self.interface
-            .checkout(&current_area.get_qualified_path())?;
+        self.interface.checkout(&current_path)?;
         self.interface.delete_branch(&temporary)?;
         Ok(success)
     }

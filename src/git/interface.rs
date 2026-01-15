@@ -148,4 +148,30 @@ impl GitInterface {
             .raw_git_interface
             .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
     }
+    pub fn get_commit_messages(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
+        let out = self.raw_git_interface.run(vec![
+            "log",
+            "--format=%BSPLIT_HERE",
+            "--all",
+            branch.to_git_branch().as_str(),
+        ])?;
+        Ok(u8_to_string(&out.stdout)
+            .split("SPLIT_HERE")
+            .map(|e| e.to_string())
+            .collect())
+    }
+    pub fn get_files_managed(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
+        let out = self.raw_git_interface
+            .run(vec!["ls-tree", "-r", "--name-only", branch.to_git_branch().as_str()])?;
+        Ok(u8_to_string(&out.stdout)
+            .split("\n")
+            .map(|e| e.to_string())
+            .collect())
+    }
+    pub fn commit(&self, message: &str) -> Result<Output, GitError> {
+        Ok(self.raw_git_interface.run(vec!["commit", "-m", message])?)
+    }
+    pub fn empty_commit(&self, message: &str) -> Result<Output, GitError> {
+        Ok(self.raw_git_interface.run(vec!["commit", "--allow-empty", "-m", message])?)
+    }
 }
