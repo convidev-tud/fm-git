@@ -176,12 +176,25 @@ impl GitInterface {
             .collect();
         Ok(commits)
     }
-    pub fn get_files_managed(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
+    pub fn get_files_managed_by_branch(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
         let out = self.raw_git_interface.run(vec![
             "ls-tree",
             "-r",
             "--name-only",
             branch.to_git_branch().as_str(),
+        ])?;
+        Ok(u8_to_string(&out.stdout)
+            .split("\n")
+            .map(|e| e.to_string())
+            .collect())
+    }
+    pub fn get_files_changed_by_commit(&self, commit: &str) -> Result<Vec<String>, GitError> {
+        let out = self.raw_git_interface.run(vec![
+           "diff-tree",
+           "--no-commit-id",
+           "--name-only",
+           commit,
+           "-r"
         ])?;
         Ok(u8_to_string(&out.stdout)
             .split("\n")
@@ -195,5 +208,8 @@ impl GitInterface {
         Ok(self
             .raw_git_interface
             .run(vec!["commit", "--allow-empty", "-m", message])?)
+    }
+    pub fn cherry_pick(&self, commit: &str) -> Result<Output, GitError> {
+        Ok(self.raw_git_interface.run(vec!["cherry-pick", commit])?)
     }
 }
