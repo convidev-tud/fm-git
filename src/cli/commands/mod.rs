@@ -10,6 +10,7 @@ mod spread;
 mod status;
 mod tag;
 mod tree;
+mod untie;
 
 pub use check::*;
 pub use checkout::*;
@@ -23,3 +24,4 @@ pub use spread::*;
 pub use status::*;
 pub use tag::*;
 pub use tree::*;
+pub use untie::*;

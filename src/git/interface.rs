@@ -148,17 +148,33 @@ impl GitInterface {
             .raw_git_interface
             .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
     }
-    pub fn get_commit_messages(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
-        let out = self.raw_git_interface.run(vec![
-            "log",
-            "--format=%BSPLIT_HERE",
-            "--all",
-            branch.to_git_branch().as_str(),
-        ])?;
-        Ok(u8_to_string(&out.stdout)
-            .split("SPLIT_HERE")
-            .map(|e| e.to_string())
-            .collect())
+    pub fn get_commit_history(&self, branch: &QualifiedPath) -> Result<Vec<Commit>, GitError> {
+        let raw_hashes = u8_to_string(
+            &self
+                .raw_git_interface
+                .run(vec!["log", "--format=%H", branch.to_git_branch().as_str()])?
+                .stdout,
+        )
+        .trim()
+        .to_string();
+        let all_hashes = raw_hashes.split("\n").collect::<Vec<&str>>();
+        let commits: Vec<Commit> = all_hashes
+            .into_iter()
+            .map(|hash| {
+                let trimmed = hash.trim();
+                let commit_message = u8_to_string(
+                    &self
+                        .raw_git_interface
+                        .run(vec!["log", "--format=%B", "-n 1", trimmed])
+                        .unwrap()
+                        .stdout,
+                )
+                .trim()
+                .to_string();
+                Commit::new(trimmed, commit_message)
+            })
+            .collect();
+        Ok(commits)
     }
     pub fn get_files_managed(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
         let out = self.raw_git_interface.run(vec![

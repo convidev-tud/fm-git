@@ -18,7 +18,7 @@ impl GitDirPersistencyHandler {
         let path = String::from("hypergit/") + file_name;
         Self {
             file_path: path,
-            raw_git_interface: RawGitInterface
+            raw_git_interface: RawGitInterface,
         }
     }
     fn get_file_path(&self) -> String {
