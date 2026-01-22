@@ -11,7 +11,9 @@ fn extract_feature_names(message: &str) -> Vec<QualifiedPath> {
         .filter_map(|e| {
             if !to_filter.contains(&e) {
                 Some(QualifiedPath::from(e))
-            } else { None }
+            } else {
+                None
+            }
         })
         .collect()
 }
@@ -24,8 +26,18 @@ impl CommandDefinition for UntieCommand {
         Command::new("untie")
             .about("Untie commit from product and merge back into feature")
             .disable_help_subcommand(true)
-            .arg(Arg::new("commit").short('c').long("commit").help("Specific commit to untie"))
-            .arg(Arg::new("feature").short('f').long("feature").help("Feature to untie to"))
+            .arg(
+                Arg::new("commit")
+                    .short('c')
+                    .long("commit")
+                    .help("Specific commit to untie"),
+            )
+            .arg(
+                Arg::new("feature")
+                    .short('f')
+                    .long("feature")
+                    .help("Feature to untie to"),
+            )
     }
 }
 
@@ -44,11 +56,11 @@ impl CommandInterface for UntieCommand {
             .get_commit_history(&current.get_qualified_path())?;
         if commit_history.is_empty() {
             context.log_to_stdout("No commits on product");
-            return Ok(())
+            return Ok(());
         }
         let hash: String = match maybe_commit {
             Some(commit) => commit,
-            None => { commit_history.get(0).unwrap().hash().clone() }
+            None => commit_history.get(0).unwrap().hash().clone(),
         };
         let mut has_valid = false;
         let mut derivation_found = false;
@@ -57,7 +69,7 @@ impl CommandInterface for UntieCommand {
         for commit in commit_history.iter() {
             if commit.message().contains("DERIVATION FINISHED") {
                 if commit.hash() == &hash {
-                    return Err("Derivation commit cannot be untied".into())
+                    return Err("Derivation commit cannot be untied".into());
                 }
                 derivation_found = true;
                 features.extend(extract_feature_names(&commit.message()));
@@ -69,7 +81,7 @@ impl CommandInterface for UntieCommand {
             }
         }
         if !has_valid {
-            return Err("Commit not found after initial derivation".into())
+            return Err("Commit not found after initial derivation".into());
         }
         let files_of_commit = context.git.get_files_changed_by_commit(&hash)?;
         let filtered = features
@@ -81,7 +93,7 @@ impl CommandInterface for UntieCommand {
                     if !managed_files.contains(file_in_commit) {
                         all_true = false;
                     }
-                };
+                }
                 all_true
             })
             .collect::<Vec<QualifiedPath>>();

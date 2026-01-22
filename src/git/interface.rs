@@ -2,16 +2,42 @@ use crate::git::error::{GitError, GitInterfaceError};
 use crate::model::*;
 use crate::util::u8_to_string;
 use std::io;
+use std::path::PathBuf;
 use std::process::{Command, Output};
 
 #[derive(Clone, Debug)]
-pub(super) struct RawGitInterface;
+pub enum GitPath {
+    CurrentDirectory,
+    CustomDirectory(PathBuf),
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct RawGitInterface {
+    path: GitPath,
+}
 impl RawGitInterface {
-    fn build_git_command(&self) -> Command {
-        Command::new("git")
+    pub fn in_current_directory() -> Self {
+        Self::new(GitPath::CurrentDirectory)
+    }
+    pub fn in_custom_directory(path: PathBuf) -> Self {
+        Self::new(GitPath::CustomDirectory(path))
+    }
+    pub fn new(path: GitPath) -> Self {
+        Self { path }
     }
     pub fn run(&self, args: Vec<&str>) -> io::Result<Output> {
-        self.build_git_command().args(args).output()
+        let mut base = Command::new("git");
+        let mut arguments: Vec<String> = vec![];
+        match self.path {
+            GitPath::CurrentDirectory => {}
+            GitPath::CustomDirectory(ref path) => {
+                arguments.push(format!("--git-dir={}/.git", path.to_str().unwrap()));
+                arguments.push(format!("--work-tree={}", path.to_str().unwrap()));
+            }
+        }
+        let mut transformed: Vec<&str> = arguments.iter().map(|s| s.as_str()).collect();
+        transformed.extend(args);
+        base.args(transformed).output()
     }
 }
 
@@ -21,8 +47,14 @@ pub struct GitInterface {
     raw_git_interface: RawGitInterface,
 }
 impl GitInterface {
-    pub fn new() -> Self {
-        let raw_interface = RawGitInterface {};
+    pub fn default() -> Self {
+        Self::new(GitPath::CurrentDirectory)
+    }
+    pub fn in_directory(path: PathBuf) -> Self {
+        Self::new(GitPath::CustomDirectory(path))
+    }
+    pub fn new(path: GitPath) -> Self {
+        let raw_interface = RawGitInterface::new(path);
         let mut interface = Self {
             model: TreeDataModel::new(),
             raw_git_interface: raw_interface,
@@ -176,7 +208,10 @@ impl GitInterface {
             .collect();
         Ok(commits)
     }
-    pub fn get_files_managed_by_branch(&self, branch: &QualifiedPath) -> Result<Vec<String>, GitError> {
+    pub fn get_files_managed_by_branch(
+        &self,
+        branch: &QualifiedPath,
+    ) -> Result<Vec<String>, GitError> {
         let out = self.raw_git_interface.run(vec![
             "ls-tree",
             "-r",
@@ -190,11 +225,11 @@ impl GitInterface {
     }
     pub fn get_files_changed_by_commit(&self, commit: &str) -> Result<Vec<String>, GitError> {
         let out = self.raw_git_interface.run(vec![
-           "diff-tree",
-           "--no-commit-id",
-           "--name-only",
-           commit,
-           "-r"
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            commit,
+            "-r",
         ])?;
         Ok(u8_to_string(&out.stdout)
             .split("\n")
@@ -211,5 +246,38 @@ impl GitInterface {
     }
     pub fn cherry_pick(&self, commit: &str) -> Result<Output, GitError> {
         Ok(self.raw_git_interface.run(vec!["cherry-pick", commit])?)
+    }
+}
+
+#[cfg(test)]
+pub mod test_utils {
+    use crate::git::error::GitError;
+    use crate::git::interface::RawGitInterface;
+    use std::fs;
+    use std::path::PathBuf;
+
+    pub fn prepare_empty_git_repo(path: PathBuf) -> Result<(), GitError> {
+        let git = RawGitInterface::in_custom_directory(path.clone());
+        git.run(vec!["init", "--initial-branch=main"])?;
+        let mut file = path.clone();
+        file.push("file1");
+        fs::write(file.clone(), "")?;
+        let out = git.run(vec!["add", file.to_str().unwrap()])?;
+        let out = git.run(vec!["commit", "-m", "initial commit"])?;
+        Ok(())
+    }
+
+    pub fn populate_with_features(path: PathBuf) -> Result<(), GitError> {
+        let git = RawGitInterface::in_custom_directory(PathBuf::from(path));
+        let branches = vec![
+            "_main/_feature/root",
+            "_main/_feature/_root/foo",
+            "_main/_feature/_root/bar",
+            "_main/_feature/_root/baz",
+        ];
+        for branch in branches {
+            git.run(vec!["branch", branch])?;
+        }
+        Ok(())
     }
 }

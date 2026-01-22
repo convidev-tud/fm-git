@@ -2,11 +2,11 @@ use crate::cli::*;
 use clap::Command;
 
 #[derive(Clone, Debug)]
-pub struct FMGitCommand {}
+pub struct TangleCommand {}
 
-impl CommandDefinition for FMGitCommand {
+impl CommandDefinition for TangleCommand {
     fn build_command(&self) -> Command {
-        Command::new("fm-git")
+        Command::new("tangl")
             .arg_required_else_help(true)
             .allow_external_subcommands(true)
     }
@@ -28,4 +28,4 @@ impl CommandDefinition for FMGitCommand {
     }
 }
 
-impl CommandInterface for FMGitCommand {}
+impl CommandInterface for TangleCommand {}

@@ -1,21 +1,30 @@
 use crate::cli::{ArgHelper, CommandContext, CommandImpl, CommandMap};
-use crate::git::interface::GitInterface;
+use crate::git::interface::{GitInterface, GitPath};
+use clap::ArgMatches;
+use std::error::Error;
 use std::ffi::OsString;
+
+pub enum ArgSource<'a> {
+    CLI,
+    SUPPLIED(Vec<&'a str>),
+}
 
 pub struct CommandRepository {
     command_map: CommandMap,
+    work_path: GitPath,
 }
 impl CommandRepository {
-    pub fn new(command: Box<dyn CommandImpl>) -> Self {
+    pub fn new(root_command: Box<dyn CommandImpl>, work_path: GitPath) -> Self {
         Self {
-            command_map: CommandMap::new(command),
+            command_map: CommandMap::new(root_command),
+            work_path,
         }
     }
-    fn execute_recursive(&self, context: &mut CommandContext) {
+    fn execute_recursive(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let current = context.current_command;
         match current.command.run_command(context) {
             Ok(_) => {}
-            Err(err) => context.log_to_stderr(err.to_string()),
+            Err(err) => return Err(err),
         };
         match context.arg_helper.get_matches().subcommand() {
             Some((sub, sub_args)) => {
@@ -34,17 +43,27 @@ impl CommandRepository {
                         .output()
                         .expect("failed to execute git");
                     context.log_from_output(&output);
+                    Ok(())
                 }
             }
-            _ => {}
+            _ => Ok(()),
         }
     }
-    pub fn execute(&self) {
+    pub fn execute(&self, args: ArgSource) -> Result<(), Box<dyn Error>> {
+        let args: ArgMatches = match args {
+            ArgSource::CLI => self.command_map.clap_command.clone().get_matches(),
+            ArgSource::SUPPLIED(supplied) => self
+                .command_map
+                .clap_command
+                .clone()
+                .get_matches_from(supplied),
+        };
         self.execute_recursive(&mut CommandContext::new(
             &self.command_map,
             &self.command_map,
-            &mut GitInterface::new(),
-            ArgHelper::new(&self.command_map.clap_command.clone().get_matches()),
-        ));
+            &mut GitInterface::new(self.work_path.clone()),
+            ArgHelper::new(&args),
+        ))?;
+        Ok(())
     }
 }

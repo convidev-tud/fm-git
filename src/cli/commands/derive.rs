@@ -64,10 +64,8 @@ fn clique_to_paths(
 
 fn make_post_derivation_message(features: &Vec<QualifiedPath>) -> String {
     let mut base = "# DO NOT EDIT OR REMOVE THIS COMMIT\nDERIVATION FINISHED\n".to_string();
-    for feature in features.iter() {
-        base.push_str(feature.to_string().as_str());
-        base.push('\n');
-    }
+    let strings = features.iter().map(|f| f.to_string()).collect::<Vec<String>>();
+    base.push_str(strings.join("\n").as_str());
     base
 }
 
@@ -190,5 +188,76 @@ impl CommandInterface for DeriveCommand {
             None => vec![],
         };
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::git::interface::test_utils::{populate_with_features, prepare_empty_git_repo};
+    use crate::git::interface::{GitInterface, GitPath};
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    #[test]
+    fn derivation_no_conflicts() {
+        let path = TempDir::new().unwrap();
+        prepare_empty_git_repo(PathBuf::from(path.path())).unwrap();
+        populate_with_features(PathBuf::from(path.path())).unwrap();
+        let repo = CommandRepository::new(
+            Box::new(DeriveCommand),
+            GitPath::CustomDirectory(PathBuf::from(path.path())),
+        );
+        match repo.execute(ArgSource::SUPPLIED(vec![
+            "derive", "-p", "myprod", "root/foo", "root/bar", "root/baz",
+        ])) {
+            Ok(_) => {
+                let interface = GitInterface::in_directory(PathBuf::from(path.path()));
+                interface
+                    .get_current_area()
+                    .unwrap()
+                    .to_product_root()
+                    .unwrap()
+                    .to_product(&QualifiedPath::from("myprod"))
+                    .unwrap();
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
+
+    #[test]
+    fn derivation_commit() {
+        let path = TempDir::new().unwrap();
+        prepare_empty_git_repo(PathBuf::from(path.path())).unwrap();
+        populate_with_features(PathBuf::from(path.path())).unwrap();
+        let repo = CommandRepository::new(
+            Box::new(DeriveCommand),
+            GitPath::CustomDirectory(PathBuf::from(path.path())),
+        );
+        match repo.execute(ArgSource::SUPPLIED(vec![
+            "derive", "-p", "myprod", "root/foo", "root/bar", "root/baz",
+        ])) {
+            Ok(_) => {
+                let interface = GitInterface::in_directory(PathBuf::from(path.path()));
+                let product = interface
+                    .get_current_area()
+                    .unwrap()
+                    .to_product_root()
+                    .unwrap()
+                    .to_product(&QualifiedPath::from("myprod"))
+                    .unwrap();
+                let commits = interface.get_commit_history(&product.get_qualified_path()).unwrap();
+                let derivation_commit = commits[0].clone();
+                assert_eq!(
+                    derivation_commit.message(),
+                    &make_post_derivation_message(&vec![
+                        QualifiedPath::from("main/feature/root/foo"),
+                        QualifiedPath::from("main/feature/root/bar"),
+                        QualifiedPath::from("main/feature/root/baz"),
+                    ]),
+                )
+            }
+            Err(e) => panic!("{}", e),
+        }
     }
 }

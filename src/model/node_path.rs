@@ -60,6 +60,15 @@ impl NodePath<Area> {
     }
 }
 
+impl NodePath<ProductRoot> {
+    pub fn to_product(self, path: &QualifiedPath) -> Option<NodePath<Product>> {
+        match self.to(path)?.concretize() {
+            NodePathType::Product(path) => Some(path),
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<T: Clone + Debug> NodePath<T> {
     fn from_path(path: Vec<Rc<Node>>) -> Self {
         Self {
