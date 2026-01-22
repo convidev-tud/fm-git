@@ -12,10 +12,10 @@ pub enum GitPath {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct RawGitInterface {
+pub(super) struct GitCLI {
     path: GitPath,
 }
-impl RawGitInterface {
+impl GitCLI {
     pub fn in_current_directory() -> Self {
         Self::new(GitPath::CurrentDirectory)
     }
@@ -44,7 +44,7 @@ impl RawGitInterface {
 #[derive(Clone, Debug)]
 pub struct GitInterface {
     model: TreeDataModel,
-    raw_git_interface: RawGitInterface,
+    raw_git_interface: GitCLI,
 }
 impl GitInterface {
     pub fn default() -> Self {
@@ -54,7 +54,7 @@ impl GitInterface {
         Self::new(GitPath::CustomDirectory(path))
     }
     pub fn new(path: GitPath) -> Self {
-        let raw_interface = RawGitInterface::new(path);
+        let raw_interface = GitCLI::new(path);
         let mut interface = Self {
             model: TreeDataModel::new(),
             raw_git_interface: raw_interface,
@@ -252,12 +252,12 @@ impl GitInterface {
 #[cfg(test)]
 pub mod test_utils {
     use crate::git::error::GitError;
-    use crate::git::interface::RawGitInterface;
+    use crate::git::interface::GitCLI;
     use std::fs;
     use std::path::PathBuf;
 
     pub fn prepare_empty_git_repo(path: PathBuf) -> Result<(), GitError> {
-        let git = RawGitInterface::in_custom_directory(path.clone());
+        let git = GitCLI::in_custom_directory(path.clone());
         git.run(vec!["init", "--initial-branch=main"])?;
         let mut file = path.clone();
         file.push("file1");
@@ -268,7 +268,7 @@ pub mod test_utils {
     }
 
     pub fn populate_with_features(path: PathBuf) -> Result<(), GitError> {
-        let git = RawGitInterface::in_custom_directory(PathBuf::from(path));
+        let git = GitCLI::in_custom_directory(PathBuf::from(path));
         let branches = vec![
             "_main/_feature/root",
             "_main/_feature/_root/foo",

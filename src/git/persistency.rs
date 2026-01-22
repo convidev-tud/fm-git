@@ -1,4 +1,4 @@
-use crate::git::interface::RawGitInterface;
+use crate::git::interface::GitCLI;
 use crate::util::u8_to_string;
 use std::error::Error;
 use std::fs::{read_to_string, write};
@@ -10,7 +10,7 @@ trait PersistencyHandler<E> {
 
 pub struct GitDirPersistencyHandler {
     file_path: String,
-    raw_git_interface: RawGitInterface,
+    raw_git_interface: GitCLI,
 }
 
 impl GitDirPersistencyHandler {
@@ -18,7 +18,7 @@ impl GitDirPersistencyHandler {
         let path = String::from("hypergit/") + file_name;
         Self {
             file_path: path,
-            raw_git_interface: RawGitInterface::in_current_directory(),
+            raw_git_interface: GitCLI::in_current_directory(),
         }
     }
     fn get_file_path(&self) -> String {
