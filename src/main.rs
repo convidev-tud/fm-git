@@ -1,6 +1,8 @@
+use std::fmt::{Display, Formatter};
 use log::{LevelFilter, error, set_logger, set_max_level};
 use tangl::cli::{ArgSource, CommandRepository, TangleCommand};
 use tangl::core::model::git::GitPath;
+use tangl::core::model::Node;
 use tangl::logging::PrintingLogger;
 
 fn main() {

@@ -1,5 +1,5 @@
-use crate::core::model::WrongNodeTypeError;
-use crate::core::model::*;
+use crate::model::WrongNodeTypeError;
+use crate::model::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -57,7 +57,7 @@ impl Repository {
         self.get_virtual_root().move_to_area(path)
     }
     pub fn get_virtual_root(&self) -> NodePath<VirtualRoot> {
-        NodePath::<VirtualRoot>::new(vec![self.virtual_root.clone()], SymHead::Head)
+        NodePath::<VirtualRoot>::new(vec![self.virtual_root.clone()], VersionPointer::Head)
     }
     pub fn get_node_path<T: SymbolicNodeType>(&self, path: &NormalizedPath) -> Option<NodePath<T>> {
         let initial_path = self.get_virtual_root();

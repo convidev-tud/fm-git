@@ -5,14 +5,18 @@ use clap::{Arg, ArgAction, Command};
 use colored::Colorize;
 use itertools::Itertools;
 use std::error::Error;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
 const TARGET: &str = "target";
 const TREE: &str = "tree";
 
 #[derive(Clone, Debug)]
-pub struct LSCommand;
+pub struct LSCommand<T: Debug> {
+    phantom_data: PhantomData<T>
+}
 
-impl CommandDefinition for LSCommand {
+impl<T: Debug> CommandDefinition for LSCommand<T> {
     fn build_command(&self) -> Command {
         Command::new("ls")
             .about("List information about the repository tree")
@@ -29,7 +33,7 @@ impl CommandDefinition for LSCommand {
     }
 }
 
-impl CommandInterface for LSCommand {
+impl<T: Debug> CommandInterface for LSCommand<T> {
     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
         let current = context.git.get_current_normalized_path()?;
         let mut target = current

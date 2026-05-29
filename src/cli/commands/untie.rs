@@ -116,7 +116,7 @@ impl CommandInterface for UntieCommand {
         };
 
         let mut product_with_commit = product.clone();
-        product_with_commit.update_version(SymHead::Commit(commit.get_hash().clone()));
+        product_with_commit.update_version(VersionPointer::Commit(commit.get_hash().clone()));
         context
             .logger
             .info(format!("Untying commit to {}", feature.formatted(true)));

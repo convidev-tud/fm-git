@@ -1,4 +1,5 @@
-use crate::core::model::*;
+use crate::model::*;
+use crate::vcs::VCS;
 use colored::Colorize;
 use itertools::Itertools;
 use std::cell::RefCell;
@@ -29,13 +30,13 @@ pub enum NodePathError {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum SymHead {
+pub enum VersionPointer {
     Head,
     Commit(CommitHash),
     Tag(String),
 }
 
-impl SymHead {
+impl VersionPointer {
     fn formatted(&self, colored: bool, current_head: CommitHash) -> String {
         fn make_head_info(head: &CommitHash) -> String {
             format!("(Head -> {head})")
@@ -71,11 +72,11 @@ impl SymHead {
 }
 
 #[derive(Clone, Debug)]
-pub struct NodePath<T: SymbolicNodeType> {
+pub struct NodePath<SNT: SymbolicNodeType, V: VCS> {
     path: Vec<Rc<RefCell<Node>>>,
-    sym_head: SymHead,
-    git: Rc<GitCLI>,
-    _phantom: PhantomData<T>,
+    version: VersionPointer,
+    vcs: Rc<V>,
+    _phantom: PhantomData<SNT>,
 }
 
 impl<T: HasFeatureChildren> NodePath<T> {
@@ -122,17 +123,17 @@ impl<T: IsGitObject> NodePath<T> {
             .clone()
     }
     pub fn get_object(&self) -> String {
-        match &self.sym_head {
-            SymHead::Head => self.get_head().get_full_hash().clone(),
-            SymHead::Commit(hash) => hash.get_full_hash().clone(),
-            SymHead::Tag(tag) => tag.clone(),
+        match &self.version {
+            VersionPointer::Head => self.get_head().get_full_hash().clone(),
+            VersionPointer::Commit(hash) => hash.get_full_hash().clone(),
+            VersionPointer::Tag(tag) => tag.clone(),
         }
     }
     pub fn get_qualified_object(&self) -> String {
-        match &self.sym_head {
-            SymHead::Head => self.get_object(),
-            SymHead::Commit(_) => self.get_object(),
-            SymHead::Tag(_) => {
+        match &self.version {
+            VersionPointer::Head => self.get_object(),
+            VersionPointer::Commit(_) => self.get_object(),
+            VersionPointer::Tag(_) => {
                 todo!()
             }
         }
@@ -140,15 +141,15 @@ impl<T: IsGitObject> NodePath<T> {
     pub fn get_head(&self) -> CommitHash {
         self.get_metadata().get_head().unwrap().clone()
     }
-    pub fn get_version(&self) -> &SymHead {
-        &self.sym_head
+    pub fn get_version(&self) -> &VersionPointer {
+        &self.version
     }
-    pub fn update_version(&mut self, head: SymHead) {
-        self.sym_head = head;
+    pub fn update_version(&mut self, head: VersionPointer) {
+        self.version = head;
     }
     pub fn formatted_with_version(&self, colored: bool) -> String {
         let base = self.formatted(colored);
-        let version = self.sym_head.formatted(colored, self.get_head());
+        let version = self.version.formatted(colored, self.get_head());
         format!("{base} {version}")
     }
     pub fn to_normalized_path_with_version(&self) -> NormalizedPath {
@@ -187,10 +188,10 @@ impl<T: SymbolicNodeType> ToNormalizedPath for NodePath<T> {
         for p in self.path.iter() {
             path.push(p.borrow().get_name());
         }
-        match &self.sym_head {
-            SymHead::Head => path.set_version_appendix::<String>(None),
-            SymHead::Commit(hash) => path.set_version_appendix(Some(hash.get_full_hash())),
-            SymHead::Tag(tag) => path.set_version_appendix(Some(tag)),
+        match &self.version {
+            VersionPointer::Head => path.set_version_appendix::<String>(None),
+            VersionPointer::Commit(hash) => path.set_version_appendix(Some(hash.get_full_hash())),
+            VersionPointer::Tag(tag) => path.set_version_appendix(Some(tag)),
         }
         path
     }
@@ -208,7 +209,7 @@ impl<T: SymbolicNodeType> NodePath<T> {
     }
     pub(in crate::core::model) fn new(
         path: Vec<Rc<RefCell<Node>>>,
-        sym_head: SymHead,
+        sym_head: VersionPointer,
         git: Rc<GitCLI>,
     ) -> Result<NodePath<T>, WrongNodeTypeError> {
         let last = path.last().unwrap();
@@ -218,8 +219,8 @@ impl<T: SymbolicNodeType> NodePath<T> {
         }
         let new = Self {
             path,
-            sym_head,
-            git,
+            version: sym_head,
+            vcs: git,
             _phantom: PhantomData,
         };
         Ok(new)
@@ -227,8 +228,8 @@ impl<T: SymbolicNodeType> NodePath<T> {
     pub fn try_convert_to<To: SymbolicNodeType>(&self) -> Result<NodePath<To>, WrongNodeTypeError> {
         NodePath::<To>::new(
             self.path.clone(),
-            self.sym_head.clone(),
-            self.git.clone(),
+            self.version.clone(),
+            self.vcs.clone(),
         )
     }
     pub fn move_to<To: SymbolicNodeType>(
@@ -247,18 +248,18 @@ impl<T: SymbolicNodeType> NodePath<T> {
         let head = match path.get_version_appendix() {
             Some(version) => {
                 if self.has_tag(version.clone()) {
-                    SymHead::Tag(version)
+                    VersionPointer::Tag(version)
                 } else {
-                    SymHead::Commit(CommitHash::new(version))
+                    VersionPointer::Commit(CommitHash::new(version))
                 }
             }
-            None => SymHead::Head,
+            None => VersionPointer::Head,
         };
-        Ok(NodePath::<To>::new(self.path, head, self.git)?)
+        Ok(NodePath::<To>::new(self.path, head, self.vcs)?)
     }
     pub fn move_to_index<To: SymbolicNodeType>(self, index: usize) -> Result<NodePath<To>, WrongNodeTypeError> {
         let path = self.path[0..index + 1].to_vec();
-        NodePath::<To>::new(path, SymHead::Head, self.git)
+        NodePath::<To>::new(path, VersionPointer::Head, self.vcs)
     }
     pub fn has_children(&self) -> bool {
         self.get_node().borrow().has_children()
@@ -304,7 +305,7 @@ impl<T: SymbolicNodeType> NodePath<T> {
         self.get_node().borrow().get_type().clone()
     }
     pub fn as_any_type(&self) -> NodePath<AnyNode> {
-        NodePath::new(self.path.clone(), self.sym_head.clone(), self.git.clone()).unwrap()
+        NodePath::new(self.path.clone(), self.version.clone(), self.vcs.clone()).unwrap()
     }
     pub fn display_tree(&self, show_tags: bool) -> String {
         self.get_node().borrow().display_tree(show_tags)

@@ -5,6 +5,7 @@ pub mod git;
 mod inspection;
 pub mod model;
 mod verification;
+mod vcs;
 
 pub use derivation::*;
 pub use error::*;
