@@ -4,6 +4,8 @@ Welcome to **tangl**, a tool to manage git repositories as feature models!
 
 ## How To Use
 
+https://github.com/user-attachments/assets/f035a0c5-e2cd-45dd-b313-bc715ca2a850
+
 ### The Basics
 
 Git is a ***version control system*** (VCS) and is therefore great in managing consequitive versions of your project.
