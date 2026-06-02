@@ -103,9 +103,8 @@ fn handle_product(
                         .to_string(),
                 );
                 context.logger.info(format!(
-                    "{} {} {}",
-                    "Hint: Use".yellow(),
-                    format_command_help("tangl untie"),
+                    "{} {}",
+                    "Hint: Use 'tangl untie'".yellow(),
                     "to copy the commit onto a feature.".yellow(),
                 ));
             }
