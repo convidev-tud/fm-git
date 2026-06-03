@@ -16,3 +16,4 @@ pub mod model;
 pub mod vcs;
 pub mod workspace;
 pub mod repository;
+pub mod derivation;

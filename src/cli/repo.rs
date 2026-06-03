@@ -12,17 +12,6 @@ pub enum ArgSource<'a> {
     SUPPLIED(Vec<&'a str>),
 }
 
-#[derive(Debug, Clone)]
-pub struct RunStatistics {
-    logs: Vec<String>,
-}
-
-impl RunStatistics {
-    pub fn contains_log<S: Into<String>>(&self, log: S) -> bool {
-        self.logs.contains(&log.into())
-    }
-}
-
 pub struct CommandRepository {
     command_map: CommandMap,
     work_path: GitPath,

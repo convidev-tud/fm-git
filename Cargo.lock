@@ -256,7 +256,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hyrmyr-cli"
+name = "hyrmir-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -273,24 +273,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyrmyr-git"
+name = "hyrmir-git"
 version = "0.1.0"
 dependencies = [
- "clap",
- "colored",
- "globset",
- "itertools",
- "log",
- "serde",
- "serde_json",
+ "hyrmir-lib",
  "tempfile",
- "termtree",
- "thiserror",
- "uuid",
 ]
 
 [[package]]
-name = "hyrmyr-lib"
+name = "hyrmir-lib"
 version = "0.1.0"
 dependencies = [
  "clap",

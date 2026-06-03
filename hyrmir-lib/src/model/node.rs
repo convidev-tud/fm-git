@@ -34,25 +34,20 @@ impl Display for WrongNodeTypeError {
     }
 }
 
-pub enum PayloadType {
-    Branch(String),
-    Tag(CommitTag),
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeType {
     VirtualRoot,
-    Area(bool),
+    Area(Option<String>),
     FeatureRoot,
     ProductRoot,
-    Feature(bool),
-    Product(bool),
-    Temporary(bool),
+    Feature(Option<String>),
+    Product(Option<String>),
+    Temporary(Option<String>),
     Unknown,
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, branch: bool) -> NodeType {
+    pub fn decide_next_type(&self, name: &str, branch: Option<String>) -> NodeType {
         match self {
             Self::VirtualRoot => Self::Area(branch),
             Self::Area(_) => match name {
@@ -122,8 +117,6 @@ impl NodeType {
 pub struct Node {
     name: String,
     node_type: NodeType,
-    branch: Option<String>,
-    tags: Vec<CommitTag>,
     children: RefCell<HashMap<String, Rc<RefCell<Node>>>>,
 }
 
@@ -131,14 +124,10 @@ impl Node {
     pub fn new (
         name: String,
         node_type: NodeType,
-        branch: Option<String>,
-        tags: Vec<CommitTag>,
     ) -> Self {
         Self {
             name,
             node_type,
-            branch,
-            tags,
             children: RefCell::new(HashMap::new()),
         }
     }

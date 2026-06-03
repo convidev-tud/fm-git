@@ -1,11 +1,11 @@
-use crate::core::conflict::{
+use crate::conflict::{
     CheckMode, ConflictAnalyzer, ConflictChecker, MergeChainStatistic, MergeResult, MergeStatistic,
     NormalizedMergeStatistic,
 };
-use crate::core::git::error::PathAssertionError;
-use crate::core::model::git::GitInterface;
-use crate::core::model::*;
-use crate::core::*;
+use crate::git::error::PathAssertionError;
+use crate::model::git::GitInterface;
+use crate::model::*;
+use crate::*;
 use crate::logging::TanglLogger;
 use serde::{Deserialize, Serialize};
 use std::error::Error;

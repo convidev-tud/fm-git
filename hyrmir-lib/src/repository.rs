@@ -2,23 +2,24 @@ use crate::model::WrongNodeTypeError;
 use crate::model::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::vcs::VCS;
 
 #[derive(Debug)]
-pub struct Repository {
+pub struct Repository<V: VCS> {
     virtual_root: Rc<RefCell<Node>>,
-    qualified_paths_with_branch: Vec<NormalizedPath>,
-    unknowns_exist: RefCell<bool>,
+    vcs: V,
 }
 
-impl Repository {
+impl<V: VCS> Repository<V> {
     pub fn new() -> Self {
+        let root = Node::new(
+            "",
+            NodeType::VirtualRoot,
+            BranchData::empty(),
+            vec![],
+        );
         Self {
-            virtual_root: Rc::new(RefCell::new(Node::new(
-                "",
-                NodeType::VirtualRoot,
-                BranchData::empty(),
-                vec![],
-            ))),
+            virtual_root: Rc::new(RefCell::new(root)),
             qualified_paths_with_branch: vec![],
             unknowns_exist: RefCell::new(false),
         }
