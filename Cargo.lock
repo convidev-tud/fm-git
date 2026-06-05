@@ -284,7 +284,6 @@ dependencies = [
 name = "hyrmir-lib"
 version = "0.1.0"
 dependencies = [
- "clap",
  "colored",
  "globset",
  "itertools",

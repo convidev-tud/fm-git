@@ -1,13 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::derivation::DerivationManager;
 use crate::model::*;
 use crate::vcs::VCS;
 
-pub(crate) struct InternalWorkspace {
-
-}
 
 pub struct Workspace<S: SymbolicNodeType, V: VCS> {
-    repo: Repository<V>,
+    virtual_root: Rc<RefCell<Node>>,
+    vcs: V,
 }
 
 impl<S: SymbolicNodeType, V: VCS> Workspace<S, V> {

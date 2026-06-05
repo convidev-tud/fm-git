@@ -5,25 +5,22 @@ use std::rc::Rc;
 use crate::vcs::VCS;
 
 #[derive(Debug)]
-pub struct Repository<V: VCS> {
+pub struct Repository {
     virtual_root: Rc<RefCell<Node>>,
-    vcs: V,
 }
 
-impl<V: VCS> Repository<V> {
+impl Repository {
     pub fn new() -> Self {
         let root = Node::new(
-            "",
+            "".to_string(),
             NodeType::VirtualRoot,
-            BranchData::empty(),
-            vec![],
         );
         Self {
             virtual_root: Rc::new(RefCell::new(root)),
-            qualified_paths_with_branch: vec![],
-            unknowns_exist: RefCell::new(false),
+            vcs,
         }
     }
+
     pub fn insert_git_branch<S1: Into<String>, S2: Into<String>>(
         &self,
         path: S1,
@@ -38,22 +35,14 @@ impl<V: VCS> Repository<V> {
             .borrow_mut()
             .insert_path(&normalized_path, PayloadType::Branch(branch_data));
         match node_type {
-            NodeType::Unknown => {
+            NodeType::Undefined => {
                 self.unknowns_exist.replace(true);
             }
             _ => {}
         }
         node_type
     }
-    pub fn insert_tag<S: Into<String>>(&self, path: S) {
-        let path = path.into();
-        let normalized_path = path.to_normalized_path();
-        let tag = CommitTag::new(path);
-        self.virtual_root.borrow_mut().insert_path(
-            &normalized_path.strip_n_right(normalized_path.len() - 1),
-            PayloadType::Tag(tag),
-        );
-    }
+    
     pub fn get_area(&self, path: &NormalizedPath) -> Option<NodePath<ConcreteArea>> {
         self.get_virtual_root().move_to_area(path)
     }

@@ -1,11 +1,11 @@
-use crate::core::model::commit::CommitTag;
-use crate::core::model::*;
+use crate::model::*;
 use colored::{ColoredString, Colorize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex, RwLock};
 use termtree::Tree;
 use thiserror::Error;
 
@@ -43,23 +43,23 @@ pub enum NodeType {
     Feature(Option<String>),
     Product(Option<String>),
     Temporary(Option<String>),
-    Unknown,
+    Undefined,
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, branch: Option<String>) -> NodeType {
+    pub fn decide_next_type(&self, name: &str, branch: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
         match self {
-            Self::VirtualRoot => Self::Area(branch),
+            Self::VirtualRoot => Ok(Self::Area(branch)),
             Self::Area(_) => match name {
-                FEATURE_ROOT => Self::FeatureRoot,
-                PRODUCT_ROOT => Self::ProductRoot,
-                TEMPORARY => Self::Temporary(branch),
-                _ => Self::Unknown,
+                FEATURE_ROOT => Ok(Self::FeatureRoot),
+                PRODUCT_ROOT => Ok(Self::ProductRoot),
+                TEMPORARY => Ok(Self::Temporary(branch)),
+                _ => Err(WrongNodeTypeError::new()),
             },
-            Self::Feature(_) | Self::FeatureRoot => Self::Feature(branch),
-            Self::Product(_) | Self::ProductRoot => Self::Product(branch),
-            Self::Temporary(_) => Self::Temporary(branch),
-            Self::Unknown => Self::Unknown,
+            Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(branch)),
+            Self::Product(_) | Self::ProductRoot => Ok(Self::Product(branch)),
+            Self::Temporary(_) => Ok(Self::Temporary(branch)),
+            Self::Undefined => Ok(Self::Undefined),
         }
     }
 
@@ -83,7 +83,7 @@ impl NodeType {
             Self::Feature => "feature",
             Self::Product => "product",
             Self::Temporary => "temporary",
-            Self::Unknown => "",
+            Self::Undefined => "",
         };
         name.to_string()
     }
@@ -97,7 +97,7 @@ impl NodeType {
             Self::Feature => "f",
             Self::Product => "p",
             Self::Temporary => "temp",
-            Self::Unknown => "",
+            Self::Undefined => "",
         };
         name.to_string()
     }
@@ -117,7 +117,7 @@ impl NodeType {
 pub struct Node {
     name: String,
     node_type: NodeType,
-    children: RefCell<HashMap<String, Rc<RefCell<Node>>>>,
+    children: HashMap<String, Rc<RefCell<Node>>>,
 }
 
 impl Node {
@@ -128,15 +128,14 @@ impl Node {
         Self {
             name,
             node_type,
-            children: RefCell::new(HashMap::new()),
+            children: HashMap::new(),
         }
     }
+
     fn update_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
     }
-    fn update_branch(&mut self, branch: Option<String>) {
-        self.branch = branch;
-    }
+
     fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
         let mut formatted = ColoredString::from(self.name.clone());
         if self.branch.has_branch() {
@@ -162,78 +161,58 @@ impl Node {
         }
         tree
     }
-    fn decide_child_type<S: Into<String>>(&self, name: S, metadata: &BranchData) -> NodeType {
-        let real_name = name.into();
-        self.node_type
-            .decide_next_type(real_name.as_str(), metadata)
+
+    fn decide_child_type(&self, name: &str, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
+        self.node_type.decide_next_type(name, object)
     }
-    fn add_child<S: Into<String>>(&self, name: S, metadata: PayloadType) -> NodeType {
-        let real_name = name.into();
-        let (branch, tags) = match metadata {
-            PayloadType::Branch(branch) => (branch, vec![]),
-            PayloadType::Tag(tag) => {
-                let branch = BranchData::empty();
-                (branch, vec![tag])
-            }
-        };
-        let node_type = self.decide_child_type(real_name.clone(), &branch);
-        let child = Rc::new(RefCell::new(Node::new(
-            real_name.clone(),
+
+    fn add_child(&mut self, name: String, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
+        let node_type = self.decide_child_type(name.as_str(), object)?;
+        // let child = ;
+        let child = Node::new(
+            name.clone(),
             node_type.clone(),
-            branch,
-            tags,
-        )));
-        self.children.borrow_mut().insert(real_name, child);
-        node_type
+        );
+        self.children.borrow_mut().insert(name, Rc::new(RefCell::new(child)));
+        Ok(node_type)
     }
-    fn update_child<S: Into<String>>(&self, name: S, metadata: PayloadType) -> NodeType {
-        let real_name = name.into();
-        let node_type = match metadata {
-            PayloadType::Branch(branch) => {
-                let new_type = self.decide_child_type(real_name.clone(), &branch);
-                let child = self.get_child(real_name).unwrap();
-                child.borrow_mut().update_type(new_type.clone());
-                child.borrow_mut().update_branch(branch);
-                new_type
-            }
-            PayloadType::Tag(tag) => {
-                let child = self.get_child(real_name.clone()).unwrap();
-                child.borrow_mut().add_tag(tag);
-                child.borrow().get_type().clone()
-            }
-        };
-        node_type
+
+    fn update_child(&self, name: String, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
+        let new_type = self.decide_child_type(name.as_str(), object)?;
+        let child = self.get_child(&name).unwrap();
+        child.borrow_mut().update_type(new_type.clone());
+        Ok(new_type)
     }
+
     pub fn get_name(&self) -> &String {
         &self.name
     }
+
     pub fn get_type(&self) -> &NodeType {
         &self.node_type
     }
-    pub fn get_branch_data(&self) -> &BranchData {
-        &self.branch
-    }
-    pub fn get_tags(&self) -> &Vec<CommitTag> {
-        &self.tags
-    }
+
     pub fn get_child<S: Into<String>>(&self, name: S) -> Option<Rc<RefCell<Node>>> {
         Some(self.children.borrow().get(&name.into())?.clone())
     }
+
     pub fn has_children(&self) -> bool {
         !self.children.borrow().is_empty()
     }
+
     pub fn get_children(&self) -> Vec<Rc<RefCell<Node>>> {
         let nodes = self.children.borrow();
         nodes.values().cloned().collect()
     }
-    pub fn insert_path(&self, path: &NormalizedPath, metadata: PayloadType) -> NodeType {
+
+    pub fn insert_path(&mut self, path: &NormalizedPath, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
         match path.len() {
-            0 => self.node_type.clone(),
+            0 => Ok(self.node_type.clone()),
             1 => {
                 let name = path.get(0).unwrap().to_string();
                 let new_type = match self.get_child(&name) {
-                    Some(_) => self.update_child(name, metadata),
-                    None => self.add_child(name.clone(), metadata),
+                    Some(_) => self.update_child(name, object),
+                    None => self.add_child(name, object),
                 };
                 new_type
             }
@@ -242,19 +221,17 @@ impl Node {
                 let next_child = match self.get_child(&name) {
                     Some(node) => node,
                     None => {
-                        self.add_child(name.clone(), PayloadType::Branch(BranchData::empty()));
+                        self.add_child(name.clone(), None)?;
                         self.get_child(&name).unwrap()
                     }
                 };
                 next_child
                     .borrow_mut()
-                    .insert_path(&path.strip_n_left(1), metadata)
+                    .insert_path(&path.strip_n_left(1), object)
             }
         }
     }
-    pub fn add_tag(&mut self, tag: CommitTag) {
-        self.tags.push(tag);
-    }
+
     pub fn display_tree(&self, show_tags: bool) -> String {
         self.build_display_tree(show_tags).to_string()
     }
