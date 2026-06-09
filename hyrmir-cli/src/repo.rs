@@ -1,26 +1,89 @@
-use crate::cli::{ArgHelper, CommandContext, CommandImpl, CommandMap, VERBOSE};
-use crate::core::model::ImportFormat;
-use crate::core::model::git::{GitInterface, GitPath};
-use crate::logging::TanglLogger;
+use crate::logging::CommandLogger;
+use crate::*;
 use clap::ArgMatches;
 use log::LevelFilter;
 use std::error::Error;
 use std::ffi::OsString;
+use hyrmir_lib::vcs::VCS;
+
+const IMPORT_FORMAT: &str = "import_format";
+
+#[derive(Clone, Debug)]
+pub struct RootCommand<V: VCS>;
+
+impl<V: VCS> CommandDefinition<V> for RootCommand<V> {
+    fn build_command(&self) -> Command {
+        Command::new("tangl")
+            .arg_required_else_help(true)
+            .arg(
+                Arg::new(crate::def::IMPORT_FORMAT)
+                    .short('f')
+                    .long("import-format")
+                    .default_value("waffle")
+                    .help("Specify file import format for all commands"),
+            )
+    }
+    fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl<V>>> {
+        vec![
+            Box::new(StatusCommand),
+            Box::new(LSCommand),
+            Box::new(DeriveCommand),
+            Box::new(CheckCommand),
+            Box::new(CheckoutCommand),
+            Box::new(InitCommand),
+            Box::new(CloneCommand),
+            Box::new(FeatureCommand),
+            Box::new(ProductCommand),
+            Box::new(TagCommand),
+            Box::new(SpreadCommand),
+            Box::new(UntieCommand),
+            Box::new(CommitCommand),
+            Box::new(HiddenCompletionCommand),
+        ]
+    }
+}
+
+impl<V: VCS> CommandInterface<V> for RootCommand<V> {
+    fn run_command(
+        &self,
+        workspace: &mut Workspace<V>,
+        context: &mut CommandContext<V>,
+    ) -> Result<(), Box<dyn Error>> {
+        let format = context
+            .arg_helper
+            .get_argument_value::<String>(crate::def::IMPORT_FORMAT)
+            .unwrap();
+        context.import_format = ImportFormat::from(format);
+        Ok(())
+    }
+
+    fn shell_complete(
+        &self,
+        completion_helper: CompletionHelper,
+        _context: &mut CommandContext,
+    ) -> Result<Vec<String>, Box<dyn Error>> {
+        match completion_helper.currently_editing() {
+            Some(value) => match value.get_id().as_str() {
+                "format" => Ok(vec!["waffle".to_string(), "uvl".to_string()]),
+                _ => Ok(vec![]),
+            },
+            None => Ok(vec![]),
+        }
+    }
+}
 
 pub enum ArgSource<'a> {
     CLI,
     SUPPLIED(Vec<&'a str>),
 }
 
-pub struct CommandRepository {
-    command_map: CommandMap,
-    work_path: GitPath,
+pub struct CommandRepository<V: VCS> {
+    command_map: CommandMap<V>,
 }
-impl CommandRepository {
-    pub fn new(root_command: Box<dyn CommandImpl>, work_path: GitPath) -> Self {
+impl<V: VCS> CommandRepository<V> {
+    pub fn new(root_command: Box<dyn CommandImpl<V>>) -> Self {
         Self {
             command_map: CommandMap::new(root_command),
-            work_path,
         }
     }
     fn execute_recursive<'a>(
@@ -82,7 +145,7 @@ impl CommandRepository {
             &self.command_map,
             &self.command_map,
             GitInterface::new(self.work_path.clone()),
-            TanglLogger::new(),
+            CommandLogger::new(),
             ArgHelper::new(args),
             import_format,
         )

@@ -4,7 +4,7 @@ use crate::core::conflict::{MergeChainStatistic, NormalizedMergeStatistic};
 use crate::core::model::git::GitInterface;
 use crate::core::model::*;
 use crate::core::*;
-use crate::logging::TanglLogger;
+use crate::logging::CommandLogger;
 use clap::{Arg, ArgAction, Command};
 use colored::Colorize;
 use std::error::Error;
@@ -69,7 +69,7 @@ fn initialize_hint(
     state: &DerivationState,
     optimize: bool,
     derivation_manager: &DerivationManager,
-    logger: &TanglLogger,
+    logger: &CommandLogger,
 ) -> Result<(), Box<dyn Error>> {
     match state {
         DerivationState::InProgress => {
@@ -109,7 +109,7 @@ fn handle_initialize(
     features: Vec<NodePath<Feature>>,
     optimize: bool,
     derivation_manager: &mut DerivationManager,
-    logger: &TanglLogger,
+    logger: &CommandLogger,
 ) -> Result<(), Box<dyn Error>> {
     match derivation_manager.initialize_derivation(features, optimize) {
         Ok(state) => {
@@ -125,7 +125,7 @@ fn handle_initialize(
 
 fn handle_continue(
     derivation_manager: &mut DerivationManager,
-    logger: &TanglLogger,
+    logger: &CommandLogger,
     git: &GitInterface,
 ) -> Result<(), Box<dyn Error>> {
     let old = derivation_manager.get_current_state().clone();
@@ -176,7 +176,7 @@ fn handle_continue(
 fn handle_update(
     optimize: bool,
     derivation_manager: &mut DerivationManager,
-    logger: &TanglLogger,
+    logger: &CommandLogger,
 ) -> Result<(), Box<dyn Error>> {
     match derivation_manager.update_product(optimize) {
         Ok(state) => {

@@ -261,15 +261,10 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "colored",
- "globset",
+ "hyrmir-lib",
  "itertools",
  "log",
- "serde",
- "serde_json",
  "tempfile",
- "termtree",
- "thiserror",
- "uuid",
 ]
 
 [[package]]

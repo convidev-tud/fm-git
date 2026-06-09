@@ -1,22 +1,22 @@
-use crate::cli::completion::CompletionHelper;
-use crate::cli::*;
-use crate::core::model::{AnyNode, ToNormalizedPath};
+use crate::*;
 use clap::{Arg, ArgAction, Command};
 use colored::Colorize;
 use itertools::Itertools;
 use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use hyrmir_lib::vcs::VCS;
+use hyrmir_lib::workspace::Workspace;
 
 const TARGET: &str = "target";
 const TREE: &str = "tree";
 
 #[derive(Clone, Debug)]
-pub struct LSCommand<T: Debug> {
-    phantom_data: PhantomData<T>
+pub struct LSCommand<V: VCS> {
+    phantom_data: PhantomData<V>
 }
 
-impl<T: Debug> CommandDefinition for LSCommand<T> {
+impl<V: VCS> CommandDefinition<V> for LSCommand<V> {
     fn build_command(&self) -> Command {
         Command::new("ls")
             .about("List information about the repository tree")
@@ -33,8 +33,12 @@ impl<T: Debug> CommandDefinition for LSCommand<T> {
     }
 }
 
-impl<T: Debug> CommandInterface for LSCommand<T> {
-    fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
+impl<V: VCS> CommandInterface<V> for LSCommand<V> {
+    fn run_command(
+        &self, 
+        workspace: &mut Workspace<V>, 
+        context: &mut CommandContext<V>,
+    ) -> Result<(), Box<dyn Error>> {
         let current = context.git.get_current_normalized_path()?;
         let mut target = current
             + context

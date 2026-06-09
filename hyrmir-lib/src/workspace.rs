@@ -1,39 +1,43 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use crate::derivation::DerivationManager;
 use crate::model::*;
 use crate::vcs::VCS;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 
-pub struct Workspace<S: SymbolicNodeType, V: VCS> {
+pub struct Workspace<V: VCS> {
     virtual_root: Rc<RefCell<Node>>,
-    vcs: V,
+    vcs: Rc<RefCell<V>>,
 }
 
-impl<S: SymbolicNodeType, V: VCS> Workspace<S, V> {
-    pub fn new(repo: Repository<V>) -> Workspace<S, V> {
-        Workspace { repo }
-    }
-}
-
-impl<V: VCS> Workspace<Feature<Concrete>, V> {
-    pub fn merge<T: CanMergeWithFeature>(&self, path: &NodePath<T, V>) {
-        todo!()
-    }
-}
-
-impl<V: VCS> Workspace<Product<Concrete>, V> {
-    pub fn derivation(&self) -> DerivationManager {
-        todo!()
-    }
-}
-
-impl<S: IsConcrete, V: VCS> Workspace<S, V> {
-    pub fn view<NewS: IsConcrete>(&self, path: &NodePath<NewS, V>) -> Workspace<NewS, V> {
-        todo!()
+impl<V: VCS> Workspace<V> {
+    fn get_vcs(&self) -> &Rc<RefCell<V>> {
+        &self.vcs
     }
 
-    pub fn simulate_merge(&self) {
-        todo!()
+    pub fn new(virtual_root: Rc<RefCell<Node>>, vcs: Rc<RefCell<V>>) -> Self {
+        Self { virtual_root, vcs }
     }
+
+    pub fn get_virtual_root(&self) -> NodePath<VirtualRoot, V> {
+        NodePath::new(vec![self.virtual_root.clone()], self.get_vcs().clone()).unwrap()
+    }
+    
+    pub fn status(&self, colored: bool) -> String {
+        self.get_vcs().borrow().status(colored)
+    }
+
+    pub fn format_status(
+        &self,
+        current_path_msg: String,
+        extra_msg: String,
+        colored: bool,
+    ) -> String {
+        self.get_vcs().borrow().format_status(
+            current_path_msg,
+            extra_msg,
+            colored,
+        )
+    }
+
+    pub fn commit(&self) { todo!() }
 }

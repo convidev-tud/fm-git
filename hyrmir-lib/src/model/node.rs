@@ -35,30 +35,49 @@ impl Display for WrongNodeTypeError {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct VirtualRootMetadata {
+    repo_scanned: bool
+}
+
+impl VirtualRootMetadata {
+    pub fn new() -> Self {
+        Self { repo_scanned: false }
+    }
+    
+    pub fn repo_scanned(&self) -> bool {
+        self.repo_scanned
+    }
+    
+    pub fn set_repo_scanned(&mut self) {
+        self.repo_scanned = true;
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeType {
-    VirtualRoot,
-    Area(Option<String>),
+    VirtualRoot(VirtualRootMetadata),
+    Area(bool),
     FeatureRoot,
     ProductRoot,
-    Feature(Option<String>),
-    Product(Option<String>),
-    Temporary(Option<String>),
+    Feature(bool),
+    Product(bool),
+    Temporary(bool),
     Undefined,
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, branch: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
+    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
         match self {
-            Self::VirtualRoot => Ok(Self::Area(branch)),
+            Self::VirtualRoot(_) => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
-                TEMPORARY => Ok(Self::Temporary(branch)),
+                TEMPORARY => Ok(Self::Temporary(concrete)),
                 _ => Err(WrongNodeTypeError::new()),
             },
-            Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(branch)),
-            Self::Product(_) | Self::ProductRoot => Ok(Self::Product(branch)),
-            Self::Temporary(_) => Ok(Self::Temporary(branch)),
+            Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
+            Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
+            Self::Temporary(_) => Ok(Self::Temporary(concrete)),
             Self::Undefined => Ok(Self::Undefined),
         }
     }
@@ -132,7 +151,7 @@ impl Node {
         }
     }
 
-    fn update_type(&mut self, node_type: NodeType) {
+    pub(crate) fn update_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
     }
 
@@ -162,12 +181,12 @@ impl Node {
         tree
     }
 
-    fn decide_child_type(&self, name: &str, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
-        self.node_type.decide_next_type(name, object)
+    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+        self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
-        let node_type = self.decide_child_type(name.as_str(), object)?;
+    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+        let node_type = self.decide_child_type(name.as_str(), concrete)?;
         // let child = ;
         let child = Node::new(
             name.clone(),
@@ -177,8 +196,8 @@ impl Node {
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
-        let new_type = self.decide_child_type(name.as_str(), object)?;
+    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+        let new_type = self.decide_child_type(name.as_str(), concrete)?;
         let child = self.get_child(&name).unwrap();
         child.borrow_mut().update_type(new_type.clone());
         Ok(new_type)
@@ -205,14 +224,14 @@ impl Node {
         nodes.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, object: Option<String>) -> Result<NodeType, WrongNodeTypeError> {
+    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {
                 let name = path.get(0).unwrap().to_string();
                 let new_type = match self.get_child(&name) {
-                    Some(_) => self.update_child(name, object),
-                    None => self.add_child(name, object),
+                    Some(_) => self.update_child(name, concrete),
+                    None => self.add_child(name, concrete),
                 };
                 new_type
             }
@@ -221,13 +240,13 @@ impl Node {
                 let next_child = match self.get_child(&name) {
                     Some(node) => node,
                     None => {
-                        self.add_child(name.clone(), None)?;
+                        self.add_child(name.clone(), false)?;
                         self.get_child(&name).unwrap()
                     }
                 };
                 next_child
                     .borrow_mut()
-                    .insert_path(&path.strip_n_left(1), object)
+                    .insert_path(&path.strip_n_left(1), concrete)
             }
         }
     }

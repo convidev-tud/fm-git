@@ -16,6 +16,50 @@ use crate::model::node::*;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use colored::Colorize;
+use crate::model::CommitHash;
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+pub enum VersionPointer {
+    Head,
+    Commit(CommitHash),
+    Tag(String),
+}
+
+impl VersionPointer {
+    fn formatted(&self, colored: bool, current_head: CommitHash) -> String {
+        fn make_head_info(head: &CommitHash) -> String {
+            format!("(Head -> {head})")
+        }
+
+        let info = if colored {
+            match self {
+                Self::Head => make_head_info(&current_head).yellow(),
+                Self::Commit(c) => {
+                    if c == &current_head {
+                        make_head_info(&current_head).yellow()
+                    } else {
+                        format!("({})", c.get_short_hash()).yellow()
+                    }
+                }
+                Self::Tag(tag) => format!("({})", tag).green(),
+            }
+        } else {
+            match self {
+                Self::Head => make_head_info(&current_head).normal(),
+                Self::Commit(c) => {
+                    if c == &current_head {
+                        make_head_info(&current_head).normal()
+                    } else {
+                        format!("({})", c.get_short_hash()).normal()
+                    }
+                }
+                Self::Tag(tag) => format!("({})", tag).green().normal(),
+            }
+        };
+        info.to_string()
+    }
+}
 
 /*
     Marker structs for node types
@@ -73,7 +117,9 @@ pub struct AnyNode;
 ///
 /// The trait [IsConcrete] is automatically implemented if this is used as parameter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Concrete;
+pub struct Concrete {
+    version_pointer: VersionPointer,
+}
 
 /// Defines a [SymbolicNodeType] as abstract (without associated artifact).
 ///
@@ -99,8 +145,19 @@ impl NodeClassification for AnyClassification {}
 /// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
 ///
 /// Is automatically implemented if [Concrete] is used as parameter.
-pub trait IsConcrete {}
-impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {}
+pub trait IsConcrete: SymbolicNodeType {
+    fn get_version(&self) -> &VersionPointer;
+    fn set_version(&mut self, version: VersionPointer);
+}
+impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {
+    fn get_version(&self) -> &VersionPointer {
+        todo!()
+    }
+
+    fn set_version(&mut self, version: VersionPointer) {
+        todo!()
+    }
+}
 
 /// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
 ///
@@ -116,6 +173,7 @@ impl<T: SymbolicNodeType<Classification=Abstract>> IsAbstract for T {}
 /// This exists for generic type parameters.
 pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     type Classification: NodeClassification;
+    fn new() -> Self { Self {} }
     fn identifier() -> String;
     fn is_compatible(node: &Node) -> bool {
         Self::is_compatible_to_node(node)
@@ -263,12 +321,11 @@ pub trait HasProductChildren: SymbolicNodeType {}
 impl HasProductChildren for ProductRoot {}
 impl<T: NodeClassification> HasProductChildren for Product<T> {}
 
-pub trait IsOnOrUnderArea: SymbolicNodeType {}
-impl<T: NodeClassification> IsOnOrUnderArea for Area<T> {}
-impl IsOnOrUnderArea for FeatureRoot {}
-impl IsOnOrUnderArea for ProductRoot {}
-impl<T: NodeClassification> IsOnOrUnderArea for Feature<T> {}
-impl<T: NodeClassification> IsOnOrUnderArea for Product<T> {}
-impl<C: NodeClassification> IsOnOrUnderArea for Temporary<C> {}
+pub trait IsUnderArea: SymbolicNodeType {}
+impl IsUnderArea for FeatureRoot {}
+impl IsUnderArea for ProductRoot {}
+impl<T: NodeClassification> IsUnderArea for Feature<T> {}
+impl<T: NodeClassification> IsUnderArea for Product<T> {}
+impl<C: NodeClassification> IsUnderArea for Temporary<C> {}
 
 pub trait CanMergeWithFeature: SymbolicNodeType {}

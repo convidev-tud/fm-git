@@ -4,17 +4,19 @@ use colored::Colorize;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 use std::rc::Rc;
 use thiserror::Error;
+use crate::derivation::DerivationData;
 
 #[derive(Error, Debug)]
 #[error("Path {path} des not exist.")]
 pub struct PathNotFoundError {
     path: NormalizedPath,
 }
+
 impl PathNotFoundError {
     pub fn new(path: NormalizedPath) -> Self {
         Self { path }
@@ -29,57 +31,184 @@ pub enum NodePathError {
     NotFound(#[from] PathNotFoundError),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum VersionPointer {
-    Head,
-    Commit(CommitHash),
-    Tag(String),
+#[derive(Clone, Debug)]
+pub struct NodePath<S: SymbolicNodeType, V: VCS> {
+    path: Vec<Rc<RefCell<Node>>>,
+    sym_type: S,
+    vcs: Rc<RefCell<V>>,
 }
 
-impl VersionPointer {
-    fn formatted(&self, colored: bool, current_head: CommitHash) -> String {
-        fn make_head_info(head: &CommitHash) -> String {
-            format!("(Head -> {head})")
-        }
+impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
+    fn get_vcs(&self) -> &Rc<RefCell<V>> {
+        &self.vcs
+    }
 
-        let info = if colored {
-            match self {
-                Self::Head => make_head_info(&current_head).yellow(),
-                Self::Commit(c) => {
-                    if c == &current_head {
-                        make_head_info(&current_head).yellow()
-                    } else {
-                        format!("({})", c.get_short_hash()).yellow()
-                    }
-                }
-                Self::Tag(tag) => format!("({})", tag).green(),
-            }
-        } else {
-            match self {
-                Self::Head => make_head_info(&current_head).normal(),
-                Self::Commit(c) => {
-                    if c == &current_head {
-                        make_head_info(&current_head).normal()
-                    } else {
-                        format!("({})", c.get_short_hash()).normal()
-                    }
-                }
-                Self::Tag(tag) => format!("({})", tag).green().normal(),
-            }
+    pub fn get_node(&self) -> &Rc<RefCell<Node>> {
+        self.path.last().unwrap()
+    }
+    
+    pub(crate) fn new(
+        path: Vec<Rc<RefCell<Node>>>,
+        vcs: Rc<RefCell<V>>,
+    ) -> Result<NodePath<S, V>, WrongNodeTypeError> {
+        let last = path.last().unwrap();
+        let node = last.borrow();
+        if !S::is_compatible(&node) {
+            return Err(WrongNodeTypeError::new())
+        }
+        let new = Self {
+            path,
+            sym_type: S::new(),
+            vcs,
         };
-        info.to_string()
+        Ok(new)
+    }
+    
+    pub fn try_convert_to<To: SymbolicNodeType>(&self) -> Result<NodePath<To, V>, WrongNodeTypeError> {
+        NodePath::new(self.path.clone(), self.vcs.clone())
+    }
+    
+    pub fn move_to<To: SymbolicNodeType>(
+        mut self,
+        path: &NormalizedPath,
+    ) -> Result<NodePath<To, V>, NodePathError> {
+        let without_version = path.strip_version();
+        for p in without_version.iter_segments() {
+            let node = if let Some(node) = self.get_node().borrow().get_child(p) {
+                node
+            } else {
+                return Err(PathNotFoundError::new(path.clone()).into());
+            };
+            self.path.push(node);
+        }
+        Ok(NodePath::new(self.path, self.vcs)?)
+    }
+    
+    pub fn move_to_index<To: SymbolicNodeType>(self, index: usize) -> Result<NodePath<To, V>, WrongNodeTypeError> {
+        let path = self.path[0..index + 1].to_vec();
+        NodePath::new(path, self.vcs)
+    }
+
+    pub fn move_to_current<To: SymbolicNodeType>(self) -> Result<NodePath<To, V>, WrongNodeTypeError> {
+        let current = self.get_vcs().borrow().get_current_path();
+        match self.move_to(&current) {
+            Ok(path) => Ok(path),
+            Err(error) => {
+                match error {
+                    NodePathError::WrongType(e) => Err(e),
+                    NodePathError::NotFound(_) => unreachable!(),
+                }
+            }
+        }
+    }
+    
+    pub fn has_children(&self) -> bool {
+        self.get_node().borrow().has_children()
+    }
+    
+    pub fn iter_children_by_type<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I, V>> {
+        self.get_node()
+            .borrow()
+            .get_children()
+            .into_iter()
+            .filter_map(|node| {
+                match self
+                    .clone()
+                    .move_to::<I>(&node.borrow().get_name().to_normalized_path()) {
+                    Ok(path) => Some(path),
+                    Err(_) => None,
+                }
+            })
+            .sorted()
+    }
+    
+    pub fn iter_children_by_type_req<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I, V>> {
+        self.iter_children_by_type::<I>().flat_map(|path| {
+            let mut to_iter = Vec::new();
+            to_iter.push(path.clone());
+            to_iter.extend(path.iter_children_by_type_req());
+            to_iter
+        })
+    }
+    
+    pub fn get_tags(&self) -> Vec<CommitTag> {
+        self.get_node().borrow().get_tags().clone()
+    }
+    
+    pub fn has_tag<S: Into<String>>(&self, tag: S) -> bool {
+        let mut has_tag = false;
+        let into = tag.into();
+        for tag in self.get_tags() {
+            if tag.get_tag() == &into {
+                has_tag = true;
+                break;
+            }
+        }
+        has_tag
+    }
+    
+    pub fn get_real_type(&self) -> NodeType {
+        self.get_node().borrow().get_type().clone()
+    }
+    
+    pub fn as_any_type(&self) -> NodePath<AnyNode> {
+        NodePath::new(self.path.clone(), self.version.clone(), self.vcs.clone()).unwrap()
+    }
+    
+    pub fn display_tree(&self, show_tags: bool) -> String {
+        self.get_node().borrow().display_tree(show_tags)
+    }
+    
+    pub fn formatted(&self, colored: bool) -> String {
+        let path = self.to_normalized_path().strip_version();
+        if colored {
+            path.to_string().blue().to_string()
+        } else {
+            path.to_string()
+        }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct NodePath<SNT: SymbolicNodeType, V: VCS> {
-    path: Vec<Rc<RefCell<Node>>>,
-    version: VersionPointer,
-    vcs: Rc<V>,
-    _phantom: PhantomData<SNT>,
+impl<V: VCS> NodePath<VirtualRoot, V> {
+    pub fn scan_repository(&self) -> Result<(), WrongNodeTypeError> {
+        let mut node = self.get_node().borrow_mut();
+        match node.get_type() {
+            NodeType::VirtualRoot(mut data) => {
+                if data.repo_scanned() {
+                    return Ok(());
+                }
+                let vcs = self.vcs.borrow();
+                for path in vcs.iter_concrete_paths() {
+                    let p = if path.is_absolute() {
+                        path.strip_n_left(1)
+                    } else { path };
+                    node.insert_path(&p, true)?;
+                }
+                data.set_repo_scanned()
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+    
+    pub fn move_to_area<C: NodeClassification>(self, area: &NormalizedPath) -> Result<NodePath<Area<C>, V>, PathNotFoundError> {
+        match self.move_to(area) {
+            Ok(node) => Ok(node),
+            Err(error) => match error {
+                NodePathError::NotFound(e) => Err(e),
+                _ => unreachable!(),
+            }
+        }
+    }
 }
 
-impl<T: HasFeatureChildren> NodePath<T> {
+impl<V: VCS> NodePath<Product<Concrete>, V> {
+    pub fn get_derivation_data(&self) -> Result<DerivationData, dyn Error> {
+        todo!()
+    }
+}
+
+impl<S: HasFeatureChildren, V: VCS> NodePath<S, V> {
     pub fn move_to_feature(self, path: &NormalizedPath) -> Option<NodePath<Feature>> {
         self.move_to(path)?.try_convert_to()
     }
@@ -107,13 +236,13 @@ impl<T: HasProductChildren> NodePath<T> {
     }
 }
 
-impl<T: IsOnOrUnderArea> NodePath<T> {
+impl<T: IsUnderArea> NodePath<T> {
     pub fn move_to_area(self) -> NodePath<Area> {
         self.move_to_index(1).unwrap()
     }
 }
 
-impl<T: IsGitObject> NodePath<T> {
+impl<S: IsConcrete, V: VCS> NodePath<S, V> {
     pub fn get_ref_name(&self) -> String {
         self.get_node()
             .borrow()
@@ -159,12 +288,6 @@ impl<T: IsGitObject> NodePath<T> {
     }
 }
 
-impl NodePath<VirtualRoot> {
-    pub fn move_to_area(self, area: &NormalizedPath) -> Option<NodePath<ConcreteArea>> {
-        self.move_to(area)?.try_convert_to()
-    }
-}
-
 impl NodePath<ConcreteArea> {
     pub fn get_path_to_feature_root(&self) -> NormalizedPath {
         self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
@@ -200,123 +323,6 @@ impl<T: SymbolicNodeType> ToNormalizedPath for NodePath<T> {
 impl<T: SymbolicNodeType> Hash for NodePath<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_normalized_path().hash(state);
-    }
-}
-
-impl<T: SymbolicNodeType> NodePath<T> {
-    pub fn get_node(&self) -> &Rc<RefCell<Node>> {
-        self.path.last().unwrap()
-    }
-    pub(in crate::core::model) fn new(
-        path: Vec<Rc<RefCell<Node>>>,
-        sym_head: VersionPointer,
-        git: Rc<GitCLI>,
-    ) -> Result<NodePath<T>, WrongNodeTypeError> {
-        let last = path.last().unwrap();
-        let node = last.borrow();
-        if !T::is_compatible(&node) {
-            return Err(WrongNodeTypeError::new())
-        }
-        let new = Self {
-            path,
-            version: sym_head,
-            vcs: git,
-            _phantom: PhantomData,
-        };
-        Ok(new)
-    }
-    pub fn try_convert_to<To: SymbolicNodeType>(&self) -> Result<NodePath<To>, WrongNodeTypeError> {
-        NodePath::<To>::new(
-            self.path.clone(),
-            self.version.clone(),
-            self.vcs.clone(),
-        )
-    }
-    pub fn move_to<To: SymbolicNodeType>(
-        mut self,
-        path: &NormalizedPath,
-    ) -> Result<NodePath<To>, NodePathError> {
-        let without_version = path.strip_version();
-        for p in without_version.iter_segments() {
-            let node = if let Some(node) = self.get_node().borrow().get_child(p) {
-                node
-            } else {
-                return Err(PathNotFoundError::new(path.clone()).into());
-            };
-            self.path.push(node);
-        }
-        let head = match path.get_version_appendix() {
-            Some(version) => {
-                if self.has_tag(version.clone()) {
-                    VersionPointer::Tag(version)
-                } else {
-                    VersionPointer::Commit(CommitHash::new(version))
-                }
-            }
-            None => VersionPointer::Head,
-        };
-        Ok(NodePath::<To>::new(self.path, head, self.vcs)?)
-    }
-    pub fn move_to_index<To: SymbolicNodeType>(self, index: usize) -> Result<NodePath<To>, WrongNodeTypeError> {
-        let path = self.path[0..index + 1].to_vec();
-        NodePath::<To>::new(path, VersionPointer::Head, self.vcs)
-    }
-    pub fn has_children(&self) -> bool {
-        self.get_node().borrow().has_children()
-    }
-    pub fn iter_children_by_type<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I>> {
-        self.get_node()
-            .borrow()
-            .get_children()
-            .into_iter()
-            .filter_map(|node| {
-                match self
-                    .clone()
-                    .move_to::<I>(&node.borrow().get_name().to_normalized_path()) {
-                    Ok(path) => Some(path),
-                    Err(_) => None,
-                }
-            })
-            .sorted()
-    }
-    pub fn iter_children_by_type_req<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I>> {
-        self.iter_children_by_type::<I>().flat_map(|path| {
-            let mut to_iter = Vec::new();
-            to_iter.push(path.clone());
-            to_iter.extend(path.iter_children_by_type_req());
-            to_iter
-        })
-    }
-    pub fn get_tags(&self) -> Vec<CommitTag> {
-        self.get_node().borrow().get_tags().clone()
-    }
-    pub fn has_tag<S: Into<String>>(&self, tag: S) -> bool {
-        let mut has_tag = false;
-        let into = tag.into();
-        for tag in self.get_tags() {
-            if tag.get_tag() == &into {
-                has_tag = true;
-                break;
-            }
-        }
-        has_tag
-    }
-    pub fn get_real_type(&self) -> NodeType {
-        self.get_node().borrow().get_type().clone()
-    }
-    pub fn as_any_type(&self) -> NodePath<AnyNode> {
-        NodePath::new(self.path.clone(), self.version.clone(), self.vcs.clone()).unwrap()
-    }
-    pub fn display_tree(&self, show_tags: bool) -> String {
-        self.get_node().borrow().display_tree(show_tags)
-    }
-    pub fn formatted(&self, colored: bool) -> String {
-        let path = self.to_normalized_path().strip_version();
-        if colored {
-            path.to_string().blue().to_string()
-        } else {
-            path.to_string()
-        }
     }
 }
 

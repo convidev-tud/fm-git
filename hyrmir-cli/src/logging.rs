@@ -16,8 +16,8 @@ impl Log for PrintingLogger {
 }
 
 #[derive(Debug)]
-pub struct TanglLogger;
-impl TanglLogger {
+pub struct CommandLogger;
+impl CommandLogger {
     pub fn new() -> Self {
         Self
     }

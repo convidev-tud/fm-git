@@ -10,7 +10,6 @@ mod product;
 mod spread;
 mod status;
 mod tag;
-mod tangl;
 mod tree;
 mod untie;
 
@@ -26,6 +25,5 @@ pub use product::*;
 pub use spread::*;
 pub use status::*;
 pub use tag::*;
-pub use tangl::*;
 pub use tree::*;
 pub use untie::*;
