@@ -3,7 +3,7 @@ use crate::conflict::{
     NormalizedMergeStatistic,
 };
 use crate::git::error::PathAssertionError;
-use crate::model::git::GitInterface;
+use crate::git::GitInterface;
 use crate::model::*;
 use crate::*;
 use crate::logging::TanglLogger;

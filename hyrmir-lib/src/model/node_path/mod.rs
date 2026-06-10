@@ -1,15 +1,22 @@
+mod virtual_root;
+mod area;
+mod feature;
+mod product;
+mod any;
+mod classif;
+
 use crate::model::*;
 use crate::vcs::VCS;
-use colored::Colorize;
-use itertools::Itertools;
+pub use area::*;
+pub use feature::*;
+pub use product::*;
+pub use classif::*;
 use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
+use std::fmt::Debug;
+use std::hash::Hash;
 use std::rc::Rc;
 use thiserror::Error;
-use crate::derivation::DerivationData;
+pub use virtual_root::*;
 
 #[derive(Error, Debug)]
 #[error("Path {path} des not exist.")]
@@ -31,6 +38,79 @@ pub enum NodePathError {
     NotFound(#[from] PathNotFoundError),
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+pub enum VersionPointer {
+    Head,
+    Commit(CommitHash),
+    Tag(String),
+}
+
+impl VersionPointer {
+    fn formatted(&self, colored: bool, current_head: CommitHash) -> String {
+        fn make_head_info(head: &CommitHash) -> String {
+            format!("(Head -> {head})")
+        }
+
+        let info = if colored {
+            match self {
+                Self::Head => make_head_info(&current_head).yellow(),
+                Self::Commit(c) => {
+                    if c == &current_head {
+                        make_head_info(&current_head).yellow()
+                    } else {
+                        format!("({})", c.get_short_hash()).yellow()
+                    }
+                }
+                Self::Tag(tag) => format!("({})", tag).green(),
+            }
+        } else {
+            match self {
+                Self::Head => make_head_info(&current_head).normal(),
+                Self::Commit(c) => {
+                    if c == &current_head {
+                        make_head_info(&current_head).normal()
+                    } else {
+                        format!("({})", c.get_short_hash()).normal()
+                    }
+                }
+                Self::Tag(tag) => format!("({})", tag).green().normal(),
+            }
+        };
+        info.to_string()
+    }
+}
+
+/// Some node node_path have the option of being concrete (with attached artifacts) or abstract.
+/// This is the base trait for this classification.
+pub trait NodeClassification: Clone + Debug + Eq + PartialEq + Hash {
+    fn requires_artifact() -> Option<bool>;
+}
+
+/// Symbolic node type base trait.
+/// This exists for generic type parameters.
+pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
+    type Classification: NodeClassification;
+    fn new() -> Self { Self {} }
+    fn compatible(&self) -> Vec<NodeType>;
+}
+
+/// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
+///
+/// Is automatically implemented if [Concrete] is used as parameter.
+pub trait IsConcrete: SymbolicNodeType {
+    fn get_version(&self) -> &VersionPointer;
+    fn set_version(&mut self, version: VersionPointer);
+}
+impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {
+    fn get_version(&self) -> &VersionPointer {
+        todo!()
+    }
+
+    fn set_version(&mut self, version: VersionPointer) {
+        todo!()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NodePath<S: SymbolicNodeType, V: VCS> {
     path: Vec<Rc<RefCell<Node>>>,
@@ -39,14 +119,14 @@ pub struct NodePath<S: SymbolicNodeType, V: VCS> {
 }
 
 impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
-    fn get_vcs(&self) -> &Rc<RefCell<V>> {
+    pub(super) fn get_vcs(&self) -> &Rc<RefCell<V>> {
         &self.vcs
     }
 
     pub fn get_node(&self) -> &Rc<RefCell<Node>> {
         self.path.last().unwrap()
     }
-    
+
     pub(crate) fn new(
         path: Vec<Rc<RefCell<Node>>>,
         vcs: Rc<RefCell<V>>,
@@ -63,11 +143,11 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
         };
         Ok(new)
     }
-    
+
     pub fn try_convert_to<To: SymbolicNodeType>(&self) -> Result<NodePath<To, V>, WrongNodeTypeError> {
         NodePath::new(self.path.clone(), self.vcs.clone())
     }
-    
+
     pub fn move_to<To: SymbolicNodeType>(
         mut self,
         path: &NormalizedPath,
@@ -83,7 +163,7 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
         }
         Ok(NodePath::new(self.path, self.vcs)?)
     }
-    
+
     pub fn move_to_index<To: SymbolicNodeType>(self, index: usize) -> Result<NodePath<To, V>, WrongNodeTypeError> {
         let path = self.path[0..index + 1].to_vec();
         NodePath::new(path, self.vcs)
@@ -101,11 +181,11 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
             }
         }
     }
-    
+
     pub fn has_children(&self) -> bool {
         self.get_node().borrow().has_children()
     }
-    
+
     pub fn iter_children_by_type<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I, V>> {
         self.get_node()
             .borrow()
@@ -121,7 +201,7 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
             })
             .sorted()
     }
-    
+
     pub fn iter_children_by_type_req<I: SymbolicNodeType>(&self) -> impl Iterator<Item = NodePath<I, V>> {
         self.iter_children_by_type::<I>().flat_map(|path| {
             let mut to_iter = Vec::new();
@@ -130,11 +210,11 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
             to_iter
         })
     }
-    
+
     pub fn get_tags(&self) -> Vec<CommitTag> {
         self.get_node().borrow().get_tags().clone()
     }
-    
+
     pub fn has_tag<S: Into<String>>(&self, tag: S) -> bool {
         let mut has_tag = false;
         let into = tag.into();
@@ -146,19 +226,19 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
         }
         has_tag
     }
-    
+
     pub fn get_real_type(&self) -> NodeType {
         self.get_node().borrow().get_type().clone()
     }
-    
+
     pub fn as_any_type(&self) -> NodePath<AnyNode> {
         NodePath::new(self.path.clone(), self.version.clone(), self.vcs.clone()).unwrap()
     }
-    
+
     pub fn display_tree(&self, show_tags: bool) -> String {
         self.get_node().borrow().display_tree(show_tags)
     }
-    
+
     pub fn formatted(&self, colored: bool) -> String {
         let path = self.to_normalized_path().strip_version();
         if colored {
@@ -166,79 +246,6 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
         } else {
             path.to_string()
         }
-    }
-}
-
-impl<V: VCS> NodePath<VirtualRoot, V> {
-    pub fn scan_repository(&self) -> Result<(), WrongNodeTypeError> {
-        let mut node = self.get_node().borrow_mut();
-        match node.get_type() {
-            NodeType::VirtualRoot(mut data) => {
-                if data.repo_scanned() {
-                    return Ok(());
-                }
-                let vcs = self.vcs.borrow();
-                for path in vcs.iter_concrete_paths() {
-                    let p = if path.is_absolute() {
-                        path.strip_n_left(1)
-                    } else { path };
-                    node.insert_path(&p, true)?;
-                }
-                data.set_repo_scanned()
-            }
-            _ => unreachable!(),
-        }
-        Ok(())
-    }
-    
-    pub fn move_to_area<C: NodeClassification>(self, area: &NormalizedPath) -> Result<NodePath<Area<C>, V>, PathNotFoundError> {
-        match self.move_to(area) {
-            Ok(node) => Ok(node),
-            Err(error) => match error {
-                NodePathError::NotFound(e) => Err(e),
-                _ => unreachable!(),
-            }
-        }
-    }
-}
-
-impl<V: VCS> NodePath<Product<Concrete>, V> {
-    pub fn get_derivation_data(&self) -> Result<DerivationData, dyn Error> {
-        todo!()
-    }
-}
-
-impl<S: HasFeatureChildren, V: VCS> NodePath<S, V> {
-    pub fn move_to_feature(self, path: &NormalizedPath) -> Option<NodePath<Feature>> {
-        self.move_to(path)?.try_convert_to()
-    }
-    pub fn iter_features(&self) -> impl Iterator<Item = NodePath<Feature>> {
-        self.iter_children_by_type()
-            .map(|p| p.try_convert_to().unwrap())
-    }
-    pub fn iter_features_req(&self) -> impl Iterator<Item = NodePath<Feature>> {
-        self.iter_children_by_type_req()
-            .map(|p| p.try_convert_to().unwrap())
-    }
-}
-
-impl<T: HasProductChildren> NodePath<T> {
-    pub fn move_to_product(self, path: &NormalizedPath) -> Option<NodePath<Product>> {
-        self.move_to(path)?.try_convert_to()
-    }
-    pub fn iter_products(&self) -> impl Iterator<Item = NodePath<Product>> {
-        self.iter_children_by_type()
-            .map(|p| p.try_convert_to().unwrap())
-    }
-    pub fn iter_products_req(&self) -> impl Iterator<Item = NodePath<Product>> {
-        self.iter_children_by_type_req()
-            .map(|p| p.try_convert_to().unwrap())
-    }
-}
-
-impl<T: IsUnderArea> NodePath<T> {
-    pub fn move_to_area(self) -> NodePath<Area> {
-        self.move_to_index(1).unwrap()
     }
 }
 
@@ -285,23 +292,6 @@ impl<S: IsConcrete, V: VCS> NodePath<S, V> {
         let mut path = self.to_normalized_path();
         path.set_version_appendix(Some(self.get_object()));
         path
-    }
-}
-
-impl NodePath<ConcreteArea> {
-    pub fn get_path_to_feature_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
-    }
-    pub fn get_path_to_product_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(PRODUCT_ROOT)
-    }
-    pub fn move_to_feature_root(self) -> Option<NodePath<FeatureRoot>> {
-        self.move_to(&NormalizedPath::from(FEATURE_ROOT))?
-            .try_convert_to()
-    }
-    pub fn move_to_product_root(self) -> Option<NodePath<ProductRoot>> {
-        self.move_to(&NormalizedPath::from(PRODUCT_ROOT))?
-            .try_convert_to()
     }
 }
 

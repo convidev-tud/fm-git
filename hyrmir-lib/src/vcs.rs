@@ -14,16 +14,4 @@ pub trait VCS: Debug {
         extra_msg: String,
         colored: bool,
     ) -> String;
-    
-    fn view(&self);
-
-    fn iter_history(&self);
-
-    fn commit(&self);
-
-    fn merge(&self);
-
-    fn simulate_merge(&self);
-
-    fn apply_tag(&self);
 }

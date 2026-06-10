@@ -55,30 +55,25 @@ impl VirtualRootMetadata {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeType {
-    VirtualRoot(VirtualRootMetadata),
+    VirtualRoot,
     Area(bool),
     FeatureRoot,
     ProductRoot,
     Feature(bool),
     Product(bool),
-    Temporary(bool),
-    Undefined,
 }
 
 impl NodeType {
     pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
         match self {
-            Self::VirtualRoot(_) => Ok(Self::Area(concrete)),
+            Self::VirtualRoot => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
-                TEMPORARY => Ok(Self::Temporary(concrete)),
                 _ => Err(WrongNodeTypeError::new()),
             },
             Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
             Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
-            Self::Temporary(_) => Ok(Self::Temporary(concrete)),
-            Self::Undefined => Ok(Self::Undefined),
         }
     }
 
