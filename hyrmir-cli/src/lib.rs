@@ -5,7 +5,6 @@ pub mod repo;
 pub mod commands;
 pub mod completion;
 pub mod logging;
-mod root;
 
 pub use def::*;
 pub use repo::*;

@@ -1,6 +1,6 @@
 use crate::derivation::DerivationData;
 use crate::model::node_path::*;
-use crate::model::{HasProductChildren, NodeType, NormalizedPath};
+use crate::model::NodeType;
 use crate::vcs::VCS;
 use std::error::Error;
 
@@ -11,7 +11,7 @@ pub struct ProductRoot;
 impl SymbolicNodeType for ProductRoot {
     type Classification = Abstract;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         todo!()
     }
 }
@@ -25,7 +25,7 @@ pub struct Product<C: NodeClassification>;
 impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         match C::requires_artifact() {
             Some(true) => vec![NodeType::Product(true)],
             Some(false) => vec![NodeType::Product(false)],

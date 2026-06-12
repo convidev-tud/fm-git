@@ -1,11 +1,10 @@
-use hyrmir_lib::vcs::VCS;
+mod git;
 
-pub struct Git;
-
-impl VCS for Git {}
-
-
+use hyrmir_cli::{ArgSource, CommandLogger, EntryPoint};
+use crate::git::Git;
 
 fn main() {
-    println!("Hello, world!");
+    let logger = CommandLogger::new();
+    let mut entry = EntryPoint::new("tangl", Git::new(), logger);
+    entry.execute(ArgSource::CLI)
 }

@@ -12,7 +12,7 @@ pub struct Area<C: NodeClassification> {
 impl<C: NodeClassification> SymbolicNodeType for Area<C> {
     type Classification = C;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         todo!()
     }
 }
@@ -24,20 +24,18 @@ impl<C: NodeClassification, V: VCS> NodePath<Area<C>, V> {
     pub fn get_path_to_product_root(&self) -> NormalizedPath {
         self.to_normalized_path() + NormalizedPath::from(PRODUCT_ROOT)
     }
-    pub fn move_to_feature_root(self) -> Option<NodePath<FeatureRoot>> {
-        self.move_to(&NormalizedPath::from(FEATURE_ROOT))?
-            .try_convert_to()
+    pub fn move_to_feature_root(self) -> Result<NodePath<FeatureRoot, V>, NodePathError> {
+        self.move_to(&NormalizedPath::from(FEATURE_ROOT))?.into()
     }
-    pub fn move_to_product_root(self) -> Option<NodePath<ProductRoot>> {
-        self.move_to(&NormalizedPath::from(PRODUCT_ROOT))?
-            .try_convert_to()
+    pub fn move_to_product_root(self) -> Result<NodePath<ProductRoot, V>, NodePathError> {
+        self.move_to(&NormalizedPath::from(PRODUCT_ROOT))?.into()
     }
 }
 
 pub trait IsUnderArea: SymbolicNodeType {}
 
 impl<T: IsUnderArea, V: VCS> NodePath<T, V> {
-    pub fn move_to_area(self) -> NodePath<Area> {
+    pub fn move_to_area<C: NodeClassification>(self) -> NodePath<Area<C>, V> {
         self.move_to_index(1).unwrap()
     }
 }

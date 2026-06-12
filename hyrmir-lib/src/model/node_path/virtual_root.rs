@@ -29,18 +29,3 @@ impl<V: VCS> NodePath<VirtualRoot, V> {
         }
     }
 }
-
-/// VCS connection for virtual root
-impl<V: VCS> NodePath<VirtualRoot, V> {
-    pub fn scan_repository(&self) -> Result<(), WrongNodeTypeError> {
-        let mut node = self.get_node().borrow_mut();
-        let vcs = self.get_vcs().borrow();
-        for path in vcs.iter_concrete_paths() {
-            let p = if path.is_absolute() {
-                path.strip_n_left(1)
-            } else { path };
-            node.insert_path(&p, true)?;
-        }
-        Ok(())
-    }
-}

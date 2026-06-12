@@ -35,8 +35,8 @@ impl<V: VCS> CommandDefinition<V> for LSCommand<V> {
 
 impl<V: VCS> CommandInterface<V> for LSCommand<V> {
     fn run_command(
-        &self, 
-        workspace: &mut Workspace<V>, 
+        &self,
+        workspace: &mut Workspace<V>,
         context: &mut CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         let current = context.git.get_current_normalized_path()?;

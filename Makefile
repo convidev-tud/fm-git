@@ -1,7 +1,7 @@
 install: install-completion
-	cargo install --path .
+	cargo install --path hyrmir-git
 install-frozen: install-completion
-	cargo install --frozen --path .
+	cargo install --frozen --path hyrmir-git
 install-completion:
 	mkdir --parents ~/.local/share/bash-completion/completions
 	cp completion.sh ~/.local/share/bash-completion/completions/tangl

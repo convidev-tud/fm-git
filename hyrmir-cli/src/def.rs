@@ -1,13 +1,12 @@
+use crate::arg::ArgHelper;
 use crate::completion::CompletionHelper;
-use crate::commands::*;
-use clap::{Arg, ArgMatches, Command};
+use crate::logging::CommandLogger;
+use clap::{ArgMatches, Command};
+use hyrmir_lib::importer::ImportFormat;
+use hyrmir_lib::repository::Repository;
 use hyrmir_lib::vcs::VCS;
-use hyrmir_lib::workspace::Workspace;
 use std::error::Error;
 use std::fmt::Debug;
-use hyrmir_lib::model::ImportFormat;
-use crate::arg::ArgHelper;
-use crate::logging::CommandLogger;
 
 #[derive(Debug)]
 pub struct CommandMap<V: VCS> {
@@ -72,7 +71,6 @@ pub struct CommandContext<'a, V: VCS> {
     current_command: &'a CommandMap<V>,
     root_command: &'a CommandMap<V>,
     arg_helper: ArgHelper,
-    
     import_format: ImportFormat,
 }
 
@@ -90,6 +88,22 @@ impl<'a, V: VCS> CommandContext<'a, V> {
             import_format,
         }
     }
+    
+    pub fn get_current_command(&self) -> &CommandMap<V> {
+        &self.current_command
+    }
+    
+    pub fn get_root_command(&self) -> &CommandMap<V> {
+        &self.root_command
+    }
+    
+    pub fn get_arg_helper(&self) -> &ArgHelper {
+        &self.arg_helper
+    }
+    
+    pub fn get_import_format(&self) -> &ImportFormat {
+        &self.import_format
+    }
 }
 
 pub trait CommandDefinition<V: VCS>: Debug {
@@ -102,17 +116,17 @@ pub trait CommandDefinition<V: VCS>: Debug {
 pub trait CommandInterface<V: VCS>: Debug {
     fn run_command(
         &self,
-        _workspace: &mut Workspace<V>,
+        _repository: &mut Repository<V>,
         _logger: &mut CommandLogger,
-        _context: &mut CommandContext<V>,
+        _context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     fn shell_complete(
         &self,
-        _workspace: &mut Workspace<V>,
+        _repository: &mut Repository<V>,
         _completion_helper: CompletionHelper,
-        _context: &mut CommandContext<V>,
+        _context: &CommandContext<V>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
         Ok(Vec::new())
     }

@@ -15,14 +15,14 @@ pub const TEMPORARY: &str = "tmp";
 
 #[derive(Error, Debug)]
 pub struct WrongNodeTypeError {
-    types_expected: Vec<NodeType>,
+    types_possible: Vec<NodeType>,
     type_found: NodeType,
 }
 
 impl WrongNodeTypeError {
-    pub fn new(types_expected: Vec<NodeType>, type_found: NodeType) -> Self {
+    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType) -> Self {
         Self {
-            types_expected,
+            types_possible,
             type_found,
         }
     }
