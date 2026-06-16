@@ -13,13 +13,13 @@ pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
 pub const TEMPORARY: &str = "tmp";
 
-#[derive(Error, Debug)]
-pub struct WrongNodeTypeError {
+#[derive(Error, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct InvalidNodeTypeError {
     types_possible: Vec<NodeType>,
     type_found: NodeType,
 }
 
-impl WrongNodeTypeError {
+impl InvalidNodeTypeError {
     pub fn new(types_possible: Vec<NodeType>, type_found: NodeType) -> Self {
         Self {
             types_possible,
@@ -28,7 +28,7 @@ impl WrongNodeTypeError {
     }
 }
 
-impl Display for WrongNodeTypeError {
+impl Display for InvalidNodeTypeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
@@ -61,16 +61,17 @@ pub enum NodeType {
     ProductRoot,
     Feature(bool),
     Product(bool),
+    NonExistent,
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
         match self {
             Self::VirtualRoot => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
-                _ => Err(WrongNodeTypeError::new()),
+                _ => Err(InvalidNodeTypeError::new()),
             },
             Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
             Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
@@ -176,11 +177,11 @@ impl Node {
         tree
     }
 
-    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
         let node_type = self.decide_child_type(name.as_str(), concrete)?;
         // let child = ;
         let child = Node::new(
@@ -191,7 +192,7 @@ impl Node {
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
         let new_type = self.decide_child_type(name.as_str(), concrete)?;
         let child = self.get_child(&name).unwrap();
         child.borrow_mut().update_type(new_type.clone());
@@ -219,7 +220,7 @@ impl Node {
         nodes.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, WrongNodeTypeError> {
+    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {

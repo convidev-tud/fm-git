@@ -4,7 +4,7 @@ use crate::model::node_path::*;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct AnyNode<C: NodeClassification>;
 
-impl<C: NodeClassification> SymbolicNodeType for AnyNode<C> {
+impl<C: NodeClassification> ValidNodeType for AnyNode<C> {
     type Classification = C;
 
     fn compatible() -> Vec<NodeType> {

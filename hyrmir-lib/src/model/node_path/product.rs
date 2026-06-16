@@ -8,7 +8,7 @@ use std::error::Error;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ProductRoot;
 
-impl SymbolicNodeType for ProductRoot {
+impl ValidNodeType for ProductRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
@@ -22,7 +22,7 @@ impl IsUnderArea for ProductRoot {}
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Product<C: NodeClassification>;
 
-impl<C: NodeClassification> SymbolicNodeType for Product<C> {
+impl<C: NodeClassification> ValidNodeType for Product<C> {
     type Classification = C;
 
     fn compatible() -> Vec<NodeType> {

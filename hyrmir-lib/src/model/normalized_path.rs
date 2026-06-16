@@ -82,7 +82,7 @@ impl Add for NormalizedPath {
         if new_path.last_is(&NormalizedPath::from("")) && new_path.len() > 1 {
             new_path = new_path.strip_n_right(new_path.len() - 1);
         }
-        for (i, part) in rhs.iter_segments().enumerate() {
+        for (i, part) in rhs.iter_all_segments().enumerate() {
             match part.as_str() {
                 "." => {}
                 ".." => {
@@ -222,11 +222,14 @@ impl NormalizedPath {
         self.path.is_empty()
     }
     pub fn iter(&self) -> impl Iterator<Item = NormalizedPath> {
-        self.iter_segments()
+        self.iter_all_segments()
             .map(|s| NormalizedPath::from(s.clone()))
     }
-    pub fn iter_segments(&self) -> impl Iterator<Item = &String> {
+    pub(crate) fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
         self.path.iter()
+    }
+    pub(crate) fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
+        self.path[l..r].iter()
     }
     pub fn get(&self, index: usize) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.get(index)?.clone()))

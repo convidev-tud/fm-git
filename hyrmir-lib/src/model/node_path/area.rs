@@ -9,7 +9,7 @@ pub struct Area<C: NodeClassification> {
     _phantom: PhantomData<C>,
 }
 
-impl<C: NodeClassification> SymbolicNodeType for Area<C> {
+impl<C: NodeClassification> ValidNodeType for Area<C> {
     type Classification = C;
 
     fn compatible() -> Vec<NodeType> {
@@ -32,7 +32,7 @@ impl<C: NodeClassification, V: VCS> NodePath<Area<C>, V> {
     }
 }
 
-pub trait IsUnderArea: SymbolicNodeType {}
+pub trait IsUnderArea: ValidNodeType {}
 
 impl<T: IsUnderArea, V: VCS> NodePath<T, V> {
     pub fn move_to_area<C: NodeClassification>(self) -> NodePath<Area<C>, V> {

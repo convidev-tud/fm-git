@@ -1,4 +1,4 @@
-use crate::conflict::{
+use crate::conflict::statistic::{
     CheckMode, ConflictAnalyzer, ConflictChecker, MergeChainStatistic, MergeResult, MergeStatistic,
     NormalizedMergeStatistic,
 };

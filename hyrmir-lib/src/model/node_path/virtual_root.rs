@@ -1,12 +1,12 @@
 use crate::model::node_path::*;
-use crate::model::{NodeType, NormalizedPath, WrongNodeTypeError};
+use crate::model::{NodeType, NormalizedPath, InvalidNodeTypeError};
 use crate::vcs::VCS;
 
 /// Marker for the virtual root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRoot;
 
-impl SymbolicNodeType for VirtualRoot {
+impl ValidNodeType for VirtualRoot {
     type Classification = Abstract;
 
     fn compatible(&self) -> Vec<NodeType> {

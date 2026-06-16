@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FeatureRoot;
 
-impl SymbolicNodeType for FeatureRoot {
+impl ValidNodeType for FeatureRoot {
     type Classification = Abstract;
 
     fn compatible(&self) -> Vec<NodeType> {
@@ -22,7 +22,7 @@ pub struct Feature<C: NodeClassification> {
     _phantom: PhantomData<C>,
 }
 
-impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
+impl<C: NodeClassification> ValidNodeType for Feature<C> {
     type Classification = C;
 
     fn compatible(&self) -> Vec<NodeType> {
@@ -32,4 +32,4 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
 
 impl<C: NodeClassification> IsUnderArea for Feature<C> {}
 
-pub trait CanMergeWithFeature: SymbolicNodeType {}
+pub trait CanMergeWithFeature: ValidNodeType {}

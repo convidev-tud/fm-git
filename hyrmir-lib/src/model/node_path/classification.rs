@@ -1,5 +1,5 @@
 use colored::Colorize;
-use crate::model::{NodeClassification, NodePath, NormalizedPath, SymbolicNodeType};
+use crate::model::{NodeClassification, NodePath, NormalizedPath, ValidNodeType};
 use crate::vcs::VCS;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -43,7 +43,7 @@ impl VersionPointer {
     }
 }
 
-/// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
+/// Defines a compatible [ValidNodeType] as concrete (with associated artifact).
 ///
 /// The trait [IsConcrete] is automatically implemented.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -51,7 +51,7 @@ pub struct Concrete {
     version_pointer: VersionPointer,
 }
 
-/// Defines a [SymbolicNodeType] as abstract (without associated artifact).
+/// Defines a [ValidNodeType] as abstract (without associated artifact).
 ///
 /// The trait [IsAbstract] is automatically implemented if this is used as parameter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -61,14 +61,14 @@ pub struct Abstract;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct AnyCls;
 
-/// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
+/// Denotes that a [ValidNodeType] is concrete (with associated artifact).
 ///
 /// Is automatically implemented if the type uses [Concrete] as parameter.
-pub trait IsConcrete: SymbolicNodeType {
+pub trait IsConcrete: ValidNodeType {
     fn get_version(&self) -> &VersionPointer;
     fn set_version(&mut self, version: VersionPointer);
 }
-impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {
+impl<T: ValidNodeType<Classification=Concrete>> IsConcrete for T {
     fn get_version(&self) -> &VersionPointer {
         todo!()
     }
@@ -78,11 +78,11 @@ impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {
     }
 }
 
-/// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
+/// Denotes that a [ValidNodeType] is abstract (without associated artifact).
 ///
 /// Is automatically implemented if [Abstract] is used as parameter.
 pub trait IsAbstract {}
-impl<T: SymbolicNodeType<Classification=Abstract>> IsAbstract for T {}
+impl<T: ValidNodeType<Classification=Abstract>> IsAbstract for T {}
 
 impl NodeClassification for Concrete {
     fn requires_artifact() -> Option<bool> {
@@ -100,7 +100,7 @@ impl NodeClassification for AnyCls {
     }
 }
 
-impl<S: SymbolicNodeType<Classification=Concrete>, V: VCS> NodePath<S, V> {
+impl<S: ValidNodeType<Classification=Concrete>, V: VCS> NodePath<S, V> {
     pub fn get_qualified_object(&self) -> String {
         match &self.get_sym_type().get_version() {
             VersionPointer::Head => self.get_object(),
