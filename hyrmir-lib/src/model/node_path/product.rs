@@ -1,8 +1,6 @@
-use crate::derivation::DerivationData;
+use std::marker::PhantomData;
 use crate::model::node_path::*;
 use crate::model::NodeType;
-use crate::vcs::VCS;
-use std::error::Error;
 
 /// Marker for the product root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -20,7 +18,9 @@ impl IsUnderArea for ProductRoot {}
 
 /// Marker of a product node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Product<C: NodeClassification>;
+pub struct Product<C: NodeClassification> {
+    phantom_data: PhantomData<C>,
+}
 
 impl<C: NodeClassification> ValidNodeType for Product<C> {
     type Classification = C;
@@ -36,8 +36,8 @@ impl<C: NodeClassification> ValidNodeType for Product<C> {
 
 impl<C: NodeClassification> IsUnderArea for Product<C> {}
 
-impl<V: VCS> NodePath<Product<Concrete>, V> {
-    pub fn get_derivation_data(&self) -> Result<DerivationData, dyn Error> {
-        todo!()
-    }
-}
+// impl<V: VCS> NodePath<Product<Concrete>, V> {
+//     pub fn get_derivation_data(&self) -> Result<DerivationData, dyn Error> {
+//         todo!()
+//     }
+// }

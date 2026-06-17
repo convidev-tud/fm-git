@@ -13,27 +13,6 @@ pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
 pub const TEMPORARY: &str = "tmp";
 
-#[derive(Error, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct InvalidNodeTypeError {
-    types_possible: Vec<NodeType>,
-    type_found: NodeType,
-}
-
-impl InvalidNodeTypeError {
-    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType) -> Self {
-        Self {
-            types_possible,
-            type_found,
-        }
-    }
-}
-
-impl Display for InvalidNodeTypeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRootMetadata {
     repo_scanned: bool
@@ -65,16 +44,25 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
+    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
         match self {
             Self::VirtualRoot => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
-                _ => Err(InvalidNodeTypeError::new()),
+                _ => Err(InvalidSymTypeError::new()),
             },
             Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
             Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
+        }
+    }
+
+    pub fn accepts_explicit_version(&self) -> bool {
+        match self {
+            Self::Area(true) |
+            Self::Feature(true) |
+            Self::Product(true) => true,
+            _ => false,
         }
     }
 
@@ -177,11 +165,11 @@ impl Node {
         tree
     }
 
-    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
+    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
+    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
         let node_type = self.decide_child_type(name.as_str(), concrete)?;
         // let child = ;
         let child = Node::new(
@@ -192,7 +180,7 @@ impl Node {
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
+    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
         let new_type = self.decide_child_type(name.as_str(), concrete)?;
         let child = self.get_child(&name).unwrap();
         child.borrow_mut().update_type(new_type.clone());
@@ -220,7 +208,7 @@ impl Node {
         nodes.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, InvalidNodeTypeError> {
+    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {

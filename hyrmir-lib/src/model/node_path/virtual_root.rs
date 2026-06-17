@@ -1,5 +1,5 @@
 use crate::model::node_path::*;
-use crate::model::{NodeType, NormalizedPath, InvalidNodeTypeError};
+use crate::model::{NodeType, NormalizedPath};
 use crate::vcs::VCS;
 
 /// Marker for the virtual root node.
@@ -9,7 +9,7 @@ pub struct VirtualRoot;
 impl ValidNodeType for VirtualRoot {
     type Classification = Abstract;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         vec![NodeType::VirtualRoot]
     }
 }
@@ -19,13 +19,7 @@ impl<V: VCS> NodePath<VirtualRoot, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
         area: &NormalizedPath
-    ) -> Result<NodePath<Area<C>, V>, PathNotFoundError> {
-        match self.move_to(area) {
-            Ok(node) => Ok(node),
-            Err(error) => match error {
-                NodePathError::NotFound(e) => Err(e),
-                _ => unreachable!(),
-            }
-        }
+    ) -> Result<NodePath<Area<C>, V>, NodePath<ErrorState, V>> {
+        self.move_to(area)
     }
 }

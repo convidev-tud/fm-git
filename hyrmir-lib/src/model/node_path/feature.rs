@@ -1,5 +1,4 @@
 use crate::model::node_path::*;
-use crate::vcs::VCS;
 use std::marker::PhantomData;
 
 /// Marker for the feature root node.
@@ -9,7 +8,7 @@ pub struct FeatureRoot;
 impl ValidNodeType for FeatureRoot {
     type Classification = Abstract;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         todo!()
     }
 }
@@ -25,7 +24,7 @@ pub struct Feature<C: NodeClassification> {
 impl<C: NodeClassification> ValidNodeType for Feature<C> {
     type Classification = C;
 
-    fn compatible(&self) -> Vec<NodeType> {
+    fn compatible() -> Vec<NodeType> {
         todo!()
     }
 }

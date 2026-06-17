@@ -8,14 +8,16 @@ pub trait VersionObject: Debug {
     fn get_metadata(&self, key: String) -> Result<String, Self::VersionError>;
 }
 
-pub trait VCS: Debug {
+pub trait VCS: Debug + PartialEq + Eq {
     type VCSError: Error;
     
     type VersionObject: VersionObject;
 
     fn get_current_path(&self) -> Result<NormalizedPath, Self::VCSError>;
 
-    fn get_version(&self, identifier: String) -> Result<Self::VersionObject, Self::VCSError>;
+    fn get_version(&self, version: &String) -> Result<Self::VersionObject, Self::VCSError>;
+
+    fn version_exists_on_path(&self, path: &NormalizedPath, version: &String) -> Result<bool, Self::VCSError>;
     
     fn iter_concrete_paths(&self) -> impl Iterator<Item = Result<NormalizedPath, Self::VCSError>>;
 

@@ -1,4 +1,4 @@
-use crate::model::InvalidNodeTypeError;
+use crate::model::InvalidSymTypeError;
 use crate::model::*;
 use crate::vcs::VCS;
 use std::cell::RefCell;
@@ -10,7 +10,7 @@ use crate::workspace::Workspace;
 #[derive(Error, Debug)]
 pub enum ScanError<V: VCS> {
     #[error(transparent)]
-    WrongType(#[from] InvalidNodeTypeError),
+    WrongType(#[from] InvalidSymTypeError),
     #[error("ScanError::VCS")]
     VCS(#[source] V::VCSError),
 }
