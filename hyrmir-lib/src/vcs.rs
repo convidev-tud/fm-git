@@ -2,14 +2,16 @@ use std::error::Error;
 use std::fmt::Debug;
 use crate::model::NormalizedPath;
 
+pub trait VCSError: Error {}
+
 pub trait VersionObject: Debug {
     type VersionError: Error;
     
     fn get_metadata(&self, key: String) -> Result<String, Self::VersionError>;
 }
 
-pub trait VCS: Debug + PartialEq + Eq {
-    type VCSError: Error;
+pub trait VCS: Debug + Clone + PartialEq + Eq {
+    type VCSError: VCSError;
     
     type VersionObject: VersionObject;
 
@@ -26,7 +28,8 @@ pub trait VCS: Debug + PartialEq + Eq {
     fn format_status_message(
         &self,
         current_path_msg: String,
-        extra_msg: String,
+        pre_status: String,
+        post_status: String,
         colored: bool,
     ) -> Result<String, Self::VCSError>;
 }

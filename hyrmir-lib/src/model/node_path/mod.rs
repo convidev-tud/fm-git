@@ -7,7 +7,7 @@ mod classification;
 mod error;
 
 use crate::model::*;
-use crate::vcs::VCS;
+use crate::vcs::{VCSError, VCS};
 pub use any::*;
 pub use area::*;
 pub use classification::*;
@@ -21,7 +21,15 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use thiserror::Error;
 pub use virtual_root::*;
+
+#[derive(Error, Clone, Debug)]
+pub enum VCSPathError<V: VCS, VE: VCSError> {
+    #[error(transparent)]
+    PathError(#[from] NodePath<ErrorState, V>),
+    VCS(#[from] VE)
+}
 
 /// Some node node_path have the option of being concrete (with attached artifacts) or abstract.
 /// This is the base trait for this classification.
@@ -36,7 +44,7 @@ pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {}
 /// Symbolic node type for valid (non-error) paths.
 pub trait ValidNodeType: SymbolicNodeType {
     type Classification: NodeClassification;
-    fn new() -> Self { Self {} }
+    fn new() -> Self;
     fn compatible() -> Vec<NodeType> { vec![] }
 }
 
@@ -63,7 +71,7 @@ pub enum VersionPointer {
 #[derive(Clone, Debug)]
 pub struct NodePath<S: SymbolicNodeType, V: VCS> {
     path: Vec<Rc<RefCell<Node>>>,
-    vcs: Rc<RefCell<V>>,
+    vcs: V,
     sym_type: S,
     version_pointer: VersionPointer,
 }
@@ -72,9 +80,9 @@ pub struct NodePath<S: SymbolicNodeType, V: VCS> {
 impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
     pub(crate) fn new(
         path: Vec<Rc<RefCell<Node>>>,
-        vcs: Rc<RefCell<V>>,
+        vcs: V,
         version: Option<String>,
-    ) -> Result<NodePath<S, V>, NodePath<ErrorState, V>> {
+    ) -> Result<NodePath<S, V>, VCSPathError<V, V::VCSError>> {
         let pointer = match version {
             Some(v) => VersionPointer::Version(v),
             None => VersionPointer::Default,
@@ -85,9 +93,10 @@ impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
             sym_type: S::new(),
             version_pointer: pointer,
         };
-        new.check_path_not_existent()?;
-        new.check_sym_type_compatibility()?;
-        new.check_version_compatibility()?;
+        let new = new
+            .check_path_not_existent()?
+            .check_sym_type_compatibility()?
+            .check_version_compatibility()?;
         Ok(new)
     }
 
@@ -98,7 +107,7 @@ impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
             sym_type: To::new(),
             version_pointer: self.version_pointer,
         };
-        new.check_sym_type_compatibility()?;
+        let new = new.check_sym_type_compatibility()?;
         Ok(new)
     }
 
@@ -106,35 +115,36 @@ impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
         self.try_convert_to().unwrap()
     }
 
-    fn check_path_not_existent(&self) -> Result<(), NodePath<ErrorState, V>> {
+    fn check_path_not_existent(self) -> Result<Self, NodePath<ErrorState, V>> {
         if &self.get_real_type() == &NodeType::NonExistent {
             Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::DoesNotExist))
         } else {
-            Ok(())
+            Ok(self)
         }
     }
 
-    fn check_sym_type_compatibility(&self) -> Result<(), NodePath<ErrorState, V>> {
+    fn check_sym_type_compatibility(self) -> Result<Self, NodePath<ErrorState, V>> {
         if !S::compatible().contains(&self.get_real_type()) {
+            let real_type = self.get_real_type();
             Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::InvalidSymType(
-                InvalidSymTypeError::new(S::compatible(), self.get_real_type())
+                InvalidSymTypeError::new(S::compatible(), real_type)
             )))
         } else {
-            Ok(())
+            Ok(self)
         }
     }
 
-    fn check_version_compatibility(&self) -> Result<(), NodePath<ErrorState, V>> {
-        match self.version_pointer {
-            VersionPointer::Default => Ok(()),
+    fn check_version_compatibility(self) -> Result<Self, VCSPathError<V, V::VCSError>> {
+        match &self.version_pointer {
+            VersionPointer::Default => Ok(self),
             VersionPointer::Version(v) => {
-                if !self.get_real_type().accepts_explicit_version() {
-                    Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotSupported))
+                if !&self.get_real_type().accepts_explicit_version() {
+                    Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotSupported).into())
                 }
-                else if !self.get_vcs().borrow().version_exists_on_path(&self.to_normalized_path(), &v) {
-                    Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotOnPath))
+                else if !self.get_vcs().version_exists_on_path(&self.to_normalized_path(), &v)? {
+                    Err(NodePath::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotOnPath).into())
                 } else {
-                    Ok(())
+                    Ok(self)
                 }
             }
         }
@@ -149,7 +159,7 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
 
     pub fn get_root(&self) -> &Rc<RefCell<Node>> { self.path.first().unwrap() }
 
-    pub fn get_vcs(&self) -> &Rc<RefCell<V>> {
+    pub fn get_vcs(&self) -> &V {
         &self.vcs
     }
 
@@ -164,7 +174,10 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
     pub fn has_children(&self) -> bool {
         self.get_node().borrow().has_children()
     }
+}
 
+/// Iterators
+impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
     pub fn iter_children_by_type<I: ValidNodeType>(&self) -> impl Iterator<Item = NodePath<I, V>> {
         self.get_node()
             .borrow()
@@ -194,9 +207,9 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
 /// Path pointer movement
 impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
     /// Moves path to a specific index of the node vector.
-    pub fn move_to_index<To: ValidNodeType>(self, index: usize) -> Result<NodePath<To, V>, InvalidSymTypeError> {
+    pub fn move_to_index<To: ValidNodeType>(self, index: usize) -> Result<NodePath<To, V>, VCSPathError<V, V::VCSError>> {
         let path = self.path[0..index + 1].to_vec();
-        NodePath::new(path, self.vcs)
+        Ok(NodePath::<To, V>::new(path, self.vcs, None)?)
     }
     
     /// Move path to another node.
@@ -212,7 +225,7 @@ impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
     pub fn move_to<To: ValidNodeType>(
         self,
         path: &impl ToNormalizedPath,
-    ) -> Result<NodePath<To, V>, NodePath<ErrorState, V>> {
+    ) -> Result<NodePath<To, V>, VCSPathError<V, V::VCSError>> {
         let path = path.to_normalized_path();
         let normalized_self = self.to_normalized_path();
         let version = path.get_version_appendix();
@@ -233,9 +246,9 @@ impl<S: ValidNodeType, V: VCS> NodePath<S, V> {
 
 /// Display and pretty printing
 impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
-    pub fn display_tree(&self, show_tags: bool) -> String {
-        self.get_node().borrow().display_tree(show_tags)
-    }
+    // pub fn display_tree(&self, show_tags: bool) -> String {
+    //     self.get_node().borrow().display_tree(show_tags)
+    // }
 
     pub fn formatted(&self, colored: bool) -> String {
         let path = self.to_normalized_path().strip_version();
@@ -247,7 +260,7 @@ impl<S: SymbolicNodeType, V: VCS> NodePath<S, V> {
     }
 }
 
-impl<T: ValidNodeType, V: VCS> ToNormalizedPath for NodePath<T, V> {
+impl<T: SymbolicNodeType, V: VCS> ToNormalizedPath for NodePath<T, V> {
     fn to_normalized_path(&self) -> NormalizedPath {
         let mut path = NormalizedPath::new();
         for p in self.path.iter() {

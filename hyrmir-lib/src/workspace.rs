@@ -1,32 +1,21 @@
 use crate::model::*;
 use crate::vcs::VCS;
-use std::cell::RefCell;
-use std::rc::Rc;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum CurrentPathError<V: VCS> {
-    #[error(transparent)]
-    WrongType(#[from] NodePathError),
-    #[error("CurrentPathError::VCS")]
-    VCS(#[source] V::VCSError),
-}
 
 pub struct Workspace<V: VCS> {
     virtual_root: NodePath<VirtualRoot, V>,
-    vcs: Rc<RefCell<V>>,
+    vcs: V,
 }
 
 /// Base implementation
 impl<V: VCS> Workspace<V> {
-    pub fn new(virtual_root: NodePath<VirtualRoot, V>, vcs: Rc<RefCell<V>>) -> Self {
+    pub fn new(virtual_root: NodePath<VirtualRoot, V>, vcs: V) -> Self {
         Self { virtual_root, vcs }
     }
 }
 
 /// VCS commands
 impl<V: VCS> Workspace<V> {
-    pub fn get_vcs(&self) -> &Rc<RefCell<V>> {
+    pub fn get_vcs(&self) -> &V {
         &self.vcs
     }
 
@@ -34,26 +23,28 @@ impl<V: VCS> Workspace<V> {
         &self.virtual_root
     }
 
-    pub fn get_current_path<T: IsConcrete>(&self) -> Result<NodePath<T, V>, CurrentPathError<V>> {
-        let current = self.get_vcs().borrow().get_current_path()?;
-        self.get_virtual_root().clone().move_to::<T>(&current)?.into()
+    pub fn get_current_path<T: IsConcrete>(&self) -> Result<NodePath<T, V>, VCSPathError<V, V::VCSError>> {
+        let current = self.get_vcs().get_current_path()?;
+        let root = self.get_virtual_root().clone();
+        Ok(root.move_to::<T>(&current)?)
     }
 
     pub fn format_status_msg(
         &self,
-        current_path_message: String,
-        extra_message: String,
+        current_path_message: impl Into<String>,
+        pre_status: impl Into<String>,
+        post_status: impl Into<String>,
         colored: bool,
     ) -> Result<String, V::VCSError> {
-        self
+        let status =self
             .get_vcs()
-            .borrow()
             .format_status_message(
-                current_path_message,
-                extra_message,
+                current_path_message.into(),
+                pre_status.into(),
+                post_status.into(),
                 colored,
-            )?
-            .into()
+            )?;
+        Ok(status)
     }
 
     pub fn commit(&self) { todo!() }

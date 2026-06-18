@@ -1,9 +1,9 @@
-use crate::cli::ArgHelper;
-use crate::cli::completion::RelativePathCompleter;
-use crate::core::model::NormalizedPath;
+use crate::arg::ArgHelper;
+use crate::completion::RelativePathCompleter;
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::ops::Range;
+use hyrmir_lib::model::NormalizedPath;
 
 #[derive(Debug, Clone)]
 pub struct CompletionHelper<'a> {

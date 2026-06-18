@@ -6,9 +6,18 @@ use hyrmir_lib::model::*;
 use hyrmir_lib::repository::Repository;
 use hyrmir_lib::vcs::VCS;
 use std::error::Error;
+use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
-pub struct StatusCommand<V: VCS>;
+pub struct StatusCommand<V: VCS + 'static> {
+    _phantom: PhantomData<V>
+}
+
+impl<V: VCS> StatusCommand<V> {
+    pub fn new() -> Self {
+        Self { _phantom: PhantomData }
+    }
+}
 
 impl<V: VCS> CommandDefinition<V> for StatusCommand<V> {
     fn build_command(&self) -> Command {
@@ -26,8 +35,13 @@ impl<V: VCS> CommandInterface<V> for StatusCommand<V> {
         _context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         let workspace = repository.get_workspace()?;
-        // let status = workspace.format_status_msg(true);
-        // logger.info(status);
+        let status = workspace.format_status_msg(
+            "Cool path",
+            "Pre Status",
+            "Post status",
+            true
+        )?;
+        logger.info(status);
         Ok(())
     }
 }

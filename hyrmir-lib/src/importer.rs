@@ -2,12 +2,12 @@
 // use serde::Deserialize;
 // use serde_json::Value;
 // use std::error::Error;
-// 
-// #[derive(Debug, Clone)]
-// pub enum ImportFormat {
-//     Waffle,
-//     UVL,
-// }
+
+#[derive(Debug, Clone)]
+pub enum ImportFormat {
+    Waffle,
+    UVL,
+}
 // 
 // impl<S: Into<String>> From<S> for ImportFormat {
 //     fn from(value: S) -> Self {

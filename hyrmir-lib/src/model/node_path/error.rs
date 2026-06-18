@@ -49,7 +49,7 @@ impl SymbolicNodeType for ErrorState {}
 impl<V: VCS> NodePath<ErrorState, V> {
     pub(crate) fn new(
         path: Vec<Rc<RefCell<Node>>>,
-        vcs: Rc<RefCell<V>>,
+        vcs: V,
         version: VersionPointer,
         error: NodePathError,
     ) -> Self {

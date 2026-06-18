@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 hyrmir-lib = { path="../hyrmir-lib" }
 hyrmir-cli = { path="../hyrmir-cli" }
+thiserror = "2.0.18"
+log = "0"

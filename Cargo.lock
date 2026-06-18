@@ -530,6 +530,8 @@ version = "0.1.0"
 dependencies = [
  "hyrmir-cli",
  "hyrmir-lib",
+ "log",
+ "thiserror",
 ]
 
 [[package]]

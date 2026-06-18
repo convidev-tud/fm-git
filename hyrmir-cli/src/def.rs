@@ -66,7 +66,7 @@ impl<V: VCS> CommandMap<V> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandContext<'a, V: VCS> {
     current_command: &'a CommandMap<V>,
     root_command: &'a CommandMap<V>,
@@ -75,7 +75,7 @@ pub struct CommandContext<'a, V: VCS> {
 }
 
 impl<'a, V: VCS> CommandContext<'a, V> {
-    pub fn new<'a>(
+    pub fn new(
         current_command: &'a CommandMap<V>,
         root_command: &'a CommandMap<V>,
         arg_helper: ArgHelper,
@@ -133,3 +133,5 @@ pub trait CommandInterface<V: VCS>: Debug {
 }
 
 pub trait CommandImpl<V: VCS>: CommandDefinition<V> + CommandInterface<V> {}
+
+impl<V: VCS, T: CommandDefinition<V> + CommandInterface<V>> CommandImpl<V> for T {}

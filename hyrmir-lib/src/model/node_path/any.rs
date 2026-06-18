@@ -4,11 +4,15 @@ use crate::model::node_path::*;
 /// Placeholder if the exact node type is unknown or does not matter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct AnyNode<C: NodeClassification> {
-    phantom_data: PhantomData<C>
+    _phantom: PhantomData<C>
 }
 
 impl<C: NodeClassification> ValidNodeType for AnyNode<C> {
     type Classification = C;
+
+    fn new() -> Self {
+        Self { _phantom: PhantomData }
+    }
 
     fn compatible() -> Vec<NodeType> {
         let mut base = vec![

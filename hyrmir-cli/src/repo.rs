@@ -1,32 +1,33 @@
+use crate::arg::ArgHelper;
+use crate::commands::*;
+use crate::completion::CompletionHelper;
 use crate::logging::CommandLogger;
 use crate::*;
-use crate::commands::*;
 use clap::{Arg, ArgMatches, Command};
-use log::LevelFilter;
-use std::error::Error;
-use std::ffi::OsString;
 use hyrmir_lib::importer::ImportFormat;
 use hyrmir_lib::repository::Repository;
 use hyrmir_lib::vcs::VCS;
-use crate::arg::ArgHelper;
-use crate::completion::CompletionHelper;
+use log::LevelFilter;
+use std::error::Error;
+use std::marker::PhantomData;
 
 const IMPORT_FORMAT: &str = "import_format";
 
 #[derive(Clone, Debug)]
 pub struct RootCommand<V: VCS> {
     name: String,
+    _phantom: PhantomData<V>,
 }
 
 impl<V: VCS> RootCommand<V> {
     pub fn new(name: String) -> Self {
-        Self { name }
+        Self { name, _phantom: PhantomData }
     }
 }
 
-impl<V: VCS> CommandDefinition<V> for RootCommand<V> {
+impl<V: VCS + 'static> CommandDefinition<V> for RootCommand<V> {
     fn build_command(&self) -> Command {
-        Command::new(self.name.as_str())
+        Command::new("tangl")
             .arg_required_else_help(true)
             .arg(
                 Arg::new(IMPORT_FORMAT)
@@ -36,9 +37,10 @@ impl<V: VCS> CommandDefinition<V> for RootCommand<V> {
                     .help("Specify file import format for all commands"),
             )
     }
+
     fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl<V>>> {
         vec![
-            Box::new(StatusCommand),
+            Box::new(StatusCommand::new()),
             // Box::new(LSCommand),
             // Box::new(DeriveCommand),
             // Box::new(CheckCommand),
@@ -93,24 +95,18 @@ pub enum ArgSource<'a> {
 
 pub struct EntryPoint<V: VCS> {
     command_map: CommandMap<V>,
-    repository: Repository<V>,
-    logger: CommandLogger,
 }
-impl<V: VCS> EntryPoint<V> {
-    pub fn new(
-        name: &str,
-        vcs: V,
-        logger: CommandLogger,
-    ) -> Self {
+impl<V: VCS + 'static> EntryPoint<V> {
+    pub fn new(name: &str) -> Self {
         Self {
             command_map: CommandMap::new(Box::new(RootCommand::new(name.to_string()))),
-            repository: Repository::new(vcs),
-            logger,
         }
     }
 
     fn execute_recursive<'a>(
-        &mut self,
+        &self,
+        repository: &mut Repository<V>,
+        logger: &mut CommandLogger,
         context: CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         let arg_helper = context.get_arg_helper();
@@ -125,7 +121,7 @@ impl<V: VCS> EntryPoint<V> {
         // }
         log::set_max_level(LevelFilter::Info);
         let current = context.get_current_command();
-        match current.command.run_command(&mut self.repository, &mut self.logger, &context) {
+        match current.command.run_command(repository, logger, &context) {
             Ok(_) => {}
             Err(err) => return Err(err),
         };
@@ -138,7 +134,7 @@ impl<V: VCS> EntryPoint<V> {
                         ArgHelper::new(sub_args.clone()),
                         context.get_import_format().clone(),
                     );
-                    self.execute_recursive(new_context)
+                    self.execute_recursive(repository, logger, new_context)
                 } else {
                     Ok(())
                 }
@@ -147,11 +143,11 @@ impl<V: VCS> EntryPoint<V> {
         }
     }
 
-    pub fn execute(&mut self, arg_source: ArgSource) {
+    pub fn execute(&self, repository: &mut Repository<V>, logger: &mut CommandLogger, arg_source: ArgSource) {
         let context = self.build_context(arg_source, ImportFormat::Waffle);
-        match self.execute_recursive(context) {
+        match self.execute_recursive(repository, logger, context) {
             Ok(_) => {}
-            Err(err) => { self.logger.error(err); }
+            Err(err) => { logger.error(err.to_string()); }
         }
     }
 

@@ -5,13 +5,28 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, RwLock};
-use termtree::Tree;
 use thiserror::Error;
 
 pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
 pub const TEMPORARY: &str = "tmp";
+
+#[derive(Error, Debug)]
+pub struct MalformedModelError {
+    reason: String,
+}
+
+impl MalformedModelError {
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self { reason: reason.into() }
+    }
+}
+
+impl Display for MalformedModelError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRootMetadata {
@@ -34,26 +49,32 @@ impl VirtualRootMetadata {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeType {
+    // Valid types
     VirtualRoot,
     Area(bool),
     FeatureRoot,
     ProductRoot,
     Feature(bool),
     Product(bool),
+
+    // Error types
+    Malformed,
     NonExistent,
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
+    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, MalformedModelError> {
         match self {
             Self::VirtualRoot => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
-                _ => Err(InvalidSymTypeError::new()),
+                _ => Err(MalformedModelError::new("Expected 'feature' or 'product'")),
             },
             Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
             Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
+            Self::Malformed => Ok(Self::Malformed),
+            Self::NonExistent => Ok(Self::NonExistent),
         }
     }
 
@@ -73,20 +94,19 @@ impl NodeType {
             Self::Feature(_) => name.purple(),
             Self::ProductRoot => name.truecolor(231, 100, 18),
             Self::Product(_) => name.truecolor(231, 100, 18),
-            _ => name,
+            _ => name.red(),
         }
     }
 
     pub fn get_type_name(&self) -> String {
         let name: &str = match self {
             Self::VirtualRoot => "virtual root",
-            Self::Area => "area",
+            Self::Area(_) => "area",
             Self::FeatureRoot => "feature root",
             Self::ProductRoot => "product root",
-            Self::Feature => "feature",
-            Self::Product => "product",
-            Self::Temporary => "temporary",
-            Self::Undefined => "",
+            Self::Feature(_) => "feature",
+            Self::Product(_) => "product",
+            _ => "bad"
         };
         name.to_string()
     }
@@ -94,13 +114,12 @@ impl NodeType {
     pub fn get_short_type_name(&self) -> String {
         let name: &str = match self {
             Self::VirtualRoot => "vr",
-            Self::Area => "a",
+            Self::Area(_) => "a",
             Self::FeatureRoot => "fr",
             Self::ProductRoot => "pr",
-            Self::Feature => "f",
-            Self::Product => "p",
-            Self::Temporary => "temp",
-            Self::Undefined => "",
+            Self::Feature(_) => "f",
+            Self::Product(_) => "p",
+            _ => "b"
         };
         name.to_string()
     }
@@ -139,48 +158,48 @@ impl Node {
         self.node_type = node_type;
     }
 
-    fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
-        let mut formatted = ColoredString::from(self.name.clone());
-        if self.branch.has_branch() {
-            formatted = formatted.blue()
-        }
-        let type_display = match self.node_type {
-            NodeType::AbstractFeature | NodeType::AbstractProduct => None,
-            _ => Some(self.node_type.get_formatted_short_name()),
-        };
-        let content = if let Some(type_display) = type_display {
-            format!("{formatted} [{type_display}]")
-        } else {
-            formatted.to_string()
-        };
-        let mut tree = Tree::<String>::new(content);
-        let children = self.children.borrow();
-        let mut sorted_children = children.iter().collect::<Vec<_>>();
-        sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
-        sorted_children.reverse();
-        for (_, child) in sorted_children {
-            tree.leaves
-                .push(child.borrow().build_display_tree(show_tags));
-        }
-        tree
-    }
+    // fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
+    //     let mut formatted = ColoredString::from(self.name.clone());
+    //     if self.branch.has_branch() {
+    //         formatted = formatted.blue()
+    //     }
+    //     let type_display = match self.node_type {
+    //         NodeType::AbstractFeature | NodeType::AbstractProduct => None,
+    //         _ => Some(self.node_type.get_formatted_short_name()),
+    //     };
+    //     let content = if let Some(type_display) = type_display {
+    //         format!("{formatted} [{type_display}]")
+    //     } else {
+    //         formatted.to_string()
+    //     };
+    //     let mut tree = Tree::<String>::new(content);
+    //     let children = self.children.borrow();
+    //     let mut sorted_children = children.iter().collect::<Vec<_>>();
+    //     sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
+    //     sorted_children.reverse();
+    //     for (_, child) in sorted_children {
+    //         tree.leaves
+    //             .push(child.borrow().build_display_tree(show_tags));
+    //     }
+    //     tree
+    // }
 
-    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
+    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, MalformedModelError> {
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
+    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, MalformedModelError> {
         let node_type = self.decide_child_type(name.as_str(), concrete)?;
         // let child = ;
         let child = Node::new(
             name.clone(),
             node_type.clone(),
         );
-        self.children.borrow_mut().insert(name, Rc::new(RefCell::new(child)));
+        self.children.insert(name, Rc::new(RefCell::new(child)));
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
+    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, MalformedModelError> {
         let new_type = self.decide_child_type(name.as_str(), concrete)?;
         let child = self.get_child(&name).unwrap();
         child.borrow_mut().update_type(new_type.clone());
@@ -196,19 +215,18 @@ impl Node {
     }
 
     pub fn get_child<S: Into<String>>(&self, name: S) -> Option<Rc<RefCell<Node>>> {
-        Some(self.children.borrow().get(&name.into())?.clone())
+        Some(self.children.get(&name.into())?.clone())
     }
 
     pub fn has_children(&self) -> bool {
-        !self.children.borrow().is_empty()
+        !self.children.is_empty()
     }
 
     pub fn get_children(&self) -> Vec<Rc<RefCell<Node>>> {
-        let nodes = self.children.borrow();
-        nodes.values().cloned().collect()
+        self.children.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, InvalidSymTypeError> {
+    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, MalformedModelError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {
@@ -235,7 +253,7 @@ impl Node {
         }
     }
 
-    pub fn display_tree(&self, show_tags: bool) -> String {
-        self.build_display_tree(show_tags).to_string()
-    }
+    // pub fn display_tree(&self, show_tags: bool) -> String {
+    //     self.build_display_tree(show_tags).to_string()
+    // }
 }

@@ -8,6 +8,10 @@ pub struct FeatureRoot;
 impl ValidNodeType for FeatureRoot {
     type Classification = Abstract;
 
+    fn new() -> Self {
+        Self
+    }
+
     fn compatible() -> Vec<NodeType> {
         todo!()
     }
@@ -23,6 +27,10 @@ pub struct Feature<C: NodeClassification> {
 
 impl<C: NodeClassification> ValidNodeType for Feature<C> {
     type Classification = C;
+
+    fn new() -> Self {
+        Self { _phantom: PhantomData }
+    }
 
     fn compatible() -> Vec<NodeType> {
         todo!()

@@ -9,6 +9,10 @@ pub struct ProductRoot;
 impl ValidNodeType for ProductRoot {
     type Classification = Abstract;
 
+    fn new() -> Self {
+        Self
+    }
+
     fn compatible() -> Vec<NodeType> {
         todo!()
     }
@@ -24,6 +28,10 @@ pub struct Product<C: NodeClassification> {
 
 impl<C: NodeClassification> ValidNodeType for Product<C> {
     type Classification = C;
+
+    fn new() -> Self {
+        Self { phantom_data: PhantomData }
+    }
 
     fn compatible() -> Vec<NodeType> {
         match C::requires_artifact() {

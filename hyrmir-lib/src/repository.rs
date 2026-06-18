@@ -1,32 +1,31 @@
-use crate::model::InvalidSymTypeError;
 use crate::model::*;
-use crate::vcs::VCS;
+use crate::vcs::{VCSError, VCS};
+use crate::workspace::Workspace;
 use std::cell::RefCell;
+use std::error::Error;
 use std::ops::Deref;
 use std::rc::Rc;
 use thiserror::Error;
-use crate::workspace::Workspace;
 
 #[derive(Error, Debug)]
-pub enum ScanError<V: VCS> {
+pub enum ScanError<V: VCSError> {
     #[error(transparent)]
-    WrongType(#[from] InvalidSymTypeError),
-    #[error("ScanError::VCS")]
-    VCS(#[source] V::VCSError),
+    MalformedModel(#[from] MalformedModelError),
+    #[error(transparent)]
+    VCS(#[from] V),
 }
 
 #[derive(Debug)]
 pub struct Repository<V: VCS> {
     virtual_root: Rc<RefCell<Node>>,
-    vcs: Rc<RefCell<V>>,
+    vcs: V,
     repo_scanned: RefCell<bool>,
 }
 
 impl<V: VCS> Repository<V> {
-    fn scan_repository(&self) -> Result<(), ScanError<V>> {
+    fn scan_repository(&self) -> Result<(), ScanError<V::VCSError>> {
         let mut root = self.virtual_root.borrow_mut();
-        let vcs = self.vcs.borrow();
-        for path in vcs.iter_concrete_paths() {
+        for path in self.get_vcs().iter_concrete_paths() {
             let unwrapped = path?;
             let p = if unwrapped.is_absolute() {
                 unwrapped.strip_n_left(1)
@@ -44,21 +43,25 @@ impl<V: VCS> Repository<V> {
         );
         Self {
             virtual_root: Rc::new(RefCell::new(root)),
-            vcs: Rc::new(RefCell::new(vcs)),
+            vcs,
             repo_scanned: RefCell::new(false),
         }
     }
 
-    pub fn get_virtual_root(&self) -> Result<NodePath<VirtualRoot, V>, ScanError<V>> {
-        let scanned = self.repo_scanned.borrow().deref();
+    pub fn get_vcs(&self) -> &V {
+        &self.vcs
+    }
+
+    pub fn get_virtual_root(&self) -> Result<NodePath<VirtualRoot, V>, ScanError<V::VCSError>> {
+        let scanned = self.repo_scanned.borrow().clone();
         if !scanned {
             self.scan_repository()?
         }
-        NodePath::new(vec![self.virtual_root.clone()], self.vcs.clone())?.into()
+        Ok(NodePath::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], self.vcs.clone(), None).unwrap())
     }
     
-    pub fn get_workspace(&self) -> Result<Workspace<V>, ScanError<V>> {
+    pub fn get_workspace(&self) -> Result<Workspace<V>, ScanError<V::VCSError>> {
         let root = self.get_virtual_root()?;
-        Workspace::new(root, self.vcs.clone()).into()
+        Ok(Workspace::new(root, self.vcs.clone()))
     }
 }
