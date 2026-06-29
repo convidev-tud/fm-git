@@ -1,9 +1,7 @@
-use std::cell::RefCell;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
-use std::rc::Rc;
 
 const PATH_SEPARATOR: char = '/';
 const VERSION_SEPARATOR: char = ':';

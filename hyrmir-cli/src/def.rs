@@ -3,7 +3,7 @@ use crate::completion::CompletionHelper;
 use crate::logging::CommandLogger;
 use clap::{ArgMatches, Command};
 use hyrmir_lib::importer::ImportFormat;
-use hyrmir_lib::repository::Repository;
+use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
 use std::error::Error;
 use std::fmt::Debug;
@@ -116,7 +116,7 @@ pub trait CommandDefinition<V: VCS>: Debug {
 pub trait CommandInterface<V: VCS>: Debug {
     fn run_command(
         &self,
-        _repository: &mut Repository<V>,
+        _loader: &mut RepositoryLoader<V>,
         _logger: &mut CommandLogger,
         _context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
@@ -124,7 +124,7 @@ pub trait CommandInterface<V: VCS>: Debug {
     }
     fn shell_complete(
         &self,
-        _repository: &mut Repository<V>,
+        _loader: &mut RepositoryLoader<V>,
         _completion_helper: CompletionHelper,
         _context: &CommandContext<V>,
     ) -> Result<Vec<String>, Box<dyn Error>> {

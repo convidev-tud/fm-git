@@ -1,7 +1,7 @@
 use crate::def::*;
 use crate::CommandLogger;
 use clap::Command;
-use hyrmir_lib::model::node_path::*;
+use hyrmir_lib::model::tree_view::*;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::Repository;
 use hyrmir_lib::vcs::VCS;

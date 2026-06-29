@@ -1,32 +1,27 @@
 use crate::model::*;
+use crate::repository::Repository;
 use crate::vcs::VCS;
 
-pub struct Workspace<V: VCS> {
-    virtual_root: NodePath<VirtualRoot, V>,
-    vcs: V,
+pub struct Workspace<'a, V: VCS> {
+    repository: &'a Repository<V>,
 }
 
 /// Base implementation
-impl<V: VCS> Workspace<V> {
-    pub fn new(virtual_root: NodePath<VirtualRoot, V>, vcs: V) -> Self {
-        Self { virtual_root, vcs }
+impl<'a, V: VCS> Workspace<'a, V> {
+    pub fn new(repository: &'a Repository<V>) -> Self {
+        Self { repository }
     }
 }
 
 /// VCS commands
-impl<V: VCS> Workspace<V> {
+impl<'a, V: VCS> Workspace<'a, V> {
     pub fn get_vcs(&self) -> &V {
-        &self.vcs
+        &self.repository.get_vcs()
     }
 
-    pub fn get_virtual_root(&self) -> &NodePath<VirtualRoot, V> {
-        &self.virtual_root
-    }
-
-    pub fn get_current_path<T: IsConcrete>(&self) -> Result<NodePath<T, V>, VCSPathError<V, V::VCSError>> {
-        let current = self.get_vcs().get_current_path()?;
-        let root = self.get_virtual_root().clone();
-        Ok(root.move_to::<T>(&current)?)
+    pub fn get_current_path_view<T: IsConcrete>(&self) -> Result<TreeView<T, V>, TreeViewError<V::VersionId>> {
+        let current = self.get_vcs().get_current_path()?.get_path();
+        Ok(self.repository.get_view(&current)?)
     }
 
     pub fn format_status_msg(
@@ -49,5 +44,5 @@ impl<V: VCS> Workspace<V> {
 
     pub fn commit(&self) { todo!() }
     
-    pub fn view(&self) { todo!() }
+    pub fn switch_to(&self) { todo!() }
 }

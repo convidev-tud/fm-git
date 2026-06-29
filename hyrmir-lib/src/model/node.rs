@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
 use thiserror::Error;
+use crate::vcs::VersionId;
 
 pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
@@ -136,26 +137,35 @@ impl NodeType {
 }
 
 #[derive(Debug)]
-pub struct Node {
+pub struct Node<V: VersionId> {
     name: String,
     node_type: NodeType,
-    children: HashMap<String, Rc<RefCell<Node>>>,
+    head: Option<V>,
+    known_versions: HashMap<String, V>,
+    children: HashMap<String, Rc<RefCell<Node<V>>>>,
 }
 
-impl Node {
+impl<V: VersionId> Node<V> {
     pub fn new (
-        name: String,
+        name: impl Into<String>,
         node_type: NodeType,
+        head: Option<V>,
     ) -> Self {
         Self {
-            name,
+            name: name.into(),
             node_type,
+            head,
+            known_versions: HashMap::new(),
             children: HashMap::new(),
         }
     }
 
     pub(crate) fn update_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
+    }
+
+    pub(crate) fn update_head(&mut self, head: Option<V>) {
+        self.head = head;
     }
 
     // fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
@@ -184,25 +194,40 @@ impl Node {
     //     tree
     // }
 
-    fn decide_child_type(&self, name: &str, concrete: bool) -> Result<NodeType, MalformedModelError> {
+    fn decide_child_type(&self, name: &str, head: &Option<V>) -> Result<NodeType, MalformedModelError> {
+        let concrete = match head {
+            Some(_) => true,
+            None => false,
+        };
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, concrete: bool) -> Result<NodeType, MalformedModelError> {
-        let node_type = self.decide_child_type(name.as_str(), concrete)?;
+    fn add_child(&mut self, name: String, head: Option<V>) -> Result<NodeType, MalformedModelError> {
+        let node_type = self.decide_child_type(name.as_str(), &head)?;
         // let child = ;
         let child = Node::new(
             name.clone(),
             node_type.clone(),
+            head,
         );
         self.children.insert(name, Rc::new(RefCell::new(child)));
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, concrete: bool) -> Result<NodeType, MalformedModelError> {
-        let new_type = self.decide_child_type(name.as_str(), concrete)?;
+    pub fn add_known_version(&mut self, version: V) {
+        self.known_versions.insert(version.get_full_id().clone(), version);
+    }
+
+    pub fn remove_known_version(&mut self, version: &V) {
+        self.known_versions.remove(version.get_full_id());
+    }
+
+    fn update_child(&self, name: String, head: Option<V>) -> Result<NodeType, MalformedModelError> {
+        let new_type = self.decide_child_type(name.as_str(), &head)?;
         let child = self.get_child(&name).unwrap();
-        child.borrow_mut().update_type(new_type.clone());
+        let mut child = child.borrow_mut();
+        child.update_type(new_type.clone());
+        child.update_head(head);
         Ok(new_type)
     }
 
@@ -214,26 +239,26 @@ impl Node {
         &self.node_type
     }
 
-    pub fn get_child<S: Into<String>>(&self, name: S) -> Option<Rc<RefCell<Node>>> {
-        Some(self.children.get(&name.into())?.clone())
+    pub fn get_child(&self, name: &str) -> Option<Rc<RefCell<Node<V>>>> {
+        Some(self.children.get(name)?.clone())
     }
 
     pub fn has_children(&self) -> bool {
         !self.children.is_empty()
     }
 
-    pub fn get_children(&self) -> Vec<Rc<RefCell<Node>>> {
+    pub fn get_children(&self) -> Vec<Rc<RefCell<Node<V>>>> {
         self.children.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, concrete: bool) -> Result<NodeType, MalformedModelError> {
+    pub fn insert_path(&mut self, path: &NormalizedPath, head: Option<V>) -> Result<NodeType, MalformedModelError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {
                 let name = path.get(0).unwrap().to_string();
                 let new_type = match self.get_child(&name) {
-                    Some(_) => self.update_child(name, concrete),
-                    None => self.add_child(name, concrete),
+                    Some(_) => self.update_child(name, head),
+                    None => self.add_child(name, head),
                 };
                 new_type
             }
@@ -242,13 +267,13 @@ impl Node {
                 let next_child = match self.get_child(&name) {
                     Some(node) => node,
                     None => {
-                        self.add_child(name.clone(), false)?;
+                        self.add_child(name.clone(), None)?;
                         self.get_child(&name).unwrap()
                     }
                 };
                 next_child
                     .borrow_mut()
-                    .insert_path(&path.strip_n_left(1), concrete)
+                    .insert_path(&path.strip_n_left(1), head)
             }
         }
     }

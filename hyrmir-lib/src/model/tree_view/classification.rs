@@ -1,13 +1,13 @@
-use crate::model::{NodeClassification, NodePath, NormalizedPath, ValidNodeType};
+use crate::model::{NodeClassification, TreeView, NormalizedPath, SymbolicNodeType};
 use crate::vcs::VCS;
 
-/// Defines a compatible [ValidNodeType] as concrete (with associated artifact).
+/// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
 ///
 /// The trait [IsConcrete] is automatically implemented.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Concrete;
 
-/// Defines a [ValidNodeType] as abstract (without associated artifact).
+/// Defines a [SymbolicNodeType] as abstract (without associated artifact).
 ///
 /// The trait [IsAbstract] is automatically implemented if this is used as parameter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -17,17 +17,17 @@ pub struct Abstract;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct AnyCls;
 
-/// Denotes that a [ValidNodeType] is concrete (with associated artifact).
+/// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
 ///
 /// Is automatically implemented if the type uses [Concrete] as parameter.
-pub trait IsConcrete: ValidNodeType {}
-impl<T: ValidNodeType<Classification=Concrete>> IsConcrete for T {}
+pub trait IsConcrete: SymbolicNodeType {}
+impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {}
 
-/// Denotes that a [ValidNodeType] is abstract (without associated artifact).
+/// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
 ///
 /// Is automatically implemented if [Abstract] is used as parameter.
 pub trait IsAbstract {}
-impl<T: ValidNodeType<Classification=Abstract>> IsAbstract for T {}
+impl<T: SymbolicNodeType<Classification=Abstract>> IsAbstract for T {}
 
 impl NodeClassification for Concrete {
     fn requires_artifact() -> Option<bool> {

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Output};
 use std::rc::Rc;
 use hyrmir_lib::model::NormalizedPath;
-use hyrmir_lib::vcs::{VCSError, VersionObject, VCS};
+use hyrmir_lib::vcs::{VCSError, VersionId, VCS};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -38,7 +38,7 @@ impl VCSError for GitError {}
 #[derive(Debug)]
 pub struct Commit;
 
-impl VersionObject for Commit {
+impl VersionId for Commit {
     type VersionError = GitError;
 
     fn get_metadata(&self, key: String) -> Result<String, Self::VersionError> {
@@ -146,13 +146,13 @@ impl Git {
 
 impl VCS for Git {
     type VCSError = GitError;
-    type VersionObject = Commit;
+    type VersionId = Commit;
 
     fn get_current_path(&self) -> Result<NormalizedPath, Self::VCSError> {
         todo!()
     }
 
-    fn get_version(&self, version: &String) -> Result<Self::VersionObject, Self::VCSError> {
+    fn get_version(&self, version: &String) -> Result<Self::VersionId, Self::VCSError> {
         todo!()
     }
 
@@ -164,7 +164,7 @@ impl VCS for Git {
         vec![].into_iter()
     }
 
-    fn iter_versions(&self, path: &NormalizedPath) -> impl Iterator<Item=Result<Self::VersionObject, Self::VCSError>> {
+    fn iter_versions(&self, path: &NormalizedPath) -> impl Iterator<Item=Result<Self::VersionId, Self::VCSError>> {
         vec![].into_iter()
     }
 

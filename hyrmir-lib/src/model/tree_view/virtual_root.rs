@@ -1,4 +1,4 @@
-use crate::model::node_path::*;
+use crate::model::tree_view::*;
 use crate::model::{NodeType, NormalizedPath};
 use crate::vcs::VCS;
 
@@ -6,7 +6,7 @@ use crate::vcs::VCS;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRoot;
 
-impl ValidNodeType for VirtualRoot {
+impl SymbolicNodeType for VirtualRoot {
     type Classification = Abstract;
 
     fn new() -> Self {
@@ -19,11 +19,11 @@ impl ValidNodeType for VirtualRoot {
 }
 
 /// Reachability for virtual root
-impl<V: VCS> NodePath<VirtualRoot, V> {
+impl<'a, V: VCS> TreeView<'a, VirtualRoot, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
         area: &NormalizedPath
-    ) -> Result<NodePath<Area<C>, V>, VCSPathError<V, V::VCSError>> {
+    ) -> Result<TreeView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
         self.move_to(area)
     }
 }

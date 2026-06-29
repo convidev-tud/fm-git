@@ -8,17 +8,17 @@
 //     feature: NormalizedPath,
 //     context: &mut CommandContext,
 // ) -> Result<(), Box<dyn Error>> {
-//     let node_path = context.git.assert_current_node_path::<AnyGitObject>()?;
-//     let current_path = if let Some(path) = node_path.try_convert_to::<Feature>() {
+//     let tree_view = context.git.assert_current_node_path::<AnyGitObject>()?;
+//     let current_path = if let Some(path) = tree_view.try_convert_to::<Feature>() {
 //         path.to_normalized_path()
-//     } else if let Some(path) = node_path.as_any_type().try_convert_to::<ConcreteArea>() {
+//     } else if let Some(path) = tree_view.as_any_type().try_convert_to::<ConcreteArea>() {
 //         path.get_path_to_feature_root()
 //     } else {
 //         return Err(Box::new(CommandError::new(
 //             "Cannot create feature: Current branch is not a feature or area branch",
 //         )));
 //     };
-//     drop(node_path);
+//     drop(tree_view);
 //     let target_path = current_path + feature;
 //     let result = context.git.create_branch::<Feature>(&target_path)?;
 //     context.logger.info(format!(

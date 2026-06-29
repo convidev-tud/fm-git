@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
-use crate::model::node_path::*;
+use crate::model::tree_view::*;
 use crate::model::NodeType;
 
 /// Marker for the product root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ProductRoot;
 
-impl ValidNodeType for ProductRoot {
+impl SymbolicNodeType for ProductRoot {
     type Classification = Abstract;
 
     fn new() -> Self {
@@ -26,7 +26,7 @@ pub struct Product<C: NodeClassification> {
     phantom_data: PhantomData<C>,
 }
 
-impl<C: NodeClassification> ValidNodeType for Product<C> {
+impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;
 
     fn new() -> Self {

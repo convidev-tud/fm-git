@@ -1,49 +1,87 @@
 use crate::model::*;
-use crate::vcs::{VCSError, VCS};
+use crate::vcs::{VCSError, VersionId, VCS};
 use crate::workspace::Workspace;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ScanError<V: VCSError> {
+pub enum MalformedModelVCSError<VE: VCSError> {
     #[error(transparent)]
     MalformedModel(#[from] MalformedModelError),
     #[error(transparent)]
-    VCS(#[from] V),
+    VCS(#[from] VE),
+}
+
+type ScanError<VE: VCSError> = MalformedModelVCSError<VE>;
+
+pub struct RepositoryLoader<V: VCS> {
+    repository: Repository<V>
+}
+
+impl<V: VCS> RepositoryLoader<V> {
+    pub fn new(repository: Repository<V>) -> Self {
+        Self { repository }
+    }
+
+    pub fn load_repo(&mut self) -> Result<&mut Repository<V>, ScanError<V::VCSError>> {
+        self.repository.scan_repository()?;
+        Ok(&mut self.repository)
+    }
 }
 
 #[derive(Debug)]
 pub struct Repository<V: VCS> {
-    virtual_root: Rc<RefCell<Node>>,
+    virtual_root: Rc<RefCell<Node<V::VersionId>>>,
+    id_to_path: HashMap<usize, NormalizedPath>,
     vcs: V,
-    repo_scanned: RefCell<bool>,
 }
 
 impl<V: VCS> Repository<V> {
-    fn scan_repository(&self) -> Result<(), ScanError<V::VCSError>> {
+    fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
         let mut root = self.virtual_root.borrow_mut();
-        for path_info in self.get_vcs().iter_concrete_paths() {
+        for path_info in self.vcs.iter_concrete_paths() {
             let unwrapped = path_info?;
             let path = unwrapped.get_path();
             let p = if path.is_absolute() {
                 &path.strip_n_left(1)
-            } else { path };
-            root.insert_path(p, true)?;
+            } else { 
+                panic!("Paths must be absolute when loaded into repository")
+            };
+            let id = unwrapped.get_id();
+            let version = unwrapped.get_version();
+            root.insert_path(p, Some(version.clone()))?;
+            self.id_to_path.insert(id, path.clone());
         }
-        self.repo_scanned.replace(true);
         Ok(())
     }
-
+    
+    fn get_node_vec(&self, path: &NormalizedPath) -> Vec<Rc<RefCell<Node<V::VersionId>>>> {
+        let no_version = path.strip_version();
+        let mut new_node_vec = vec![self.virtual_root.clone()];
+        for p in no_version.iter_segments(1, new_node_vec.len()) {
+            let current = new_node_vec.last().unwrap();
+            let node = if let Some(node) = current.borrow().get_child(p) {
+                node
+            } else {
+                Rc::new(RefCell::new(Node::new(p.clone(), NodeType::NonExistent, None)))
+            };
+            new_node_vec.push(node);
+        };
+        new_node_vec
+    }
+    
     pub fn new(vcs: V) -> Self {
         let root = Node::new(
             "".to_string(),
             NodeType::VirtualRoot,
+            None,
         );
         Self {
             virtual_root: Rc::new(RefCell::new(root)),
+            id_to_path: HashMap::new(),
             vcs,
-            repo_scanned: RefCell::new(false),
         }
     }
 
@@ -51,16 +89,35 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn get_virtual_root(&self) -> Result<NodePath<VirtualRoot, V>, ScanError<V::VCSError>> {
-        let scanned = self.repo_scanned.borrow().clone();
-        if !scanned {
-            self.scan_repository()?
-        }
-        Ok(NodePath::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], self.vcs.clone(), None).unwrap())
+    pub fn get_virtual_root_view(&self) -> TreeView<VirtualRoot, V> {
+        TreeView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
     
-    pub fn get_workspace(&self) -> Result<Workspace<V>, ScanError<V::VCSError>> {
-        let root = self.get_virtual_root()?;
-        Ok(Workspace::new(root, self.vcs.clone()))
+    pub fn get_view<S: SymbolicNodeType>(&self, path: &NormalizedPath) -> Result<TreeView<S, V>, TreeViewError<V::VersionId>> {
+        let node_vec = self.get_node_vec(path);
+        Ok(TreeView::new(node_vec, &self)?)
+    }
+    
+    pub fn get_path(&self, path: &NormalizedPath) -> Result<NodePath<V::VersionId>, V::VCSError> {
+        let node_vec = self.get_node_vec(path);
+        let version = match path.get_version_appendix() {
+            Some(version) => {
+                let version_id = if self.get_vcs().version_exists_on_path(&node_vec.to_normalized_path(), &version)? {
+                    let version_id = self.get_vcs().get_version(&version)?.unwrap();
+                    let mut node = node_vec.last().unwrap().borrow_mut();
+                    node.add_known_version(version_id.clone());
+                    version_id
+                } else {
+                    V::VersionId::new(version)
+                };
+                VersionPointer::Version(version_id)
+            },
+            None => VersionPointer::Default,
+        };
+        Ok(NodePath::new(node_vec, version))
+    }
+    
+    pub fn get_workspace(&self) -> Result<Workspace<V>, V::VCSError> {
+        Ok(Workspace::new(&self))
     }
 }

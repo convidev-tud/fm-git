@@ -26,8 +26,8 @@
 //             .get_argument_value::<String>("branch")
 //             .unwrap();
 //         let full_target = context.git.get_current_normalized_path()? + NormalizedPath::from(branch);
-//         let node_path = match context.git.assert_path::<AnyGitObject>(&full_target) {
-//             Ok(node_path) => node_path,
+//         let tree_view = match context.git.assert_path::<AnyGitObject>(&full_target) {
+//             Ok(tree_view) => tree_view,
 //             Err(error) => {
 //                 return match error {
 //                     PathAssertionError::InvalidPath(error) => match error {
@@ -48,17 +48,17 @@
 //             }
 //         };
 //         let current = context.git.get_current_normalized_path()?;
-//         let out = context.git.checkout(&node_path)?;
-//         if current == node_path.to_normalized_path() {
+//         let out = context.git.checkout(&tree_view)?;
+//         if current == tree_view.to_normalized_path() {
 //             context.logger.info(format!(
 //                 "Already on branch {}",
-//                 node_path.to_string().blue(),
+//                 tree_view.to_string().blue(),
 //             ));
 //         } else {
 //             context.logger.info(format!(
 //                 "Switched to {} branch {}",
-//                 node_path.get_real_type().get_formatted_name(),
-//                 node_path.to_string().blue(),
+//                 tree_view.get_real_type().get_formatted_name(),
+//                 tree_view.to_string().blue(),
 //             ));
 //         }
 //         let rest = out

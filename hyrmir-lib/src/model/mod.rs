@@ -1,9 +1,9 @@
 pub mod node;
 pub mod normalized_path;
 pub mod transformer;
-pub mod node_path;
+pub mod tree_view;
 
 pub use node::*;
-pub use node_path::*;
+pub use tree_view::*;
 pub use normalized_path::*;
 pub use transformer::*;
