@@ -42,10 +42,10 @@ impl<V: VCS + 'static> CommandDefinition<V> for RootCommand<V> {
     fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl<V>>> {
         vec![
             Box::new(StatusCommand::new()),
+            Box::new(ViewCommand::new()),
             // Box::new(LSCommand),
             // Box::new(DeriveCommand),
             // Box::new(CheckCommand),
-            // Box::new(CheckoutCommand),
             // Box::new(InitCommand),
             // Box::new(CloneCommand),
             // Box::new(FeatureCommand),

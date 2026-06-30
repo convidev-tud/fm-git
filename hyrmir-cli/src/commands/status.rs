@@ -1,5 +1,5 @@
-use crate::def::*;
 use crate::CommandLogger;
+use crate::def::*;
 use clap::Command;
 use hyrmir_lib::model::tree_view::*;
 use hyrmir_lib::model::*;
@@ -38,7 +38,13 @@ impl<V: VCS> CommandInterface<V> for StatusCommand<V> {
     ) -> Result<(), Box<dyn Error>> {
         let repo = loader.load_repo()?;
         let workspace = repo.get_workspace::<AnyNode<Concrete>>()?;
-        let status = workspace.format_status_msg("Cool path", "Pre Status", "Post status", true)?;
+        let current = workspace.get_current_view();
+        let current_msg = format!(
+            "Viewing {} ({})",
+            current.formatted(true),
+            current.get_real_type().get_formatted_name(),
+        );
+        let status = workspace.status(current_msg, "", "", true)?;
         logger.info(status);
         Ok(())
     }

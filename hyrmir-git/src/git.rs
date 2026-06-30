@@ -1,14 +1,12 @@
-use hyrmir_lib::model::NormalizedPath;
-use hyrmir_lib::vcs::{VCS, VCSError, VersionId};
-use std::cell::RefCell;
+use hyrmir_lib::model::{NormalizedPath, ToNormalizedPath};
+use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, VersionId};
+use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Output};
-use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[error("Git command error")]
 pub struct GitCommandError {
     git_output: String,
     msg: String,
@@ -25,6 +23,12 @@ impl GitCommandError {
     }
 }
 
+impl Display for GitCommandError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.git_output)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum GitError {
     #[error(transparent)]
@@ -35,14 +39,26 @@ pub enum GitError {
 
 impl VCSError for GitError {}
 
-#[derive(Debug)]
-pub struct Commit;
+#[derive(Debug, Clone)]
+pub struct Commit {
+    hash: String,
+}
 
 impl VersionId for Commit {
-    type VersionError = GitError;
+    fn new(id: impl Into<String>) -> Self {
+        Self { hash: id.into() }
+    }
 
-    fn get_metadata(&self, key: String) -> Result<String, Self::VersionError> {
-        todo!()
+    fn get_full_id(&self) -> String {
+        self.hash.clone()
+    }
+
+    fn get_printable_id(&self) -> String {
+        if &self.hash.len() > &8 {
+            self.hash[..8].to_string()
+        } else {
+            self.hash.clone()
+        }
     }
 }
 
@@ -83,7 +99,7 @@ fn status_to_result(status: ExitStatus, command: &Vec<&str>) -> Result<(), GitCo
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct GitCLI {
     path: GitPath,
     colored: bool,
@@ -132,14 +148,20 @@ impl GitCLI {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Git {
-    git_cli: Rc<RefCell<GitCLI>>,
+    git_cli: GitCLI,
 }
 
 impl Git {
-    pub fn new(git_cli: Rc<RefCell<GitCLI>>) -> Self {
-        Self { git_cli }
+    pub fn new() -> Self {
+        Self {
+            git_cli: GitCLI::new(GitPath::CurrentDirectory),
+        }
+    }
+
+    fn split_branch<'a>(&self, branch: &'a str) -> (&'a str, &'a str) {
+        branch.rsplit_once('.').unwrap()
     }
 }
 
@@ -147,11 +169,41 @@ impl VCS for Git {
     type VCSError = GitError;
     type VersionId = Commit;
 
-    fn get_current_path(&self) -> Result<NormalizedPath, Self::VCSError> {
-        todo!()
+    fn get_current_path(&self) -> Result<Option<NormalizedPath>, Self::VCSError> {
+        let command = vec!["branch", "--show-current"];
+        let out = self.git_cli.run_attached(&command)?;
+        let path_string = output_to_result(out, &command)?;
+        if !path_string.is_empty() {
+            let (path, _) = self.split_branch(&path_string);
+            Ok(Some(NormalizedPath::from_git_branch(path).as_absolute()))
+        } else {
+            Ok(None)
+        }
     }
 
-    fn get_version(&self, version: &String) -> Result<Self::VersionId, Self::VCSError> {
+    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError> {
+        let branch_command = vec!["branch", "--format=%(refname:short) %(objectname)"];
+        let branch_output = self.git_cli.run_attached(&branch_command)?;
+        let all_branches: Vec<PathInfo<Self::VersionId>> = String::from_utf8(branch_output.stdout)
+            .unwrap()
+            .trim()
+            .split("\n")
+            .map(|raw_string| {
+                let split = raw_string.split(" ").collect::<Vec<&str>>();
+                let path_segment = split[0].to_string();
+                let hash = split[1].to_string();
+                let (path, id) = self.split_branch(&path_segment);
+                PathInfo::new(
+                    id.parse().unwrap(),
+                    NormalizedPath::from_git_branch(path).as_absolute(),
+                    Commit::new(hash),
+                )
+            })
+            .collect();
+        Ok(all_branches)
+    }
+
+    fn get_version(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError> {
         todo!()
     }
 
@@ -163,10 +215,6 @@ impl VCS for Git {
         todo!()
     }
 
-    fn iter_concrete_paths(&self) -> impl Iterator<Item = Result<NormalizedPath, Self::VCSError>> {
-        vec![].into_iter()
-    }
-
     fn iter_versions(
         &self,
         path: &NormalizedPath,
@@ -174,23 +222,49 @@ impl VCS for Git {
         vec![].into_iter()
     }
 
-    fn format_status_message(
-        &self,
-        current_path_msg: String,
-        pre_status: String,
-        post_status: String,
-        colored: bool,
-    ) -> Result<String, Self::VCSError> {
+    fn get_status_without_current_branch(&self, colored: bool) -> Result<String, Self::VCSError> {
         let command = vec!["status"];
-        let out = self.git_cli.borrow().run_attached(&command)?;
+        let out = self.git_cli.run_attached(&command)?;
         let original = output_to_result(out, &command)?;
-        let no_first_line = original.split("\n").collect::<Vec<_>>()[1..]
+        let status = original.split("\n").collect::<Vec<_>>()[1..]
             .to_vec()
             .join("\n")
             .trim()
             .to_string();
-        Ok(format!(
-            "{current_path_msg}\n{pre_status}\n{no_first_line}\n{post_status}"
-        ))
+        Ok(status)
+    }
+
+    fn switch_to_branch(
+        &self,
+        id: usize,
+        path: &impl ToNormalizedPath,
+    ) -> Result<String, Self::VCSError> {
+        let path = path.to_normalized_path();
+        let branch = path.to_git_branch(id);
+        let command = vec!["checkout", branch.as_str()];
+        let out = self.git_cli.run_attached(&command)?;
+        Ok(output_to_result(out, &command)?)
+    }
+}
+
+trait GitBranch {
+    fn from_git_branch(branch: &str) -> Self;
+    fn to_git_branch(&self, id: usize) -> String;
+}
+
+impl GitBranch for NormalizedPath {
+    fn from_git_branch(branch: &str) -> Self {
+        let new = branch.replace(".", "");
+        new.to_normalized_path()
+    }
+
+    fn to_git_branch(&self, id: usize) -> String {
+        let trimmed_path = self.trim_whitespaces();
+        let path = trimmed_path
+            .iter_all_segments()
+            .map(|x| x.to_string() + ".")
+            .collect::<Vec<String>>()
+            .join("/");
+        path + id.to_string().as_str()
     }
 }

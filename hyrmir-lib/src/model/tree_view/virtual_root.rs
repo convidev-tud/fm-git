@@ -19,11 +19,11 @@ impl SymbolicNodeType for VirtualRoot {
 }
 
 /// Reachability for virtual root
-impl<'a, V: VCS> TreeView<'a, VirtualRoot, V> {
+impl<'a, V: VCS> PathView<'a, VirtualRoot, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
         area: &NormalizedPath,
-    ) -> Result<TreeView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
         self.move_to(area)
     }
 }

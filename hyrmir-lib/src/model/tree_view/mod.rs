@@ -14,18 +14,16 @@ pub use area::*;
 pub use classification::*;
 use colored::Colorize;
 pub use feature::*;
-use itertools::Itertools;
 pub use path::*;
 pub use product::*;
 use std::cell::RefCell;
-use std::fmt::{Debug, Display};
-use std::hash::{Hash, Hasher};
+use std::fmt::{Debug, Display, Formatter, Write};
+use std::hash::Hash;
 use std::rc::Rc;
 use thiserror::Error;
 pub use virtual_root::*;
 
 #[derive(Error, Clone, Debug)]
-#[error("")]
 pub struct PathDoesNotExistError<V: VersionId> {
     path: NodePath<V>,
 }
@@ -36,8 +34,13 @@ impl<V: VersionId> PathDoesNotExistError<V> {
     }
 }
 
+impl<V: VersionId> Display for PathDoesNotExistError<V> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("Path '{}' does not exist", self.path).as_str())
+    }
+}
+
 #[derive(Error, Clone, Debug)]
-#[error("")]
 pub struct InvalidTypeError {
     types_possible: Vec<NodeType>,
     type_found: NodeType,
@@ -52,6 +55,12 @@ impl InvalidTypeError {
     }
 }
 
+impl Display for InvalidTypeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("{} Path has invalid type", "Error:".red()).as_str())
+    }
+}
+
 #[derive(Error, Clone, Debug)]
 pub enum TreeViewError<V: VersionId> {
     #[error(transparent)]
@@ -60,7 +69,7 @@ pub enum TreeViewError<V: VersionId> {
     InvalidType(#[from] InvalidTypeError),
 }
 
-/// Some node tree_view have the option of being concrete (with attached artifacts) or abstract.
+/// Some paths have the option of being concrete (with attached artifacts) or abstract.
 /// This is the base trait for this classification.
 pub trait NodeClassification: Clone + Debug + Eq + PartialEq + Hash {
     fn requires_artifact() -> Option<bool>;
@@ -93,18 +102,18 @@ impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
 /// - the type of node it points to ([SymbolicNodeType] parameter),
 /// - the VCS implementation ([VCS] parameter).
 #[derive(Debug)]
-pub struct TreeView<'a, S: SymbolicNodeType, V: VCS> {
+pub struct PathView<'a, S: SymbolicNodeType, V: VCS> {
     path: Vec<Rc<RefCell<Node<V::VersionId>>>>,
     sym_type: S,
     repo: &'a Repository<V>,
 }
 
 /// Construction and transformation
-impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
+impl<'a, S: SymbolicNodeType, V: VCS> PathView<'a, S, V> {
     pub(crate) fn new(
         path: Vec<Rc<RefCell<Node<V::VersionId>>>>,
         repo: &'a Repository<V>,
-    ) -> Result<TreeView<'a, S, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, S, V>, TreeViewError<V::VersionId>> {
         let new = Self {
             path,
             repo,
@@ -119,8 +128,8 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
 
     pub fn try_convert_to<To: SymbolicNodeType>(
         self,
-    ) -> Result<TreeView<'a, To, V>, InvalidTypeError> {
-        let new = TreeView {
+    ) -> Result<PathView<'a, To, V>, InvalidTypeError> {
+        let new = PathView {
             path: self.path,
             repo: self.repo,
             sym_type: To::new(),
@@ -129,7 +138,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
         Ok(new)
     }
 
-    pub fn convert_to_any(self) -> TreeView<'a, AnyNode<AnyCls>, V> {
+    pub fn convert_to_any(self) -> PathView<'a, AnyNode<AnyCls>, V> {
         self.try_convert_to().unwrap()
     }
 
@@ -176,7 +185,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
 }
 
 /// Getters and setters
-impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
+impl<'a, S: SymbolicNodeType, V: VCS> PathView<'a, S, V> {
     fn get_repo(&self) -> &'a Repository<V> {
         self.repo
     }
@@ -239,7 +248,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
 }
 
 /// Iterators
-impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
+impl<'a, S: SymbolicNodeType, V: VCS> PathView<'a, S, V> {
     pub fn iter_children(&self) -> impl Iterator<Item = NodePath<V::VersionId>> {
         let path = self.as_node_path();
         path.iter_children()
@@ -252,14 +261,14 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
 }
 
 /// Path pointer movement
-impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
+impl<'a, S: SymbolicNodeType, V: VCS> PathView<'a, S, V> {
     /// Moves path to a specific index of the node vector.
     pub fn move_to_index<To: SymbolicNodeType>(
         self,
         index: usize,
-    ) -> Result<TreeView<'a, To, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, To, V>, TreeViewError<V::VersionId>> {
         let path = self.path[0..index + 1].to_vec();
-        Ok(TreeView::<'a, To, V>::new(path, self.repo)?)
+        Ok(PathView::<'a, To, V>::new(path, self.repo)?)
     }
 
     /// Move path to another node.
@@ -275,7 +284,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
     pub fn move_to<To: SymbolicNodeType>(
         self,
         path: &impl ToNormalizedPath,
-    ) -> Result<TreeView<'a, To, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, To, V>, TreeViewError<V::VersionId>> {
         let path = path.to_normalized_path();
         let normalized_self = self.to_normalized_path();
         let new_path = normalized_self + path.strip_version();
@@ -293,12 +302,12 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
             };
             new_node_vec.push(node);
         }
-        Ok(TreeView::<'a, To, V>::new(self.path, self.repo)?)
+        Ok(PathView::<'a, To, V>::new(self.path, self.repo)?)
     }
 }
 
 /// Display and pretty printing
-impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
+impl<'a, S: SymbolicNodeType, V: VCS> PathView<'a, S, V> {
     // pub fn display_tree(&self, show_tags: bool) -> String {
     //     self.get_node().borrow().display_tree(show_tags)
     // }
@@ -313,8 +322,16 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
     }
 }
 
-impl<'a, T: SymbolicNodeType, V: VCS> ToNormalizedPath for TreeView<'a, T, V> {
+impl<'a, T: SymbolicNodeType, V: VCS> ToNormalizedPath for PathView<'a, T, V> {
     fn to_normalized_path(&self) -> NormalizedPath {
         self.path.to_normalized_path()
     }
 }
+
+impl<'a, S: SymbolicNodeType, V: VCS> PartialEq for PathView<'a, S, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_normalized_path() == other.to_normalized_path()
+    }
+}
+
+impl<'a, S: SymbolicNodeType, V: VCS> Eq for PathView<'a, S, V> {}

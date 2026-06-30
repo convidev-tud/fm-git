@@ -23,7 +23,7 @@ impl<C: NodeClassification> SymbolicNodeType for Area<C> {
     }
 }
 
-impl<'a, C: NodeClassification, V: VCS> TreeView<'a, Area<C>, V> {
+impl<'a, C: NodeClassification, V: VCS> PathView<'a, Area<C>, V> {
     pub fn get_path_to_feature_root(&self) -> NormalizedPath {
         self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
     }
@@ -34,21 +34,21 @@ impl<'a, C: NodeClassification, V: VCS> TreeView<'a, Area<C>, V> {
 
     pub fn move_to_feature_root(
         self,
-    ) -> Result<TreeView<'a, FeatureRoot, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, FeatureRoot, V>, TreeViewError<V::VersionId>> {
         Ok(self.move_to(&NormalizedPath::from(FEATURE_ROOT))?)
     }
 
     pub fn move_to_product_root(
         self,
-    ) -> Result<TreeView<'a, ProductRoot, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<PathView<'a, ProductRoot, V>, TreeViewError<V::VersionId>> {
         Ok(self.move_to(&NormalizedPath::from(PRODUCT_ROOT))?)
     }
 }
 
 pub trait IsUnderArea: SymbolicNodeType {}
 
-impl<'a, T: IsUnderArea, V: VCS> TreeView<'a, T, V> {
-    pub fn move_to_area<C: NodeClassification>(self) -> TreeView<'a, Area<C>, V> {
+impl<'a, T: IsUnderArea, V: VCS> PathView<'a, T, V> {
+    pub fn move_to_area<C: NodeClassification>(self) -> PathView<'a, Area<C>, V> {
         self.move_to_index(1).unwrap()
     }
 }

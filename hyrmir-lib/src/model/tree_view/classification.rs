@@ -1,4 +1,4 @@
-use crate::model::{NodeClassification, NormalizedPath, SymbolicNodeType, TreeView};
+use crate::model::{NodeClassification, PathView, SymbolicNodeType};
 use crate::vcs::VCS;
 
 /// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
@@ -47,25 +47,8 @@ impl NodeClassification for AnyCls {
     }
 }
 
-// impl<S: ValidNodeType<Classification=Concrete>, V: VCS> NodePath<S, V> {
-//     pub fn get_qualified_object(&self) -> String {
-//         match &self.get_sym_type().get_version() {
-//             VersionPointer::Head => self.get_object(),
-//             VersionPointer::Version(_) => self.get_object(),
-//         }
-//     }
-//     pub fn get_head(&self) -> CommitHash {
-//         self.get_metadata().get_head().unwrap().clone()
-//     }
-//     pub fn get_version(&self) -> &VersionPointer {
-//         &self.version
-//     }
-//     pub fn update_version(&mut self, head: VersionPointer) {
-//         self.version = head;
-//     }
-//     pub fn to_normalized_path_with_version(&self) -> NormalizedPath {
-//         let mut path = self.to_normalized_path();
-//         path.set_version_appendix(Some(self.get_object()));
-//         path
-//     }
-// }
+impl<'a, S: IsConcrete, V: VCS> PathView<'a, S, V> {
+    pub fn get_id(&self) -> usize {
+        self.get_node().borrow().get_branch_info().unwrap().get_id()
+    }
+}

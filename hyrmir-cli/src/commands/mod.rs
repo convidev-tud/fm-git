@@ -1,5 +1,4 @@
 mod check;
-mod checkout;
 mod clone;
 mod commit;
 mod complete;
@@ -12,9 +11,9 @@ mod status;
 mod tag;
 mod tree;
 mod untie;
+mod view;
 
 pub use check::*;
-pub use checkout::*;
 pub use clone::*;
 pub use commit::*;
 pub use complete::*;
@@ -27,3 +26,4 @@ pub use status::*;
 pub use tag::*;
 pub use tree::*;
 pub use untie::*;
+pub use view::*;

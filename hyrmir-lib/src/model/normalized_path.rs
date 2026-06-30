@@ -126,21 +126,6 @@ impl NormalizedPath {
     pub fn new() -> Self {
         Self { path: Vec::new() }
     }
-    pub fn to_git_branch(&self) -> String {
-        let trimmed_path = self.trim_whitespaces();
-        let path = trimmed_path.path;
-        match path.len() {
-            1 => path[0].to_string(),
-            _ => {
-                let mut prefix = path[..path.len() - 1]
-                    .iter()
-                    .map(|x| "_".to_string() + x)
-                    .collect::<Vec<_>>();
-                prefix.push(path[path.len() - 1].to_string());
-                prefix.join("/")
-            }
-        }
-    }
     pub fn push<S: Into<String>>(&mut self, path: S) {
         let qualified_str = path.into().replace("_", "");
         for split in qualified_str.trim().split(PATH_SEPARATOR) {
@@ -225,10 +210,10 @@ impl NormalizedPath {
         self.iter_all_segments()
             .map(|s| NormalizedPath::from(s.clone()))
     }
-    pub(crate) fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
+    pub fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
         self.path.iter()
     }
-    pub(crate) fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
+    pub fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
         self.path[l..r].iter()
     }
     pub fn get(&self, index: usize) -> Option<NormalizedPath> {
@@ -315,20 +300,6 @@ mod tests {
         assert_eq!(
             NormalizedPath::from("_foo/_bar/baz").path,
             vec!["foo", "bar", "baz"]
-        );
-    }
-
-    #[test]
-    fn test_normalized_path_to_git_object() {
-        assert_eq!(NormalizedPath::from("foo/bar").to_git_branch(), "_foo/bar");
-        assert_eq!(NormalizedPath::from("/foo/bar").to_git_branch(), "_foo/bar");
-        assert_eq!(
-            NormalizedPath::from("/foo/bar/c:abc").to_git_branch(),
-            "abc"
-        );
-        assert_eq!(
-            NormalizedPath::from("/foo/bar/t:1.0.0").to_git_branch(),
-            "_foo/_bar/1.0.0"
         );
     }
 

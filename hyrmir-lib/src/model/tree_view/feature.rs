@@ -35,7 +35,11 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     }
 
     fn compatible() -> Vec<NodeType> {
-        todo!()
+        match Self::Classification::requires_artifact() {
+            Some(true) => vec![NodeType::Feature(true)],
+            Some(false) => vec![NodeType::Feature(false)],
+            None => vec![NodeType::Feature(true), NodeType::Feature(false)],
+        }
     }
 }
 

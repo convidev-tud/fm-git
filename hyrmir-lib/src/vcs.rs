@@ -1,4 +1,4 @@
-use crate::model::NormalizedPath;
+use crate::model::{NormalizedPath, ToNormalizedPath};
 use std::error::Error;
 use std::fmt::Debug;
 
@@ -6,8 +6,8 @@ pub trait VCSError: Error {}
 
 pub trait VersionId: Debug + Clone {
     fn new(id: impl Into<String>) -> Self;
-    fn get_full_id(&self) -> &String;
-    fn get_printable_id(&self) -> &String;
+    fn get_full_id(&self) -> String;
+    fn get_printable_id(&self) -> String;
 }
 
 pub struct PathInfo<V: VersionId> {
@@ -34,16 +34,14 @@ impl<V: VersionId> PathInfo<V> {
     }
 }
 
-pub trait VCS: Debug + Clone + PartialEq + Eq {
+pub trait VCS: Debug {
     type VCSError: VCSError;
 
     type VersionId: VersionId;
 
-    fn get_current_path(&self) -> Result<PathInfo<Self::VersionId>, Self::VCSError>;
+    fn get_current_path(&self) -> Result<Option<NormalizedPath>, Self::VCSError>;
 
-    fn iter_concrete_paths(
-        &self,
-    ) -> impl Iterator<Item = Result<PathInfo<Self::VersionId>, Self::VCSError>>;
+    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError>;
 
     fn get_version(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError>;
 
@@ -58,7 +56,7 @@ pub trait VCS: Debug + Clone + PartialEq + Eq {
         path: &NormalizedPath,
     ) -> impl Iterator<Item = Result<Self::VersionId, Self::VCSError>>;
 
-    fn get_status_without_current_info(&self, colored: bool) -> Result<String, Self::VCSError>;
+    fn get_status_without_current_branch(&self, colored: bool) -> Result<String, Self::VCSError>;
 
     fn format_status_message(
         &self,
@@ -77,7 +75,7 @@ pub trait VCS: Debug + Clone + PartialEq + Eq {
         } else {
             format!("{pre_status_msg}\n")
         };
-        let native_status = self.get_status_without_current_info(colored)?;
+        let native_status = self.get_status_without_current_branch(colored)?;
         let post_status_msg = if post_status_msg.is_empty() {
             "".to_string()
         } else {
@@ -87,4 +85,10 @@ pub trait VCS: Debug + Clone + PartialEq + Eq {
             "{current_path_msg}{pre_status_msg}{native_status}{post_status_msg}"
         ))
     }
+
+    fn switch_to_branch(
+        &self,
+        id: usize,
+        path: &impl ToNormalizedPath,
+    ) -> Result<String, Self::VCSError>;
 }

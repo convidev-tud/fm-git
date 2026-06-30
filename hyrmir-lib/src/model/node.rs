@@ -25,15 +25,15 @@ impl MalformedModelError {
     }
 }
 
+impl Display for MalformedModelError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.reason.as_str())
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("Node already locked")]
 pub struct NodeLockError;
-
-impl Display for MalformedModelError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRootMetadata {
@@ -147,22 +147,49 @@ impl NodeType {
 }
 
 #[derive(Debug)]
+pub struct BranchInfo<V: VersionId> {
+    id: usize,
+    head: V,
+    known_versions: HashMap<String, V>,
+}
+
+impl<V: VersionId> BranchInfo<V> {
+    pub fn new(id: usize, head: V) -> Self {
+        Self { id, head, known_versions: HashMap::new() }
+    }
+    
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
+    
+    pub fn insert_version(&mut self, version: V) {
+        self.known_versions.insert(version.get_full_id(), version);
+    }
+    
+    pub fn remove_version(&mut self, version: &V) {
+        self.known_versions.remove(&version.get_full_id());
+    }
+}
+
+#[derive(Debug)]
 pub struct Node<V: VersionId> {
     name: String,
     node_type: NodeType,
-    head: Option<V>,
-    known_versions: HashMap<String, V>,
+    branch_info: Option<BranchInfo<V>>,
     children: HashMap<String, Rc<RefCell<Node<V>>>>,
     lock: bool,
 }
 
 impl<V: VersionId> Node<V> {
-    pub fn new(name: impl Into<String>, node_type: NodeType, head: Option<V>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        node_type: NodeType, 
+        branch_info: Option<BranchInfo<V>>,
+    ) -> Self {
         Self {
             name: name.into(),
             node_type,
-            head,
-            known_versions: HashMap::new(),
+            branch_info,
             children: HashMap::new(),
             lock: false,
         }
@@ -172,8 +199,8 @@ impl<V: VersionId> Node<V> {
         self.node_type = node_type;
     }
 
-    pub(crate) fn update_head(&mut self, head: Option<V>) {
-        self.head = head;
+    pub(crate) fn update_branch_info(&mut self, branch_info: Option<BranchInfo<V>>) {
+        self.branch_info = branch_info;
     }
 
     pub(crate) fn try_lock(&mut self) -> Result<(), NodeLockError> {
@@ -184,7 +211,7 @@ impl<V: VersionId> Node<V> {
             Err(NodeLockError)
         }
     }
-    
+
     pub(crate) fn unlock(&mut self) {
         self.lock = false;
     }
@@ -218,9 +245,9 @@ impl<V: VersionId> Node<V> {
     fn decide_child_type(
         &self,
         name: &str,
-        head: &Option<V>,
+        branch_info: &Option<BranchInfo<V>>,
     ) -> Result<NodeType, MalformedModelError> {
-        let concrete = match head {
+        let concrete = match branch_info {
             Some(_) => true,
             None => false,
         };
@@ -230,35 +257,34 @@ impl<V: VersionId> Node<V> {
     fn add_child(
         &mut self,
         name: String,
-        head: Option<V>,
+        branch_info: Option<BranchInfo<V>>,
     ) -> Result<NodeType, MalformedModelError> {
-        let node_type = self.decide_child_type(name.as_str(), &head)?;
+        let node_type = self.decide_child_type(name.as_str(), &branch_info)?;
         // let child = ;
-        let child = Node::new(name.clone(), node_type.clone(), head);
+        let child = Node::new(name.clone(), node_type.clone(), branch_info);
         self.children.insert(name, Rc::new(RefCell::new(child)));
         Ok(node_type)
     }
 
-    pub fn add_known_version(&mut self, version: V) {
-        self.known_versions
-            .insert(version.get_full_id().clone(), version);
-    }
-
-    pub fn remove_known_version(&mut self, version: &V) {
-        self.known_versions.remove(version.get_full_id());
-    }
-
-    fn update_child(&self, name: String, head: Option<V>) -> Result<NodeType, MalformedModelError> {
-        let new_type = self.decide_child_type(name.as_str(), &head)?;
+    fn update_child(&self, name: String, branch_info: Option<BranchInfo<V>>) -> Result<NodeType, MalformedModelError> {
+        let new_type = self.decide_child_type(name.as_str(), &branch_info)?;
         let child = self.get_child(&name).unwrap();
         let mut child = child.borrow_mut();
         child.update_type(new_type.clone());
-        child.update_head(head);
+        child.update_branch_info(branch_info);
         Ok(new_type)
     }
 
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+    
+    pub fn get_branch_info(&self) -> Option<&BranchInfo<V>> {
+        self.branch_info.as_ref()
+    }
+    
+    pub fn mut_get_branch_info(&mut self) -> Option<&mut BranchInfo<V>> {
+        self.branch_info.as_mut()
     }
 
     pub fn get_type(&self) -> &NodeType {
@@ -280,15 +306,15 @@ impl<V: VersionId> Node<V> {
     pub fn insert_path(
         &mut self,
         path: &NormalizedPath,
-        head: Option<V>,
+        branch_info: Option<BranchInfo<V>>,
     ) -> Result<NodeType, MalformedModelError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {
                 let name = path.get(0).unwrap().to_string();
                 let new_type = match self.get_child(&name) {
-                    Some(_) => self.update_child(name, head),
-                    None => self.add_child(name, head),
+                    Some(_) => self.update_child(name, branch_info),
+                    None => self.add_child(name, branch_info),
                 };
                 new_type
             }
@@ -303,7 +329,7 @@ impl<V: VersionId> Node<V> {
                 };
                 next_child
                     .borrow_mut()
-                    .insert_path(&path.strip_n_left(1), head)
+                    .insert_path(&path.strip_n_left(1), branch_info)
             }
         }
     }

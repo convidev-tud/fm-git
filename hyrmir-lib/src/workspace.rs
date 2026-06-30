@@ -7,12 +7,14 @@ use thiserror::Error;
 pub enum WorkSpaceError<V: VersionId, VE: VCSError> {
     #[error(transparent)]
     TreeView(#[from] TreeViewError<V>),
+    #[error("There is no workspace attached to this repository.")]
+    NoWorkspace,
     #[error(transparent)]
     VCS(#[from] VE),
 }
 
 pub struct Workspace<'a, S: IsConcrete, V: VCS> {
-    current_view: TreeView<'a, S, V>,
+    current_view: PathView<'a, S, V>,
     repository: &'a Repository<V>,
 }
 
@@ -21,13 +23,15 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
     pub fn new(
         repository: &'a Repository<V>,
     ) -> Result<Self, WorkSpaceError<V::VersionId, V::VCSError>> {
-        let current = repository.get_vcs().get_current_path()?;
-        let path = current.get_path();
-        let current_path = repository.get_view(&path)?;
-        Ok(Self {
-            current_view: current_path,
-            repository,
-        })
+        if let Some(current) = repository.get_vcs().get_current_path()? {
+            let current_path = repository.get_view(&current)?;
+            Ok(Self {
+                current_view: current_path,
+                repository,
+            })
+        } else {
+            Err(WorkSpaceError::NoWorkspace)
+        }
     }
 }
 
@@ -37,15 +41,15 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
         &self.repository.get_vcs()
     }
 
-    pub fn get_current_view(&self) -> &TreeView<'a, S, V> {
+    pub fn get_current_view(&self) -> &PathView<'a, S, V> {
         &self.current_view
     }
 
-    pub fn mut_get_current_view(&mut self) -> &mut TreeView<'a, S, V> {
+    pub fn mut_get_current_view(&mut self) -> &mut PathView<'a, S, V> {
         &mut self.current_view
     }
 
-    pub fn format_status_msg(
+    pub fn status(
         &self,
         current_path_message: impl Into<String>,
         pre_status: impl Into<String>,
@@ -61,11 +65,20 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
         Ok(status)
     }
 
-    pub fn commit(&self) {
-        todo!()
+    pub fn switch_to<T: IsConcrete>(
+        self,
+        path: PathView<'a, T, V>,
+    ) -> Result<Workspace<'a, T, V>, V::VCSError> {
+        let id = path.get_id();
+        self.repository.get_vcs().switch_to_branch(id, &path)?;
+        let new = Workspace {
+            current_view: path,
+            repository: self.repository,
+        };
+        Ok(new)
     }
 
-    pub fn switch_to(&self) {
+    pub fn commit(&self) {
         todo!()
     }
 }
