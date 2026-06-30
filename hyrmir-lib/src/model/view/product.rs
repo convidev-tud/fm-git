@@ -1,5 +1,5 @@
 use crate::model::NodeType;
-use crate::model::tree_view::*;
+use crate::model::view::*;
 use std::marker::PhantomData;
 
 /// Marker for the product root node.
@@ -18,7 +18,7 @@ impl SymbolicNodeType for ProductRoot {
     }
 }
 
-impl IsUnderArea for ProductRoot {}
+impl IsOrUnderArea for ProductRoot {}
 
 /// Marker of a product node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -44,7 +44,7 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     }
 }
 
-impl<C: NodeClassification> IsUnderArea for Product<C> {}
+impl<C: NodeClassification> IsOrUnderArea for Product<C> {}
 
 // impl<V: VCS> NodePath<Product<Concrete>, V> {
 //     pub fn get_derivation_data(&self) -> Result<DerivationData, dyn Error> {

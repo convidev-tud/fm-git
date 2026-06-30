@@ -7,7 +7,7 @@
 //     A: SymbolicNodeType,
 //     B: SymbolicNodeType,
 // {
-//     fn apply(&self, tree_view: Option<NodePath<A>>) -> Option<NodePath<B>>;
+//     fn apply(&self, view: Option<NodePath<A>>) -> Option<NodePath<B>>;
 //     fn transform(
 //         &self,
 //         node_paths: impl Iterator<Item = NodePath<A>>,
@@ -25,8 +25,8 @@
 //     }
 // }
 // impl<A: SymbolicNodeType> NodePathTransformer<A, A> for HasBranchFilteringNodePathTransformer {
-//     fn apply(&self, tree_view: Option<NodePath<A>>) -> Option<NodePath<A>> {
-//         let path = tree_view?;
+//     fn apply(&self, view: Option<NodePath<A>>) -> Option<NodePath<A>> {
+//         let path = view?;
 //         if path.get_metadata().has_branch() == self.has_branch {
 //             Some(path)
 //         } else {
@@ -49,8 +49,8 @@
 //     }
 // }
 // impl<A: SymbolicNodeType> NodePathTransformer<A, A> for ByQPathFilteringNodePathTransformer {
-//     fn apply(&self, tree_view: Option<NodePath<A>>) -> Option<NodePath<A>> {
-//         let path = tree_view?;
+//     fn apply(&self, view: Option<NodePath<A>>) -> Option<NodePath<A>> {
+//         let path = view?;
 //         match self.mode {
 //             FilteringMode::INCLUDE => {
 //                 if self.paths.contains(&path.to_normalized_path()) {
@@ -94,8 +94,8 @@
 //     }
 // }
 // impl<A: SymbolicNodeType> NodePathTransformer<A, A> for ByGlobFilteringNodePathTransformer {
-//     fn apply(&self, tree_view: Option<NodePath<A>>) -> Option<NodePath<A>> {
-//         let path = tree_view?;
+//     fn apply(&self, view: Option<NodePath<A>>) -> Option<NodePath<A>> {
+//         let path = view?;
 //         let mut found_match = false;
 //         for glob in self.globs.iter() {
 //             if glob.is_match(&path.to_string()) {
@@ -146,8 +146,8 @@
 //     In: SymbolicNodeType,
 //     Out: SymbolicNodeType,
 // {
-//     fn apply(&self, tree_view: Option<NodePath<In>>) -> Option<NodePath<Out>> {
-//         tree_view?.try_convert_to::<Out>()
+//     fn apply(&self, view: Option<NodePath<In>>) -> Option<NodePath<Out>> {
+//         view?.try_convert_to::<Out>()
 //     }
 // }
 //
@@ -180,8 +180,8 @@
 //     In: SymbolicNodeType,
 //     Out: SymbolicNodeType,
 // {
-//     fn apply(&self, tree_view: Option<NodePath<In>>) -> Option<NodePath<Out>> {
-//         self.type_filter.apply(self.glob_filter.apply(tree_view))
+//     fn apply(&self, view: Option<NodePath<In>>) -> Option<NodePath<Out>> {
+//         self.type_filter.apply(self.glob_filter.apply(view))
 //     }
 // }
 //
@@ -207,7 +207,7 @@
 // //         let root = model.get_virtual_root();
 // //         let actual = transformer
 // //             .transform(root.iter_children_req())
-// //             .map(|tree_view| tree_view.to_normalized_path())
+// //             .map(|view| view.to_normalized_path())
 // //             .collect::<Vec<_>>();
 // //         assert_eq!(actual, vec!["/main/feature/root"]);
 // //     }
@@ -222,7 +222,7 @@
 // //         let root = model.get_virtual_root();
 // //         let actual = transformer
 // //             .transform(root.iter_children_req())
-// //             .map(|tree_view| tree_view.to_normalized_path())
+// //             .map(|view| view.to_normalized_path())
 // //             .collect::<Vec<_>>();
 // //         assert_eq!(
 // //             actual,

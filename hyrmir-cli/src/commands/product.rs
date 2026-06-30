@@ -10,17 +10,17 @@
 //     product: NormalizedPath,
 //     context: &mut CommandContext,
 // ) -> Result<(), Box<dyn Error>> {
-//     let tree_view = context.git.assert_current_node_path::<AnyGitObject>()?;
-//     let current_path = if let Some(path) = tree_view.try_convert_to::<Product>() {
+//     let view = context.git.assert_current_node_path::<AnyGitObject>()?;
+//     let current_path = if let Some(path) = view.try_convert_to::<Product>() {
 //         path.to_normalized_path()
-//     } else if let Some(path) = tree_view.as_any_type().try_convert_to::<ConcreteArea>() {
+//     } else if let Some(path) = view.as_any_type().try_convert_to::<ConcreteArea>() {
 //         path.get_path_to_product_root()
 //     } else {
 //         return Err(Box::new(CommandError::new(
 //             "Cannot create product: Current branch is not a product or area branch",
 //         )));
 //     };
-//     drop(tree_view);
+//     drop(view);
 //     let target_path = current_path + product;
 //     let result = context.git.create_branch::<Product>(&target_path)?;
 //     context.logger.info(format!(

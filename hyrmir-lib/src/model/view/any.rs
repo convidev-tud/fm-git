@@ -1,13 +1,13 @@
-use crate::model::tree_view::*;
+use crate::model::view::*;
 use std::marker::PhantomData;
 
 /// Placeholder if the exact node type is unknown or does not matter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct AnyNode<C: NodeClassification> {
+pub struct AnyType<C: NodeClassification> {
     _phantom: PhantomData<C>,
 }
 
-impl<C: NodeClassification> SymbolicNodeType for AnyNode<C> {
+impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
     type Classification = C;
 
     fn new() -> Self {
@@ -45,3 +45,5 @@ impl<C: NodeClassification> SymbolicNodeType for AnyNode<C> {
         base
     }
 }
+
+impl IsOrUnderArea for AnyType<Concrete> {}

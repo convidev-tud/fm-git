@@ -1,7 +1,7 @@
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
 use clap::{Arg, Command};
 use colored::Colorize;
-use hyrmir_lib::model::{AnyNode, Concrete, ToNormalizedPath, TreeViewError};
+use hyrmir_lib::model::{AnyType, Concrete, ToNormalizedPath, TreeViewError};
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
 use std::error::Error;
@@ -44,11 +44,19 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
 
         // repo allocations
         let repo = loader.load_repo()?;
-        let workspace = repo.get_workspace::<AnyNode<Concrete>>()?;
+        let workspace = repo.get_workspace::<AnyType<Concrete>>()?;
         let current = workspace.get_current_view();
-
         let target_path = current.to_normalized_path() + target_string.to_normalized_path();
-        let target = match repo.get_view::<AnyNode<Concrete>>(&target_path) {
+
+        if current.to_normalized_path() == target_path {
+            logger.info(format!(
+                "Already viewing {}",
+                target_path.to_string().blue(),
+            ));
+            return Ok(());
+        }
+
+        let target = match repo.get_view::<AnyType<Concrete>>(&target_path) {
             Ok(path) => path,
             Err(error) => {
                 return match error {
@@ -65,25 +73,14 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
                 };
             }
         };
-
-        if current == &target {
-            logger.info(format!("Already on branch {}", target.formatted(true),));
-        } else {
-            let workspace = workspace.switch_to(target)?;
-            let new_current = workspace.get_current_view();
-            let msg = format!(
-                "Switched to {} branch {}",
-                new_current.get_real_type().get_formatted_name(),
-                new_current.formatted(true),
-            );
-            let status = workspace.status(
-                msg,
-                "",
-                "",
-                true,
-            )?;
-            logger.info(status);
-        }
+        let workspace = workspace.switch_to(target)?;
+        let new_current = workspace.get_current_view();
+        let msg = format!(
+            "Now viewing {}",
+            new_current.formatted(true, true, true),
+        );
+        let status = workspace.status(msg, "", "", true)?;
+        logger.info(status);
         Ok(())
     }
     // fn shell_complete(

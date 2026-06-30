@@ -1,4 +1,4 @@
-use crate::model::{NodeClassification, PathView, SymbolicNodeType};
+use crate::model::*;
 use crate::vcs::VCS;
 
 /// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
@@ -47,7 +47,7 @@ impl NodeClassification for AnyCls {
     }
 }
 
-impl<'a, S: IsConcrete, V: VCS> PathView<'a, S, V> {
+impl<'a, S: IsConcrete, V: VCS> SemanticView<'a, S, V> {
     pub fn get_id(&self) -> usize {
         self.get_node().borrow().get_branch_info().unwrap().get_id()
     }

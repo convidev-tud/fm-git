@@ -13,8 +13,9 @@ pub enum WorkSpaceError<V: VersionId, VE: VCSError> {
     VCS(#[from] VE),
 }
 
+#[derive(Debug)]
 pub struct Workspace<'a, S: IsConcrete, V: VCS> {
-    current_view: PathView<'a, S, V>,
+    current_view: SemanticView<'a, S, V>,
     repository: &'a Repository<V>,
 }
 
@@ -41,11 +42,11 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
         &self.repository.get_vcs()
     }
 
-    pub fn get_current_view(&self) -> &PathView<'a, S, V> {
+    pub fn get_current_view(&self) -> &SemanticView<'a, S, V> {
         &self.current_view
     }
 
-    pub fn mut_get_current_view(&mut self) -> &mut PathView<'a, S, V> {
+    pub fn mut_get_current_view(&mut self) -> &mut SemanticView<'a, S, V> {
         &mut self.current_view
     }
 
@@ -67,7 +68,7 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
 
     pub fn switch_to<T: IsConcrete>(
         self,
-        path: PathView<'a, T, V>,
+        path: SemanticView<'a, T, V>,
     ) -> Result<Workspace<'a, T, V>, V::VCSError> {
         let id = path.get_id();
         self.repository.get_vcs().switch_to_branch(id, &path)?;

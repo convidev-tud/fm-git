@@ -91,19 +91,19 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn get_virtual_root_view(&self) -> PathView<VirtualRoot, V> {
-        PathView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
+    pub fn get_virtual_root_view(&self) -> SemanticView<VirtualRoot, V> {
+        SemanticView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
 
     pub fn get_view<S: SymbolicNodeType>(
         &self,
-        path: &NormalizedPath,
-    ) -> Result<PathView<S, V>, TreeViewError<V::VersionId>> {
-        let node_vec = self.get_node_vec(path);
-        Ok(PathView::new(node_vec, &self)?)
+        path: &impl ToNormalizedPath,
+    ) -> Result<SemanticView<S, V>, TreeViewError<V::VersionId>> {
+        let node_vec = self.get_node_vec(&path.to_normalized_path());
+        Ok(SemanticView::new(node_vec, &self)?)
     }
 
-    pub fn get_path(&self, path: &NormalizedPath) -> Result<NodePath<V::VersionId>, V::VCSError> {
+    pub fn get_path(&self, path: &NormalizedPath) -> Result<StaticView<V::VersionId>, V::VCSError> {
         let node_vec = self.get_node_vec(path);
         let version = match path.get_version_appendix() {
             Some(version) => {
@@ -113,7 +113,9 @@ impl<V: VCS> Repository<V> {
                 {
                     let version_id = self.get_vcs().get_version(&version)?.unwrap();
                     let mut node = node_vec.last().unwrap().borrow_mut();
-                    node.mut_get_branch_info().unwrap().insert_version(version_id.clone());
+                    node.mut_get_branch_info()
+                        .unwrap()
+                        .insert_version(version_id.clone());
                     version_id
                 } else {
                     V::VersionId::new(version)
@@ -122,7 +124,7 @@ impl<V: VCS> Repository<V> {
             }
             None => VersionPointer::Default,
         };
-        Ok(NodePath::new(node_vec, version))
+        Ok(StaticView::new(node_vec, version))
     }
 
     pub fn get_path_by_id(&self, id: usize) -> Option<&NormalizedPath> {
@@ -134,4 +136,6 @@ impl<V: VCS> Repository<V> {
     ) -> Result<Workspace<S, V>, WorkSpaceError<V::VersionId, V::VCSError>> {
         Workspace::new(&self)
     }
+
+    pub fn test(&mut self) {}
 }

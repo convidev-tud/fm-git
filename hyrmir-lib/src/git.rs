@@ -215,8 +215,8 @@
 //         &self,
 //         path: &NormalizedPath,
 //     ) -> Result<NodePath<T>, PathAssertionError> {
-//         let tree_view = self.get_model().assert_path::<T>(path)?;
-//         Ok(tree_view)
+//         let view = self.get_model().assert_path::<T>(path)?;
+//         Ok(view)
 //     }
 //
 //     pub fn assert_paths<T: SymbolicNodeType>(

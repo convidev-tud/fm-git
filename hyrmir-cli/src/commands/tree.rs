@@ -54,14 +54,14 @@
 //             .get_argument_value::<bool>(SHOW_TAGS)
 //             .unwrap();
 //         let tree = context.arg_helper.get_argument_value::<bool>(TREE).unwrap();
-//         let tree_view = context.git.assert_path::<AnyNode>(&target)?;
+//         let view = context.git.assert_path::<AnyNode>(&target)?;
 //         match tree {
 //             true => {
-//                 let tree = tree_view.display_tree(show_tags);
+//                 let tree = view.display_tree(show_tags);
 //                 context.logger.info(tree.trim());
 //             }
 //             false => {
-//                 for child in tree_view.iter_children_by_type().sorted() {
+//                 for child in view.iter_children_by_type().sorted() {
 //                     let mut name = child.to_normalized_path().last().unwrap().clone();
 //                     if child.get_metadata().has_branch() {
 //                         name = name.blue().to_string()

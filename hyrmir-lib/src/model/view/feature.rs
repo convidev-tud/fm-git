@@ -1,4 +1,4 @@
-use crate::model::tree_view::*;
+use crate::model::view::*;
 use std::marker::PhantomData;
 
 /// Marker for the feature root node.
@@ -17,7 +17,7 @@ impl SymbolicNodeType for FeatureRoot {
     }
 }
 
-impl IsUnderArea for FeatureRoot {}
+impl IsOrUnderArea for FeatureRoot {}
 
 /// Marker of a feature node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -43,6 +43,6 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     }
 }
 
-impl<C: NodeClassification> IsUnderArea for Feature<C> {}
+impl<C: NodeClassification> IsOrUnderArea for Feature<C> {}
 
 pub trait CanMergeWithFeature: SymbolicNodeType {}

@@ -268,6 +268,12 @@ impl ToNormalizedPath for String {
     }
 }
 
+impl ToNormalizedPath for &str {
+    fn to_normalized_path(&self) -> NormalizedPath {
+        NormalizedPath::from(self.to_string())
+    }
+}
+
 impl ToNormalizedPath for NormalizedPath {
     fn to_normalized_path(&self) -> NormalizedPath {
         self.clone()

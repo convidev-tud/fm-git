@@ -1,5 +1,5 @@
-use crate::model::tree_view::*;
-use crate::model::{NodeType, NormalizedPath};
+use crate::model::NodeType;
+use crate::model::view::*;
 use crate::vcs::VCS;
 
 /// Marker for the virtual root node.
@@ -19,11 +19,12 @@ impl SymbolicNodeType for VirtualRoot {
 }
 
 /// Reachability for virtual root
-impl<'a, V: VCS> PathView<'a, VirtualRoot, V> {
+impl<'a, V: VCS> SemanticView<'a, VirtualRoot, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
-        area: &NormalizedPath,
-    ) -> Result<PathView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
-        self.move_to(area)
+        area: &impl ToNormalizedPath,
+        repo: &'a Repository<V>,
+    ) -> Result<SemanticView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
+        self.move_to(area, repo)
     }
 }

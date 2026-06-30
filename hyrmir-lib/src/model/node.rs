@@ -155,19 +155,31 @@ pub struct BranchInfo<V: VersionId> {
 
 impl<V: VersionId> BranchInfo<V> {
     pub fn new(id: usize, head: V) -> Self {
-        Self { id, head, known_versions: HashMap::new() }
+        Self {
+            id,
+            head,
+            known_versions: HashMap::new(),
+        }
     }
-    
+
     pub fn get_id(&self) -> usize {
         self.id
     }
     
+    pub fn get_head(&self) -> &V {
+        &self.head
+    }
+
     pub fn insert_version(&mut self, version: V) {
         self.known_versions.insert(version.get_full_id(), version);
     }
-    
+
     pub fn remove_version(&mut self, version: &V) {
         self.known_versions.remove(&version.get_full_id());
+    }
+    
+    pub fn contains_version(&self, version: &V) -> bool {
+        self.known_versions.contains_key(&version.get_full_id())
     }
 }
 
@@ -183,7 +195,7 @@ pub struct Node<V: VersionId> {
 impl<V: VersionId> Node<V> {
     pub fn new(
         name: impl Into<String>,
-        node_type: NodeType, 
+        node_type: NodeType,
         branch_info: Option<BranchInfo<V>>,
     ) -> Self {
         Self {
@@ -266,7 +278,11 @@ impl<V: VersionId> Node<V> {
         Ok(node_type)
     }
 
-    fn update_child(&self, name: String, branch_info: Option<BranchInfo<V>>) -> Result<NodeType, MalformedModelError> {
+    fn update_child(
+        &self,
+        name: String,
+        branch_info: Option<BranchInfo<V>>,
+    ) -> Result<NodeType, MalformedModelError> {
         let new_type = self.decide_child_type(name.as_str(), &branch_info)?;
         let child = self.get_child(&name).unwrap();
         let mut child = child.borrow_mut();
@@ -278,11 +294,11 @@ impl<V: VersionId> Node<V> {
     pub fn get_name(&self) -> &String {
         &self.name
     }
-    
+
     pub fn get_branch_info(&self) -> Option<&BranchInfo<V>> {
         self.branch_info.as_ref()
     }
-    
+
     pub fn mut_get_branch_info(&mut self) -> Option<&mut BranchInfo<V>> {
         self.branch_info.as_mut()
     }
