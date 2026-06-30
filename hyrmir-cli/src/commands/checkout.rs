@@ -8,7 +8,7 @@
 // use clap::{Arg, Command};
 // use colored::Colorize;
 // use std::error::Error;
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct CheckoutCommand;
 // impl CommandDefinition for CheckoutCommand {

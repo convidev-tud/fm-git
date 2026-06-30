@@ -5,9 +5,9 @@
 // use clap::{Arg, Command};
 // use colored::Colorize;
 // use std::error::Error;
-// 
+//
 // const MESSAGE: &str = "message";
-// 
+//
 // fn handle_feature(
 //     feature: &NodePath<Feature>,
 //     inspector: &InspectionManager,
@@ -29,7 +29,7 @@
 //         })
 //         .collect();
 //     let all_products = inspector.find_products_containing_feature(&feature)?;
-// 
+//
 //     let feature_statistics: MergeChainStatistics<Feature, Feature> = all_features
 //         .iter()
 //         .map(|f| {
@@ -39,7 +39,7 @@
 //         })
 //         .flatten()
 //         .collect::<Result<_, _>>()?;
-// 
+//
 //     if feature_statistics.n_conflicts() > 0 {
 //         context.logger.warn(format!(
 //             "\nWarning: Feature stands in conflict with {} other feature(s)",
@@ -56,7 +56,7 @@
 //             .logger
 //             .warn(format!("  {}", error.display_as_path()));
 //     }
-// 
+//
 //     let product_statistics: MergeChainStatistics<Product, Feature> = all_products
 //         .iter()
 //         .map(|product| {
@@ -66,7 +66,7 @@
 //         })
 //         .flatten()
 //         .collect::<Result<_, _>>()?;
-// 
+//
 //     if product_statistics.n_conflicts() > 0 {
 //         context.logger.warn(format!(
 //             "\nWarning: Feature stands in conflict with {} product(s) derived from it",
@@ -85,7 +85,7 @@
 //     }
 //     Ok(None)
 // }
-// 
+//
 // fn handle_product(
 //     product: &NodePath<Product>,
 //     inspector: &InspectionManager,
@@ -115,10 +115,10 @@
 //         Ok(None)
 //     }
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct CommitCommand;
-// 
+//
 // impl CommandDefinition for CommitCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("commit")
@@ -127,7 +127,7 @@
 //             .arg(Arg::new(MESSAGE).short('m').help("Commit message"))
 //     }
 // }
-// 
+//
 // impl CommandInterface for CommitCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let maybe_message = context.arg_helper.get_argument_value::<String>(MESSAGE);

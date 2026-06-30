@@ -2,10 +2,10 @@
 // use crate::cli::*;
 // use clap::{Arg, ArgAction, Command};
 // use std::error::Error;
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct HiddenCompletionCommand;
-// 
+//
 // impl CommandDefinition for HiddenCompletionCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("__completion")
@@ -15,7 +15,7 @@
 //             .disable_help_subcommand(true)
 //     }
 // }
-// 
+//
 // impl CommandInterface for HiddenCompletionCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let cursor_index: usize = context

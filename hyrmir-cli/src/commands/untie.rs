@@ -6,10 +6,10 @@
 // use clap::{Arg, Command};
 // use itertools::Itertools;
 // use std::error::Error;
-// 
+//
 // const COMMIT: &str = "commit";
 // const FEATURE: &str = "feature";
-// 
+//
 // fn find_features_that_contain_files<'a>(
 //     commit: &'a CommitHash,
 //     features: &'a Vec<NodePath<Feature>>,
@@ -31,10 +31,10 @@
 //         .collect();
 //     Ok(all)
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct UntieCommand;
-// 
+//
 // impl CommandDefinition for UntieCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("untie")
@@ -48,7 +48,7 @@
 //             .arg(Arg::new(FEATURE).help("Feature to untie to"))
 //     }
 // }
-// 
+//
 // impl CommandInterface for UntieCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let product = context.git.assert_current_node_path::<Product>()?;
@@ -57,7 +57,7 @@
 //             .get_argument_value::<String>(COMMIT)
 //             .unwrap();
 //         let maybe_feature = context.arg_helper.get_argument_value::<String>(FEATURE);
-// 
+//
 //         let commit: Commit = match target_commit.as_str() {
 //             "HEAD" => context.git.get_commit(&product)?,
 //             _ => context
@@ -92,7 +92,7 @@
 //             .unwrap()?;
 //         let state = full_metadata.get_data().unwrap();
 //         let all_features = context.git.assert_paths::<Feature>(state.get_total())?;
-// 
+//
 //         let found =
 //             find_features_that_contain_files(commit.get_hash(), &all_features, &context.git)?;
 //         let feature: NodePath<Feature> = match maybe_feature {
@@ -114,7 +114,7 @@
 //                 }
 //             },
 //         };
-// 
+//
 //         let mut product_with_commit = product.clone();
 //         product_with_commit.update_version(VersionPointer::Commit(commit.get_hash().clone()));
 //         context

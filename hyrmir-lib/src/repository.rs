@@ -1,6 +1,6 @@
 use crate::model::*;
-use crate::vcs::{VCSError, VersionId, VCS};
-use crate::workspace::Workspace;
+use crate::vcs::{VCS, VCSError, VersionId};
+use crate::workspace::{WorkSpaceError, Workspace};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,7 +17,7 @@ pub enum MalformedModelVCSError<VE: VCSError> {
 type ScanError<VE: VCSError> = MalformedModelVCSError<VE>;
 
 pub struct RepositoryLoader<V: VCS> {
-    repository: Repository<V>
+    repository: Repository<V>,
 }
 
 impl<V: VCS> RepositoryLoader<V> {
@@ -46,7 +46,7 @@ impl<V: VCS> Repository<V> {
             let path = unwrapped.get_path();
             let p = if path.is_absolute() {
                 &path.strip_n_left(1)
-            } else { 
+            } else {
                 panic!("Paths must be absolute when loaded into repository")
             };
             let id = unwrapped.get_id();
@@ -56,7 +56,7 @@ impl<V: VCS> Repository<V> {
         }
         Ok(())
     }
-    
+
     fn get_node_vec(&self, path: &NormalizedPath) -> Vec<Rc<RefCell<Node<V::VersionId>>>> {
         let no_version = path.strip_version();
         let mut new_node_vec = vec![self.virtual_root.clone()];
@@ -65,19 +65,19 @@ impl<V: VCS> Repository<V> {
             let node = if let Some(node) = current.borrow().get_child(p) {
                 node
             } else {
-                Rc::new(RefCell::new(Node::new(p.clone(), NodeType::NonExistent, None)))
+                Rc::new(RefCell::new(Node::new(
+                    p.clone(),
+                    NodeType::NonExistent,
+                    None,
+                )))
             };
             new_node_vec.push(node);
-        };
+        }
         new_node_vec
     }
-    
+
     pub fn new(vcs: V) -> Self {
-        let root = Node::new(
-            "".to_string(),
-            NodeType::VirtualRoot,
-            None,
-        );
+        let root = Node::new("".to_string(), NodeType::VirtualRoot, None);
         Self {
             virtual_root: Rc::new(RefCell::new(root)),
             id_to_path: HashMap::new(),
@@ -92,17 +92,23 @@ impl<V: VCS> Repository<V> {
     pub fn get_virtual_root_view(&self) -> TreeView<VirtualRoot, V> {
         TreeView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
-    
-    pub fn get_view<S: SymbolicNodeType>(&self, path: &NormalizedPath) -> Result<TreeView<S, V>, TreeViewError<V::VersionId>> {
+
+    pub fn get_view<S: SymbolicNodeType>(
+        &self,
+        path: &NormalizedPath,
+    ) -> Result<TreeView<S, V>, TreeViewError<V::VersionId>> {
         let node_vec = self.get_node_vec(path);
         Ok(TreeView::new(node_vec, &self)?)
     }
-    
+
     pub fn get_path(&self, path: &NormalizedPath) -> Result<NodePath<V::VersionId>, V::VCSError> {
         let node_vec = self.get_node_vec(path);
         let version = match path.get_version_appendix() {
             Some(version) => {
-                let version_id = if self.get_vcs().version_exists_on_path(&node_vec.to_normalized_path(), &version)? {
+                let version_id = if self
+                    .get_vcs()
+                    .version_exists_on_path(&node_vec.to_normalized_path(), &version)?
+                {
                     let version_id = self.get_vcs().get_version(&version)?.unwrap();
                     let mut node = node_vec.last().unwrap().borrow_mut();
                     node.add_known_version(version_id.clone());
@@ -111,13 +117,15 @@ impl<V: VCS> Repository<V> {
                     V::VersionId::new(version)
                 };
                 VersionPointer::Version(version_id)
-            },
+            }
             None => VersionPointer::Default,
         };
         Ok(NodePath::new(node_vec, version))
     }
-    
-    pub fn get_workspace(&self) -> Result<Workspace<V>, V::VCSError> {
-        Ok(Workspace::new(&self))
+
+    pub fn get_workspace<S: IsConcrete>(
+        &self,
+    ) -> Result<Workspace<S, V>, WorkSpaceError<V::VersionId, V::VCSError>> {
+        Workspace::new(&self)
     }
 }

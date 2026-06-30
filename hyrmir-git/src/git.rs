@@ -1,10 +1,10 @@
+use hyrmir_lib::model::NormalizedPath;
+use hyrmir_lib::vcs::{VCS, VCSError, VersionId};
 use std::cell::RefCell;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, ExitStatus, Output};
 use std::rc::Rc;
-use hyrmir_lib::model::NormalizedPath;
-use hyrmir_lib::vcs::{VCSError, VersionId, VCS};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -134,14 +134,13 @@ impl GitCLI {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Git {
-    git_cli: Rc<RefCell<GitCLI>>
+    git_cli: Rc<RefCell<GitCLI>>,
 }
 
-
 impl Git {
-    pub fn new(
-        git_cli: Rc<RefCell<GitCLI>>
-    ) -> Self { Self { git_cli } }
+    pub fn new(git_cli: Rc<RefCell<GitCLI>>) -> Self {
+        Self { git_cli }
+    }
 }
 
 impl VCS for Git {
@@ -156,19 +155,32 @@ impl VCS for Git {
         todo!()
     }
 
-    fn version_exists_on_path(&self, path: &NormalizedPath, version: &String) -> Result<bool, Self::VCSError> {
+    fn version_exists_on_path(
+        &self,
+        path: &NormalizedPath,
+        version: &String,
+    ) -> Result<bool, Self::VCSError> {
         todo!()
     }
 
-    fn iter_concrete_paths(&self) -> impl Iterator<Item=Result<NormalizedPath, Self::VCSError>> {
+    fn iter_concrete_paths(&self) -> impl Iterator<Item = Result<NormalizedPath, Self::VCSError>> {
         vec![].into_iter()
     }
 
-    fn iter_versions(&self, path: &NormalizedPath) -> impl Iterator<Item=Result<Self::VersionId, Self::VCSError>> {
+    fn iter_versions(
+        &self,
+        path: &NormalizedPath,
+    ) -> impl Iterator<Item = Result<Self::VersionId, Self::VCSError>> {
         vec![].into_iter()
     }
 
-    fn format_status_message(&self, current_path_msg: String, pre_status: String, post_status: String, colored: bool) -> Result<String, Self::VCSError> {
+    fn format_status_message(
+        &self,
+        current_path_msg: String,
+        pre_status: String,
+        post_status: String,
+        colored: bool,
+    ) -> Result<String, Self::VCSError> {
         let command = vec!["status"];
         let out = self.git_cli.borrow().run_attached(&command)?;
         let original = output_to_result(out, &command)?;
@@ -177,6 +189,8 @@ impl VCS for Git {
             .join("\n")
             .trim()
             .to_string();
-        Ok(format!("{current_path_msg}\n{pre_status}\n{no_first_line}\n{post_status}"))
+        Ok(format!(
+            "{current_path_msg}\n{pre_status}\n{no_first_line}\n{post_status}"
+        ))
     }
 }

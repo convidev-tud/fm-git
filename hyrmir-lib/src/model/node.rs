@@ -1,4 +1,5 @@
 use crate::model::*;
+use crate::vcs::VersionId;
 use colored::{ColoredString, Colorize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -6,7 +7,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::rc::Rc;
 use thiserror::Error;
-use crate::vcs::VersionId;
 
 pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
@@ -19,9 +19,15 @@ pub struct MalformedModelError {
 
 impl MalformedModelError {
     pub fn new(reason: impl Into<String>) -> Self {
-        Self { reason: reason.into() }
+        Self {
+            reason: reason.into(),
+        }
     }
 }
+
+#[derive(Error, Debug)]
+#[error("Node already locked")]
+pub struct NodeLockError;
 
 impl Display for MalformedModelError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -31,18 +37,20 @@ impl Display for MalformedModelError {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct VirtualRootMetadata {
-    repo_scanned: bool
+    repo_scanned: bool,
 }
 
 impl VirtualRootMetadata {
     pub fn new() -> Self {
-        Self { repo_scanned: false }
+        Self {
+            repo_scanned: false,
+        }
     }
-    
+
     pub fn repo_scanned(&self) -> bool {
         self.repo_scanned
     }
-    
+
     pub fn set_repo_scanned(&mut self) {
         self.repo_scanned = true;
     }
@@ -64,7 +72,11 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    pub fn decide_next_type(&self, name: &str, concrete: bool) -> Result<NodeType, MalformedModelError> {
+    pub fn decide_next_type(
+        &self,
+        name: &str,
+        concrete: bool,
+    ) -> Result<NodeType, MalformedModelError> {
         match self {
             Self::VirtualRoot => Ok(Self::Area(concrete)),
             Self::Area(_) => match name {
@@ -81,9 +93,7 @@ impl NodeType {
 
     pub fn accepts_explicit_version(&self) -> bool {
         match self {
-            Self::Area(true) |
-            Self::Feature(true) |
-            Self::Product(true) => true,
+            Self::Area(true) | Self::Feature(true) | Self::Product(true) => true,
             _ => false,
         }
     }
@@ -107,7 +117,7 @@ impl NodeType {
             Self::ProductRoot => "product root",
             Self::Feature(_) => "feature",
             Self::Product(_) => "product",
-            _ => "bad"
+            _ => "bad",
         };
         name.to_string()
     }
@@ -120,7 +130,7 @@ impl NodeType {
             Self::ProductRoot => "pr",
             Self::Feature(_) => "f",
             Self::Product(_) => "p",
-            _ => "b"
+            _ => "b",
         };
         name.to_string()
     }
@@ -143,20 +153,18 @@ pub struct Node<V: VersionId> {
     head: Option<V>,
     known_versions: HashMap<String, V>,
     children: HashMap<String, Rc<RefCell<Node<V>>>>,
+    lock: bool,
 }
 
 impl<V: VersionId> Node<V> {
-    pub fn new (
-        name: impl Into<String>,
-        node_type: NodeType,
-        head: Option<V>,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, node_type: NodeType, head: Option<V>) -> Self {
         Self {
             name: name.into(),
             node_type,
             head,
             known_versions: HashMap::new(),
             children: HashMap::new(),
+            lock: false,
         }
     }
 
@@ -166,6 +174,19 @@ impl<V: VersionId> Node<V> {
 
     pub(crate) fn update_head(&mut self, head: Option<V>) {
         self.head = head;
+    }
+
+    pub(crate) fn try_lock(&mut self) -> Result<(), NodeLockError> {
+        if !self.lock {
+            self.lock = true;
+            Ok(())
+        } else {
+            Err(NodeLockError)
+        }
+    }
+    
+    pub(crate) fn unlock(&mut self) {
+        self.lock = false;
     }
 
     // fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
@@ -194,7 +215,11 @@ impl<V: VersionId> Node<V> {
     //     tree
     // }
 
-    fn decide_child_type(&self, name: &str, head: &Option<V>) -> Result<NodeType, MalformedModelError> {
+    fn decide_child_type(
+        &self,
+        name: &str,
+        head: &Option<V>,
+    ) -> Result<NodeType, MalformedModelError> {
         let concrete = match head {
             Some(_) => true,
             None => false,
@@ -202,20 +227,21 @@ impl<V: VersionId> Node<V> {
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(&mut self, name: String, head: Option<V>) -> Result<NodeType, MalformedModelError> {
+    fn add_child(
+        &mut self,
+        name: String,
+        head: Option<V>,
+    ) -> Result<NodeType, MalformedModelError> {
         let node_type = self.decide_child_type(name.as_str(), &head)?;
         // let child = ;
-        let child = Node::new(
-            name.clone(),
-            node_type.clone(),
-            head,
-        );
+        let child = Node::new(name.clone(), node_type.clone(), head);
         self.children.insert(name, Rc::new(RefCell::new(child)));
         Ok(node_type)
     }
 
     pub fn add_known_version(&mut self, version: V) {
-        self.known_versions.insert(version.get_full_id().clone(), version);
+        self.known_versions
+            .insert(version.get_full_id().clone(), version);
     }
 
     pub fn remove_known_version(&mut self, version: &V) {
@@ -251,7 +277,11 @@ impl<V: VersionId> Node<V> {
         self.children.values().cloned().collect()
     }
 
-    pub fn insert_path(&mut self, path: &NormalizedPath, head: Option<V>) -> Result<NodeType, MalformedModelError> {
+    pub fn insert_path(
+        &mut self,
+        path: &NormalizedPath,
+        head: Option<V>,
+    ) -> Result<NodeType, MalformedModelError> {
         match path.len() {
             0 => Ok(self.node_type.clone()),
             1 => {

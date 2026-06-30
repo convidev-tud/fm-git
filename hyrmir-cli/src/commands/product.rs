@@ -3,9 +3,9 @@
 // use crate::core::model::*;
 // use clap::{Arg, Command};
 // use std::error::Error;
-// 
+//
 // const PRODUCT: &str = "product";
-// 
+//
 // fn add_product(
 //     product: NormalizedPath,
 //     context: &mut CommandContext,
@@ -30,7 +30,7 @@
 //     ));
 //     Ok(())
 // }
-// 
+//
 // fn print_product_tree(context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //     let area = context.git.get_current_area()?;
 //     match area.move_to_product_root() {
@@ -41,7 +41,7 @@
 //     }
 //     Ok(())
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct ProductCommand;
 // impl CommandDefinition for ProductCommand {

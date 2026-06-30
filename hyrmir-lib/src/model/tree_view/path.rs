@@ -1,11 +1,11 @@
-use crate::model::{Node, NormalizedPath, ToNormalizedPath, SymbolicNodeType};
+use crate::model::{Node, NormalizedPath, SymbolicNodeType, ToNormalizedPath};
+use crate::vcs::VersionId;
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use itertools::Itertools;
-use crate::vcs::VersionId;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum VersionPointer<V: VersionId> {
@@ -23,7 +23,7 @@ impl<V: VersionId> NodePath<V> {
     pub fn new(path: Vec<Rc<RefCell<Node<V>>>>, version: VersionPointer<V>) -> Self {
         Self { path, version }
     }
-    
+
     pub fn get_node(&self) -> &Rc<RefCell<Node<V>>> {
         &self.path.last().unwrap()
     }
@@ -79,7 +79,8 @@ impl<V: VersionId> Display for NodePath<V> {
 
 impl<V: VersionId> PartialOrd for NodePath<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.to_normalized_path().partial_cmp(&other.to_normalized_path())
+        self.to_normalized_path()
+            .partial_cmp(&other.to_normalized_path())
     }
 }
 

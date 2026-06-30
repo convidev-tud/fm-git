@@ -1,6 +1,6 @@
+use crate::model::NormalizedPath;
 use std::error::Error;
 use std::fmt::Debug;
-use crate::model::NormalizedPath;
 
 pub trait VCSError: Error {}
 
@@ -32,23 +32,31 @@ impl<V: VersionId> PathInfo<V> {
     pub fn get_version(&self) -> &V {
         &self.version
     }
-
 }
 
 pub trait VCS: Debug + Clone + PartialEq + Eq {
     type VCSError: VCSError;
-    
+
     type VersionId: VersionId;
 
     fn get_current_path(&self) -> Result<PathInfo<Self::VersionId>, Self::VCSError>;
 
-    fn iter_concrete_paths(&self) -> impl Iterator<Item = Result<PathInfo<Self::VersionId>, Self::VCSError>>;
+    fn iter_concrete_paths(
+        &self,
+    ) -> impl Iterator<Item = Result<PathInfo<Self::VersionId>, Self::VCSError>>;
 
     fn get_version(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError>;
 
-    fn version_exists_on_path(&self, path: &NormalizedPath, version: &String) -> Result<bool, Self::VCSError>;
+    fn version_exists_on_path(
+        &self,
+        path: &NormalizedPath,
+        version: &String,
+    ) -> Result<bool, Self::VCSError>;
 
-    fn iter_versions(&self, path: &NormalizedPath) -> impl Iterator<Item=Result<Self::VersionId, Self::VCSError>>;
+    fn iter_versions(
+        &self,
+        path: &NormalizedPath,
+    ) -> impl Iterator<Item = Result<Self::VersionId, Self::VCSError>>;
 
     fn get_status_without_current_info(&self, colored: bool) -> Result<String, Self::VCSError>;
 
@@ -75,6 +83,8 @@ pub trait VCS: Debug + Clone + PartialEq + Eq {
         } else {
             format!("\n{post_status_msg}")
         };
-        Ok(format!("{current_path_msg}{pre_status_msg}{native_status}{post_status_msg}"))
+        Ok(format!(
+            "{current_path_msg}{pre_status_msg}{native_status}{post_status_msg}"
+        ))
     }
 }

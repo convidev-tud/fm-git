@@ -2,10 +2,10 @@
 // use crate::core::model::{AnyGitObject, NormalizedPath};
 // use clap::{Arg, Command};
 // use std::error::Error;
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct TagCommand;
-// 
+//
 // impl CommandDefinition for TagCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("tag")
@@ -15,7 +15,7 @@
 //             .arg(delete(false).help("Delete tag"))
 //     }
 // }
-// 
+//
 // impl CommandInterface for TagCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         // let tag = context.arg_helper.get_argument_value::<String>("tag");

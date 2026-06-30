@@ -88,19 +88,19 @@ impl<'a, V: VCS> CommandContext<'a, V> {
             import_format,
         }
     }
-    
+
     pub fn get_current_command(&self) -> &CommandMap<V> {
         &self.current_command
     }
-    
+
     pub fn get_root_command(&self) -> &CommandMap<V> {
         &self.root_command
     }
-    
+
     pub fn get_arg_helper(&self) -> &ArgHelper {
         &self.arg_helper
     }
-    
+
     pub fn get_import_format(&self) -> &ImportFormat {
         &self.import_format
     }

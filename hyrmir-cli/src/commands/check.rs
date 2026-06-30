@@ -6,13 +6,13 @@
 // use clap::{Arg, ArgAction, Command};
 // use colored::Colorize;
 // use std::error::Error;
-// 
+//
 // const PATHS: &str = "paths";
 // const PERMUTATIONS: &str = "permutations";
 // const BY_ORDER: &str = "by_order";
 // const ONE_TO_N: &str = "one_to_n";
 // const PERM_TO_BASE: &str = "perm_to_base";
-// 
+//
 // fn run_checks(
 //     paths: &Vec<NodePath<AnyGitObject>>,
 //     permutations: Option<usize>,
@@ -53,10 +53,10 @@
 //         };
 //     Ok(statistics?)
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct CheckCommand;
-// 
+//
 // impl CommandDefinition for CheckCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("test")
@@ -104,7 +104,7 @@
 //             )
 //     }
 // }
-// 
+//
 // impl CommandInterface for CheckCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let paths = context
@@ -129,7 +129,7 @@
 //             .get_argument_value::<bool>(&ONE_TO_N)
 //             .unwrap();
 //         let checker = ConflictChecker::new(&context.git, CheckMode::Merge);
-// 
+//
 //         let statistics = if paths.is_empty()
 //             && permutations.is_none()
 //             && perm_to_base.is_none()
@@ -199,7 +199,7 @@
 //             };
 //             run_checks(&final_paths, perm, perm_to_b, by_order, one_to_n, &checker)?
 //         };
-// 
+//
 //         for statistic in statistics.iter_all() {
 //             if statistic.contains_conflicts() || statistic.contains_errors() {
 //                 context.logger.error(statistic.display_as_path());
@@ -212,7 +212,7 @@
 //         }
 //         Ok(())
 //     }
-// 
+//
 //     fn shell_complete(
 //         &self,
 //         completion_helper: CompletionHelper,

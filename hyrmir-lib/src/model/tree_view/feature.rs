@@ -29,7 +29,9 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     type Classification = C;
 
     fn new() -> Self {
-        Self { _phantom: PhantomData }
+        Self {
+            _phantom: PhantomData,
+        }
     }
 
     fn compatible() -> Vec<NodeType> {

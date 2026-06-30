@@ -1,6 +1,6 @@
-use std::marker::PhantomData;
-use crate::model::tree_view::*;
 use crate::model::NodeType;
+use crate::model::tree_view::*;
+use std::marker::PhantomData;
 
 /// Marker for the product root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -30,7 +30,9 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;
 
     fn new() -> Self {
-        Self { phantom_data: PhantomData }
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 
     fn compatible() -> Vec<NodeType> {

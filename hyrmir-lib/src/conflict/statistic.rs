@@ -6,7 +6,7 @@
 // use serde::{Deserialize, Serialize};
 // use std::fmt::{Display, Formatter};
 // use std::iter::once;
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub enum MergeResult {
 //     Base,
@@ -17,7 +17,7 @@
 //     Aborted,
 //     Error(String),
 // }
-// 
+//
 // impl Display for MergeResult {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         let value = match self {
@@ -32,13 +32,13 @@
 //         f.write_str(value.to_string().as_str())
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub struct NormalizedMergeStatistic {
 //     path: NormalizedPath,
 //     stat: MergeResult,
 // }
-// 
+//
 // impl NormalizedMergeStatistic {
 //     pub fn new(path: NormalizedPath, stat: MergeResult) -> Self {
 //         Self { path, stat }
@@ -50,24 +50,24 @@
 //         &self.stat
 //     }
 // }
-// 
+//
 // impl ToNormalizedPaths for Vec<NormalizedMergeStatistic> {
 //     fn to_normalized_paths(&self) -> Vec<NormalizedPath> {
 //         self.iter().map(|s| s.get_path().clone()).collect()
 //     }
 // }
-// 
+//
 // #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 // pub struct MergeStatistic<T: IsConcrete, V: VCS> {
 //     path: NodePath<T, V>,
 //     stat: MergeResult,
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> MergeStatistic<T, V> {
 //     pub fn new(path: NodePath<T, V>, stat: MergeResult) -> Self {
 //         Self { path, stat }
 //     }
-// 
+//
 //     pub fn from_normalized(
 //         stat: NormalizedMergeStatistic,
 //         root: NodePath<VirtualRoot, V>,
@@ -75,7 +75,7 @@
 //         let path = root.move_to(stat.get_path())?;
 //         Ok(Self::new(path, stat.get_stat().clone()))
 //     }
-//     
+//
 //     pub fn to_normalized(&self) -> NormalizedMergeStatistic {
 //         NormalizedMergeStatistic::new(
 //             self.path.to_normalized_path_with_version(),
@@ -85,16 +85,16 @@
 //     pub fn get_path(&self) -> &NodePath<T, V> {
 //         &self.path
 //     }
-//     
+//
 //     pub fn get_stat(&self) -> &MergeResult {
 //         &self.stat
 //     }
-//     
+//
 //     pub fn formatted(&self, colored: bool) -> String {
 //         todo!()
 //     }
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> Display for MergeStatistic<T, V> {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         let stat = self.get_stat().to_string();
@@ -107,12 +107,12 @@
 //         }
 //     }
 // }
-// 
+//
 // pub enum MergeChainPart<T: IsConcrete, V: VCS> {
 //     Normal(MergeStatistic<T, V>),
 //     Error(NodePath<ErrorState, V>),
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> MergeChainPart<T, V> {
 //     pub fn format(&self, colored: bool) -> String {
 //         match self {
@@ -121,7 +121,7 @@
 //         }
 //     }
 // }
-// 
+//
 // #[derive(Debug, PartialEq, Eq, Clone)]
 // pub struct MergeChainStatistic<B, C, V>
 // where
@@ -132,7 +132,7 @@
 //     base: MergeStatistic<B, V>,
 //     chain: Vec<MergeChainPart<C, V>>,
 // }
-// 
+//
 // impl<B, C, V> MergeChainStatistic<B, C, V>
 // where
 //     B: IsConcrete,
@@ -145,7 +145,7 @@
 //             chain: vec![],
 //         }
 //     }
-// 
+//
 //     pub fn from_normalized(
 //         base: NodePath<B, V>,
 //         stats: Vec<NormalizedMergeStatistic>,
@@ -172,32 +172,32 @@
 //             Ok(new)
 //         }
 //     }
-// 
+//
 //     pub fn push(&mut self, stat: MergeStatistic<C, V>) {
 //         self.chain.push(MergeChainPart::Normal(stat));
 //     }
-// 
+//
 //     pub fn fill(&mut self, stats: Vec<MergeStatistic<C, V>>) {
 //         for stat in stats {
 //             self.chain.push(MergeChainPart::Normal(stat));
 //         }
 //     }
-// 
+//
 //     pub fn to_normalized(&self) -> Vec<NormalizedMergeStatistic> {
 //         self.iter_chain().map(|s| s.to_normalized()).collect()
 //     }
-// 
+//
 //     pub fn insert(&mut self, index: usize, stat: MergeStatistic<C, V>) {
 //         self.chain.insert(index, MergeChainPart::Normal(stat));
 //     }
-// 
+//
 //     pub fn remove(&mut self, index: usize) -> Result<MergeStatistic<C, V>, NodePath<ErrorState, V>> {
 //         match self.chain.remove(index) {
 //             MergeChainPart::Normal(s) => Ok(s),
 //             MergeChainPart::Error(s) => Err(s),
 //         }
 //     }
-// 
+//
 //     pub fn get(&self, index: usize) -> Option<Result<&MergeStatistic<C, V>, &NodePath<ErrorState, V>>> {
 //         match self.chain.get(index) {
 //             Some(s) => match s {
@@ -207,24 +207,24 @@
 //             None => None,
 //         }
 //     }
-// 
+//
 //     pub fn get_base(&self) -> &MergeStatistic<B, V> {
 //         &self.base
 //     }
-// 
+//
 //     pub fn replace(&mut self, index: usize, stat: MergeStatistic<C, V>) {
 //         self.remove(index);
 //         self.insert(index, stat);
 //     }
-// 
+//
 //     pub fn get_chain(&self) -> &Vec<MergeStatistic<C, V>> {
 //         &self.chain
 //     }
-// 
+//
 //     pub fn iter_chain(&self) -> impl Iterator<Item = &MergeStatistic<C, V>> {
 //         self.chain.iter()
 //     }
-// 
+//
 //     pub fn get_n_success(&self) -> usize {
 //         let success: Vec<&MergeStatistic<C, V>> = self
 //             .iter_chain()
@@ -232,7 +232,7 @@
 //             .collect();
 //         success.len()
 //     }
-// 
+//
 //     pub fn get_n_conflict(&self) -> usize {
 //         let all: Vec<&MergeStatistic<C, V>> = self
 //             .iter_chain()
@@ -240,7 +240,7 @@
 //             .collect();
 //         all.len()
 //     }
-// 
+//
 //     pub fn get_n_merges(&self) -> usize {
 //         let all: Vec<&MergeStatistic<C, V>> = self
 //             .iter_chain()
@@ -251,7 +251,7 @@
 //             .collect();
 //         all.len()
 //     }
-// 
+//
 //     pub fn get_n_up_to_date(&self) -> usize {
 //         let all: Vec<&MergeStatistic<C, V>> = self
 //             .iter_chain()
@@ -259,7 +259,7 @@
 //             .collect();
 //         all.len()
 //     }
-// 
+//
 //     pub fn get_n_errors(&self) -> usize {
 //         let all: Vec<&MergeStatistic<C, V>> = self
 //             .iter_chain()
@@ -270,7 +270,7 @@
 //             .collect();
 //         all.len()
 //     }
-// 
+//
 //     pub fn all_up_to_date(&self) -> bool {
 //         if self.chain.is_empty() {
 //             true
@@ -278,27 +278,27 @@
 //             self.get_n_up_to_date() == self.chain.len()
 //         }
 //     }
-// 
+//
 //     pub fn len(&self) -> usize {
 //         self.chain.len()
 //     }
-// 
+//
 //     pub fn is_empty(&self) -> bool {
 //         self.chain.is_empty()
 //     }
-// 
+//
 //     pub fn contains_conflicts(&self) -> bool {
 //         self.get_n_conflict() > 0
 //     }
-// 
+//
 //     pub fn contains_up_to_date(&self) -> bool {
 //         self.get_n_up_to_date() > 0
 //     }
-// 
+//
 //     pub fn contains_errors(&self) -> bool {
 //         self.get_n_errors() > 0
 //     }
-// 
+//
 //     pub fn display_as_path(&self, colored: bool) -> String {
 //         vec![&self.base]
 //             .iter()
@@ -306,21 +306,21 @@
 //             .chain(self.chain.iter().map(|stat| stat.format(colored)))
 //             .join(" <- ")
 //     }
-// 
+//
 //     pub fn display_as_list(&self, colored: bool) -> impl Iterator<Item = String> {
 //         once(&self.base)
 //             .map(|m| m.formatted(colored))
 //             .chain(self.chain.iter().map(|stat| format!(" <- {}", stat.format(colored))))
 //     }
 // }
-// 
+//
 // pub struct MergeChainStatistics<B: IsConcrete, T: IsConcrete, V: VCS> {
 //     statistics: Vec<MergeChainStatistic<B, T, V>>,
 //     total_successes: usize,
 //     total_conflicts: usize,
 //     total_errors: usize,
 // }
-// 
+//
 // impl<B: IsConcrete, T: IsConcrete, V: VCS> MergeChainStatistics<B, T, V> {
 //     pub fn new() -> Self {
 //         Self {
@@ -360,7 +360,7 @@
 //         self.total_errors
 //     }
 // }
-// 
+//
 // impl<B: IsConcrete, T: IsConcrete, V: VCS> FromIterator<MergeChainStatistic<B, T, V>>
 //     for MergeChainStatistics<B, T, V>
 // {
@@ -370,12 +370,12 @@
 //         new
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 // pub enum MergeStatisticWeight {
 //     Simple,
 // }
-// 
+//
 // impl MergeStatisticWeight {
 //     pub fn get_weight(&self, statistic: &MergeResult) -> i32 {
 //         match self {
@@ -391,13 +391,13 @@
 //         }
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 // pub struct MergeStatisticComparator<T: IsConcrete, V: VCS> {
 //     statistics: Vec<MergeStatistic<T, V>>,
 //     weights: MergeStatisticWeight,
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> PartialOrd for MergeStatisticComparator<T, V> {
 //     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 //         let my_weights = self.accumulate_weights();
@@ -405,13 +405,13 @@
 //         Some(my_weights.cmp(&their_weights))
 //     }
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> Ord for MergeStatisticComparator<T, V> {
 //     fn cmp(&self, other: &Self) -> Ordering {
 //         self.partial_cmp(other).unwrap()
 //     }
 // }
-// 
+//
 // impl<T: IsConcrete, V: VCS> MergeStatisticComparator<T, V> {
 //     pub fn new(weights: MergeStatisticWeight) -> Self {
 //         Self {
@@ -419,11 +419,11 @@
 //             weights,
 //         }
 //     }
-//     
+//
 //     pub fn push(&mut self, statistic: MergeStatistic<T, V>) {
 //         self.statistics.push(statistic);
 //     }
-//     
+//
 //     pub fn accumulate_weights(&self) -> i32 {
 //         let mut sum = 0;
 //         for s in &self.statistics {
@@ -431,7 +431,7 @@
 //         }
 //         sum
 //     }
-//     
+//
 //     pub fn get_lowest(&self) -> &MergeStatistic<T, V> {
 //         self.statistics
 //             .iter()

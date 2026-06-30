@@ -1,14 +1,14 @@
-mod virtual_root;
-mod area;
-mod feature;
-mod product;
 mod any;
+mod area;
 mod classification;
+mod feature;
 mod path;
+mod product;
+mod virtual_root;
 
 use crate::model::*;
 use crate::repository::Repository;
-use crate::vcs::{VCSError, VersionId, VCS};
+use crate::vcs::{VCS, VCSError, VersionId};
 pub use any::*;
 pub use area::*;
 pub use classification::*;
@@ -71,7 +71,9 @@ pub trait NodeClassification: Clone + Debug + Eq + PartialEq + Hash {
 pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     type Classification: NodeClassification;
     fn new() -> Self;
-    fn compatible() -> Vec<NodeType> { vec![] }
+    fn compatible() -> Vec<NodeType> {
+        vec![]
+    }
 }
 
 impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
@@ -108,13 +110,16 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
             repo,
             sym_type: S::new(),
         };
+        new.lock_node();
         let new = new
             .check_path_not_existent()?
             .check_sym_type_compatibility()?;
         Ok(new)
     }
 
-    pub fn try_convert_to<To: SymbolicNodeType>(self) -> Result<TreeView<'a, To, V>, InvalidTypeError> {
+    pub fn try_convert_to<To: SymbolicNodeType>(
+        self,
+    ) -> Result<TreeView<'a, To, V>, InvalidTypeError> {
         let new = TreeView {
             path: self.path,
             repo: self.repo,
@@ -143,6 +148,13 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
             Err(InvalidTypeError::new(S::compatible(), real_type))
         } else {
             Ok(self)
+        }
+    }
+
+    fn lock_node(&self) {
+        if let Err(_) = self.get_node().borrow_mut().try_lock() {
+            let path = self.to_normalized_path();
+            panic!("Cannot lock path {path}: node is already locked")
         }
     }
 
@@ -177,28 +189,43 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
         self.path.last().unwrap()
     }
 
-    pub fn get_root(&self) -> &Rc<RefCell<Node<V::VersionId>>> { self.path.first().unwrap() }
+    pub fn get_root(&self) -> &Rc<RefCell<Node<V::VersionId>>> {
+        self.path.first().unwrap()
+    }
 
     pub fn get_real_type(&self) -> NodeType {
         self.get_node().borrow().get_type().clone()
     }
-    
+
     pub fn get_sym_type(&self) -> &S {
         &self.sym_type
     }
 
-    pub fn get_child(&self, name: &str) -> Result<NodePath<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
+    pub fn get_child(
+        &self,
+        name: &str,
+    ) -> Result<NodePath<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
         let mut path = self.path.clone();
         if let Some(child) = self.get_node().borrow().get_child(name) {
             path.push(child);
             Ok(NodePath::new(path, VersionPointer::Default))
         } else {
-            path.push(Rc::new(RefCell::new(Node::new(name.to_string(), NodeType::NonExistent, None))));
-            Err(PathDoesNotExistError::new(NodePath::new(path, VersionPointer::Default)))
+            path.push(Rc::new(RefCell::new(Node::new(
+                name.to_string(),
+                NodeType::NonExistent,
+                None,
+            ))));
+            Err(PathDoesNotExistError::new(NodePath::new(
+                path,
+                VersionPointer::Default,
+            )))
         }
     }
 
-    pub fn as_versioned_node_path(&self, version: VersionPointer<V::VersionId>) -> NodePath<V::VersionId> {
+    pub fn as_versioned_node_path(
+        &self,
+        version: VersionPointer<V::VersionId>,
+    ) -> NodePath<V::VersionId> {
         NodePath::new(self.path.clone(), version)
     }
 
@@ -227,11 +254,14 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
 /// Path pointer movement
 impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
     /// Moves path to a specific index of the node vector.
-    pub fn move_to_index<To: SymbolicNodeType>(self, index: usize) -> Result<TreeView<'a, To, V>, TreeViewError<V::VersionId>> {
+    pub fn move_to_index<To: SymbolicNodeType>(
+        self,
+        index: usize,
+    ) -> Result<TreeView<'a, To, V>, TreeViewError<V::VersionId>> {
         let path = self.path[0..index + 1].to_vec();
         Ok(TreeView::<'a, To, V>::new(path, self.repo)?)
     }
-    
+
     /// Move path to another node.
     ///
     /// Relative paths such as `..` are allowed.
@@ -255,7 +285,11 @@ impl<'a, S: SymbolicNodeType, V: VCS> TreeView<'a, S, V> {
             let node = if let Some(node) = current.borrow().get_child(p) {
                 node
             } else {
-                Rc::new(RefCell::new(Node::new(p.clone(), NodeType::NonExistent, None)))
+                Rc::new(RefCell::new(Node::new(
+                    p.clone(),
+                    NodeType::NonExistent,
+                    None,
+                )))
             };
             new_node_vec.push(node);
         }

@@ -1,11 +1,11 @@
 mod git;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use log::{set_logger, set_max_level, LevelFilter};
+use crate::git::{Git, GitCLI, GitPath};
 use hyrmir_cli::{ArgSource, CommandLogger, EntryPoint, PrintingLogger};
 use hyrmir_lib::repository::Repository;
-use crate::git::{Git, GitCLI, GitPath};
+use log::{LevelFilter, set_logger, set_max_level};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn main() {
     set_logger(&PrintingLogger).unwrap();

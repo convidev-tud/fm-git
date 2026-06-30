@@ -1,4 +1,4 @@
-use crate::model::{NodeClassification, TreeView, NormalizedPath, SymbolicNodeType};
+use crate::model::{NodeClassification, NormalizedPath, SymbolicNodeType, TreeView};
 use crate::vcs::VCS;
 
 /// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
@@ -21,13 +21,13 @@ pub struct AnyCls;
 ///
 /// Is automatically implemented if the type uses [Concrete] as parameter.
 pub trait IsConcrete: SymbolicNodeType {}
-impl<T: SymbolicNodeType<Classification=Concrete>> IsConcrete for T {}
+impl<T: SymbolicNodeType<Classification = Concrete>> IsConcrete for T {}
 
 /// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
 ///
 /// Is automatically implemented if [Abstract] is used as parameter.
 pub trait IsAbstract {}
-impl<T: SymbolicNodeType<Classification=Abstract>> IsAbstract for T {}
+impl<T: SymbolicNodeType<Classification = Abstract>> IsAbstract for T {}
 
 impl NodeClassification for Concrete {
     fn requires_artifact() -> Option<bool> {

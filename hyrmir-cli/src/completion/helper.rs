@@ -2,8 +2,8 @@ use crate::arg::ArgHelper;
 use crate::completion::RelativePathCompleter;
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use std::ops::Range;
 use hyrmir_lib::model::NormalizedPath;
+use std::ops::Range;
 
 #[derive(Debug, Clone)]
 pub struct CompletionHelper<'a> {

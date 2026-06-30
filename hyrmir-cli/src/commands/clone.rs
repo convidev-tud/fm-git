@@ -1,13 +1,13 @@
 // use crate::cli::*;
 // use clap::{Arg, ArgAction, Command};
 // use std::error::Error;
-// 
+//
 // const REPOSITORY: &str = "repository";
 // const TRACK: &str = "track";
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct CloneCommand;
-// 
+//
 // impl CommandDefinition for CloneCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("clone")
@@ -22,7 +22,7 @@
 //             ])
 //     }
 // }
-// 
+//
 // impl CommandInterface for CloneCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let repo = context.arg_helper.get_argument_value::<String>(REPOSITORY);
@@ -30,7 +30,7 @@
 //             .arg_helper
 //             .get_argument_value::<bool>(TRACK)
 //             .unwrap();
-// 
+//
 //         if track {
 //             let remotes = context.git.get_remote_branches()?;
 //             for remote in remotes {

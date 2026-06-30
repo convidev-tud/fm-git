@@ -3,10 +3,10 @@
 // use clap::Command;
 // use colored::Colorize;
 // use std::error::Error;
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct SpreadCommand;
-// 
+//
 // impl CommandDefinition for SpreadCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("spread")
@@ -14,7 +14,7 @@
 //             .disable_help_subcommand(true)
 //     }
 // }
-// 
+//
 // impl CommandInterface for SpreadCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let current = context.git.assert_current_node_path::<AnyGitObject>()?;

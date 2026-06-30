@@ -1,2 +1,2 @@
-pub mod statistic;
 mod matrix;
+pub mod statistic;

@@ -1,27 +1,48 @@
 use crate::model::*;
 use crate::repository::Repository;
-use crate::vcs::VCS;
+use crate::vcs::{VCS, VCSError, VersionId};
+use thiserror::Error;
 
-pub struct Workspace<'a, V: VCS> {
+#[derive(Error, Clone, Debug)]
+pub enum WorkSpaceError<V: VersionId, VE: VCSError> {
+    #[error(transparent)]
+    TreeView(#[from] TreeViewError<V>),
+    #[error(transparent)]
+    VCS(#[from] VE),
+}
+
+pub struct Workspace<'a, S: IsConcrete, V: VCS> {
+    current_view: TreeView<'a, S, V>,
     repository: &'a Repository<V>,
 }
 
 /// Base implementation
-impl<'a, V: VCS> Workspace<'a, V> {
-    pub fn new(repository: &'a Repository<V>) -> Self {
-        Self { repository }
+impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
+    pub fn new(
+        repository: &'a Repository<V>,
+    ) -> Result<Self, WorkSpaceError<V::VersionId, V::VCSError>> {
+        let current = repository.get_vcs().get_current_path()?;
+        let path = current.get_path();
+        let current_path = repository.get_view(&path)?;
+        Ok(Self {
+            current_view: current_path,
+            repository,
+        })
     }
 }
 
 /// VCS commands
-impl<'a, V: VCS> Workspace<'a, V> {
+impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
     pub fn get_vcs(&self) -> &V {
         &self.repository.get_vcs()
     }
 
-    pub fn get_current_path_view<T: IsConcrete>(&self) -> Result<TreeView<T, V>, TreeViewError<V::VersionId>> {
-        let current = self.get_vcs().get_current_path()?.get_path();
-        Ok(self.repository.get_view(&current)?)
+    pub fn get_current_view(&self) -> &TreeView<'a, S, V> {
+        &self.current_view
+    }
+
+    pub fn mut_get_current_view(&mut self) -> &mut TreeView<'a, S, V> {
+        &mut self.current_view
     }
 
     pub fn format_status_msg(
@@ -31,18 +52,20 @@ impl<'a, V: VCS> Workspace<'a, V> {
         post_status: impl Into<String>,
         colored: bool,
     ) -> Result<String, V::VCSError> {
-        let status =self
-            .get_vcs()
-            .format_status_message(
-                current_path_message.into(),
-                pre_status.into(),
-                post_status.into(),
-                colored,
-            )?;
+        let status = self.get_vcs().format_status_message(
+            current_path_message.into(),
+            pre_status.into(),
+            post_status.into(),
+            colored,
+        )?;
         Ok(status)
     }
 
-    pub fn commit(&self) { todo!() }
-    
-    pub fn switch_to(&self) { todo!() }
+    pub fn commit(&self) {
+        todo!()
+    }
+
+    pub fn switch_to(&self) {
+        todo!()
+    }
 }

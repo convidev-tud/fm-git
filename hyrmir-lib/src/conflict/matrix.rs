@@ -2,24 +2,24 @@
 // use std::fmt::{Display, Formatter};
 // use itertools::Itertools;
 // use crate::conflict::statistic::{MergeChainStatistic, MergeChainStatistics, MergeResult, MergeStatistic, MergeStatisticComparator, MergeStatisticWeight};
-// 
+//
 // #[derive(Debug, Clone)]
 // pub enum CheckMode {
 //     Merge,
 //     CherryPick,
 // }
-// 
+//
 // #[derive(Debug, Clone)]
 // pub struct ConflictChecker<'a> {
 //     git: &'a GitInterface,
 //     mode: CheckMode,
 // }
-// 
+//
 // impl<'a> ConflictChecker<'a> {
 //     pub fn new(git: &'a GitInterface, mode: CheckMode) -> Self {
 //         Self { git, mode }
 //     }
-// 
+//
 //     pub fn check_k_permutations<T: IsGitObject>(
 //         &self,
 //         paths: &Vec<NodePath<T>>,
@@ -31,7 +31,7 @@
 //         });
 //         iterator
 //     }
-// 
+//
 //     pub fn check_permutations_against_base<B: IsGitObject, T: IsGitObject>(
 //         &self,
 //         base: &NodePath<B>,
@@ -47,7 +47,7 @@
 //         });
 //         iterator
 //     }
-// 
+//
 //     pub fn check_by_order<T: IsGitObject>(
 //         &self,
 //         paths: &Vec<NodePath<T>>,
@@ -56,7 +56,7 @@
 //         let base = chain[0];
 //         self.check_chain(base, &chain[1..].to_vec())
 //     }
-// 
+//
 //     pub fn check_n_against_permutations<T: IsGitObject>(
 //         &self,
 //         n: &'a Vec<NodePath<T>>,
@@ -89,9 +89,9 @@
 //             .flatten();
 //         iterator
 //     }
-// 
+//
 //     pub fn clean_up(&mut self) {}
-// 
+//
 //     fn check_chain<B: IsGitObject, C: IsGitObject>(
 //         &self,
 //         base: &NodePath<B>,
@@ -139,7 +139,7 @@
 //         Ok(chain_statistic)
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone)]
 // pub struct Conflict2DMatrix {
 //     matrix: HashMap<
@@ -147,7 +147,7 @@
 //         HashMap<NodePath<AnyGitObject>, MergeStatistic<AnyGitObject>>,
 //     >,
 // }
-// 
+//
 // impl Display for Conflict2DMatrix {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         let mut result = String::new();
@@ -160,7 +160,7 @@
 //         f.write_str(result.as_str())
 //     }
 // }
-// 
+//
 // impl Conflict2DMatrix {
 //     pub fn new(statistics: &MergeChainStatistics<AnyGitObject, AnyGitObject>) -> Self {
 //         let mut matrix: HashMap<
@@ -183,7 +183,7 @@
 //         }
 //         Self { matrix }
 //     }
-// 
+//
 //     pub fn predict_conflicts<B: IsGitObject, C: IsGitObject>(
 //         &self,
 //         base: &NodePath<B>,
@@ -202,7 +202,7 @@
 //         }
 //         self.statistics_from_votes(base.clone(), &final_path)
 //     }
-// 
+//
 //     pub fn estimate_best_path<B: IsGitObject, C: IsGitObject>(
 //         &self,
 //         base_path: &NodePath<B>,
@@ -250,7 +250,7 @@
 //         }
 //         self.statistics_from_votes(base_path.clone(), &final_path)
 //     }
-// 
+//
 //     fn calculate_forward_compatibility(
 //         &self,
 //         element: &NodePath<AnyGitObject>,
@@ -269,7 +269,7 @@
 //         }
 //         statistics
 //     }
-// 
+//
 //     fn calculate_votes(
 //         &self,
 //         base: &NodePath<AnyGitObject>,
@@ -306,7 +306,7 @@
 //         }
 //         votes
 //     }
-// 
+//
 //     fn reverse_votes(
 //         votes: HashMap<NodePath<AnyGitObject>, MergeStatisticComparator<AnyGitObject>>,
 //     ) -> HashMap<MergeStatisticComparator<AnyGitObject>, Vec<NodePath<AnyGitObject>>> {
@@ -323,7 +323,7 @@
 //         }
 //         reversed
 //     }
-// 
+//
 //     fn statistics_from_votes<B: IsGitObject, C: IsGitObject>(
 //         &self,
 //         base: NodePath<B>,
@@ -343,24 +343,24 @@
 //         Some(chain_statistic)
 //     }
 // }
-// 
+//
 // pub struct ConflictAnalyzer<'a> {
 //     checker: ConflictChecker<'a>,
 //     logger: &'a TanglLogger,
 // }
-// 
+//
 // impl<'a> ConflictAnalyzer<'a> {
 //     pub fn new(checker: ConflictChecker<'a>, logger: &'a TanglLogger) -> Self {
 //         Self { checker, logger }
 //     }
-// 
+//
 //     pub fn calculate_2d_heuristics_matrix_with_merge_base(
 //         &mut self,
 //         paths: &Vec<NodePath<AnyGitObject>>,
 //         base: &NodePath<AnyGitObject>,
 //     ) -> Result<Conflict2DMatrix, PathAssertionError> {
 //         let mut statistics = MergeChainStatistics::new();
-// 
+//
 //         let mut successful_with_base: Vec<NodePath<AnyGitObject>> = vec![];
 //         let mut conflicting_with_base: Vec<NodePath<AnyGitObject>> = vec![];
 //         self.logger.debug("Checking against base pairwise");
@@ -378,7 +378,7 @@
 //                 successful_with_base.push(path);
 //             }
 //         }
-// 
+//
 //         self.logger.debug("Checking with successful against base");
 //         for successful in successful_with_base.iter() {
 //             for with_base in self.checker.check_permutations_against_base(
@@ -396,7 +396,7 @@
 //                 statistics.push(new);
 //             }
 //         }
-// 
+//
 //         self.logger.debug("Checking conflicting");
 //         for conflicting in conflicting_with_base.iter() {
 //             for with_base in

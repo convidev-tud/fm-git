@@ -11,7 +11,7 @@
 // use std::error::Error;
 // use std::fmt::{Display, Formatter};
 // use uuid::Uuid;
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // pub enum DerivationState {
 //     InProgress,
@@ -26,7 +26,7 @@
 //         f.write_str(out)
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // pub struct DerivationData {
 //     id: String,
@@ -138,13 +138,13 @@
 //         &self.initial_commit
 //     }
 // }
-// 
+//
 // #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // pub struct DerivationMetadata {
 //     previous: CommitHash,
 //     data: Option<DerivationData>,
 // }
-// 
+//
 // impl CommitMetadata for DerivationMetadata {
 //     fn header() -> String {
 //         "---derivation-metadata---".to_string()
@@ -156,7 +156,7 @@
 //         serde_json::to_string(&self)
 //     }
 // }
-// 
+//
 // impl DerivationMetadata {
 //     pub fn new(previous: CommitHash, data: Option<DerivationData>) -> Self {
 //         Self { previous, data }
@@ -168,33 +168,33 @@
 //         self.data.as_ref()
 //     }
 // }
-// 
+//
 // pub struct DerivationCommit {
 //     commit: Commit,
 //     metadata: DerivationMetadata,
 // }
-// 
+//
 // impl DerivationCommit {
 //     pub fn new(commit: Commit, metadata: DerivationMetadata) -> Self {
 //         Self { commit, metadata }
 //     }
-// 
+//
 //     pub fn get_commit(&self) -> &Commit {
 //         &self.commit
 //     }
-// 
+//
 //     pub fn get_metadata(&self) -> &DerivationMetadata {
 //         &self.metadata
 //     }
 // }
-// 
+//
 // pub struct DerivationManager<'a> {
 //     product: &'a NodePath<Product>,
 //     current_state: DerivationMetadata,
 //     git: &'a GitInterface,
 //     logger: &'a TanglLogger,
 // }
-// 
+//
 // impl<'a> DerivationManager<'a> {
 //     pub fn new(
 //         product: &'a NodePath<Product>,
@@ -210,12 +210,12 @@
 //             logger,
 //         })
 //     }
-// 
+//
 //     fn current_state(&self) -> &DerivationData {
 //         let data = self.current_state.get_data();
 //         data.as_ref().unwrap()
 //     }
-// 
+//
 //     fn derivation_commit<S: Into<String>>(
 //         &self,
 //         message: S,
@@ -227,7 +227,7 @@
 //             .git
 //             .commit::<_, Product>(real_message, Some(&container), true, true)?)
 //     }
-// 
+//
 //     fn run_derivation_until_conflict(&mut self) -> Result<DerivationData, PathAssertionError> {
 //         let mut chain = MergeChainStatistic::<_, Feature>::new(self.product.clone());
 //         chain.fill_from_normalized(self.current_state().get_missing().clone(), self.git)?;
@@ -244,7 +244,7 @@
 //         }
 //         Ok(new_state)
 //     }
-// 
+//
 //     pub fn get_current_state(&self) -> &DerivationMetadata {
 //         &self.current_state
 //     }
@@ -268,7 +268,7 @@
 //     pub fn get_product(&self) -> &NodePath<Product> {
 //         &self.product
 //     }
-// 
+//
 //     pub fn predict_conflicts(
 //         &self,
 //         order: &Vec<NodePath<Feature>>,
@@ -289,7 +289,7 @@
 //         };
 //         Ok(new_order.unwrap())
 //     }
-// 
+//
 //     pub fn initialize_derivation(
 //         &mut self,
 //         features: Vec<NodePath<Feature>>,
@@ -319,7 +319,7 @@
 //             DerivationState::InProgress => Err(InitializeDerivationError::DerivationInProgress),
 //         }
 //     }
-// 
+//
 //     pub fn continue_derivation(&mut self) -> Result<DerivationData, ContinueDerivationError> {
 //         match self.current_state().get_state() {
 //             DerivationState::InProgress => {
@@ -345,7 +345,7 @@
 //             DerivationState::None => Err(ContinueDerivationError::NoDerivationInProgress),
 //         }
 //     }
-// 
+//
 //     pub fn optimize_merge_order(
 //         &mut self,
 //     ) -> Result<MergeChainStatistic<Product, Feature>, OptimizeMergeOrderError> {
@@ -364,7 +364,7 @@
 //         }
 //         Ok(new_order)
 //     }
-// 
+//
 //     pub fn abort_derivation(self) -> Result<DerivationMetadata, AbortDerivationError> {
 //         match self.current_state().get_state() {
 //             DerivationState::InProgress => {
@@ -375,7 +375,7 @@
 //         };
 //         Ok(self.current_state)
 //     }
-// 
+//
 //     pub fn revert_derivation(&self) -> Result<DerivationMetadata, ResetDerivationError> {
 //         match self.current_state().get_state() {
 //             DerivationState::InProgress => {
@@ -386,7 +386,7 @@
 //         };
 //         Ok(self.current_state.clone())
 //     }
-// 
+//
 //     pub fn update_product(&mut self, optimize: bool) -> Result<DerivationData, UpdateProductError> {
 //         match self.current_state().get_state() {
 //             DerivationState::None => {

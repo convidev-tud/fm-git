@@ -5,7 +5,7 @@ use crate::logging::CommandLogger;
 use crate::*;
 use clap::{Arg, ArgMatches, Command};
 use hyrmir_lib::importer::ImportFormat;
-use hyrmir_lib::repository::Repository;
+use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
 use log::LevelFilter;
 use std::error::Error;
@@ -21,21 +21,22 @@ pub struct RootCommand<V: VCS> {
 
 impl<V: VCS> RootCommand<V> {
     pub fn new(name: String) -> Self {
-        Self { name, _phantom: PhantomData }
+        Self {
+            name,
+            _phantom: PhantomData,
+        }
     }
 }
 
 impl<V: VCS + 'static> CommandDefinition<V> for RootCommand<V> {
     fn build_command(&self) -> Command {
-        Command::new("tangl")
-            .arg_required_else_help(true)
-            .arg(
-                Arg::new(IMPORT_FORMAT)
-                    .short('f')
-                    .long("import-format")
-                    .default_value("waffle")
-                    .help("Specify file import format for all commands"),
-            )
+        Command::new("tangl").arg_required_else_help(true).arg(
+            Arg::new(IMPORT_FORMAT)
+                .short('f')
+                .long("import-format")
+                .default_value("waffle")
+                .help("Specify file import format for all commands"),
+        )
     }
 
     fn get_subcommands(&self) -> Vec<Box<dyn CommandImpl<V>>> {
@@ -61,7 +62,7 @@ impl<V: VCS + 'static> CommandDefinition<V> for RootCommand<V> {
 impl<V: VCS> CommandInterface<V> for RootCommand<V> {
     fn run_command(
         &self,
-        _repository: &mut Repository<V>,
+        _repository: &mut RepositoryLoader<V>,
         _logger: &mut CommandLogger,
         context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
@@ -74,7 +75,8 @@ impl<V: VCS> CommandInterface<V> for RootCommand<V> {
     }
 
     fn shell_complete(
-        &self, _repository: &mut Repository<V>,
+        &self,
+        _repository: &mut RepositoryLoader<V>,
         completion_helper: CompletionHelper,
         _context: &CommandContext<V>,
     ) -> Result<Vec<String>, Box<dyn Error>> {
@@ -105,7 +107,7 @@ impl<V: VCS + 'static> EntryPoint<V> {
 
     fn execute_recursive<'a>(
         &self,
-        repository: &mut Repository<V>,
+        repository: &mut RepositoryLoader<V>,
         logger: &mut CommandLogger,
         context: CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
@@ -143,11 +145,18 @@ impl<V: VCS + 'static> EntryPoint<V> {
         }
     }
 
-    pub fn execute(&self, repository: &mut Repository<V>, logger: &mut CommandLogger, arg_source: ArgSource) {
+    pub fn execute(
+        &self,
+        repository: &mut RepositoryLoader<V>,
+        logger: &mut CommandLogger,
+        arg_source: ArgSource,
+    ) {
         let context = self.build_context(arg_source, ImportFormat::Waffle);
         match self.execute_recursive(repository, logger, context) {
             Ok(_) => {}
-            Err(err) => { logger.error(err.to_string()); }
+            Err(err) => {
+                logger.error(err.to_string());
+            }
         }
     }
 

@@ -4,7 +4,7 @@
 // use std::io;
 // use std::path::PathBuf;
 // use std::process::{Command, ExitStatus, Output};
-// 
+//
 // fn output_to_result(output: Output, command: &Vec<&str>) -> Result<String, GitCommandError> {
 //     let stdout = String::from_utf8(output.stdout).unwrap().trim().to_string();
 //     let stderr = String::from_utf8(output.stderr).unwrap().trim().to_string();
@@ -21,7 +21,7 @@
 //         Err(GitCommandError::new(message, error))
 //     }
 // }
-// 
+//
 // fn status_to_result(status: ExitStatus, command: &Vec<&str>) -> Result<(), GitCommandError> {
 //     if status.success() {
 //         Ok(())
@@ -35,7 +35,7 @@
 //         Err(GitCommandError::new("", error))
 //     }
 // }
-// 
+//
 // fn make_commit_message_with_metadata<S: Into<String>>(
 //     message: S,
 //     metadata: Option<&CommitMetadataContainer>,
@@ -48,13 +48,13 @@
 //         message
 //     }
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub enum GitPath {
 //     CurrentDirectory,
 //     CustomDirectory(PathBuf),
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct GitCLI {
 //     path: GitPath,
@@ -103,7 +103,7 @@
 //         base.args(arguments).status()
 //     }
 // }
-// 
+//
 // #[derive(Debug)]
 // pub struct GitInterface {
 //     model: Repository,
@@ -114,11 +114,11 @@
 //     pub fn default() -> Self {
 //         Self::new(GitPath::CurrentDirectory)
 //     }
-// 
+//
 //     pub fn in_directory(path: PathBuf) -> Self {
 //         Self::new(GitPath::CustomDirectory(path))
 //     }
-// 
+//
 //     pub fn new(path: GitPath) -> Self {
 //         let raw_interface = GitCLI::new(path);
 //         Self {
@@ -127,11 +127,11 @@
 //             repo_scanned: false,
 //         }
 //     }
-// 
+//
 //     pub fn colored_output(&mut self, color: bool) {
 //         self.raw_git_interface.colored(color);
 //     }
-// 
+//
 //     fn update_complete_model(&self) -> Result<(), io::Error> {
 //         let branch_command = vec!["branch", "--format=%(refname:short) %(objectname)"];
 //         let branch_output = self.raw_git_interface.run_attached(&branch_command)?;
@@ -164,7 +164,7 @@
 //         }
 //         Ok(())
 //     }
-// 
+//
 //     fn get_model(&self) -> &Repository {
 //         if !self.repo_scanned {
 //             match self.update_complete_model() {
@@ -175,7 +175,7 @@
 //             &self.model
 //         }
 //     }
-// 
+//
 //     fn update_head_commit<T: IsGitObject>(&self, path: &NodePath<T>) -> Result<(), GitError> {
 //         let commit = self.get_commit(&path)?;
 //         let node = path.get_node();
@@ -183,13 +183,13 @@
 //             .update_head_commit(commit.get_hash().clone());
 //         Ok(())
 //     }
-// 
+//
 //     fn get_current_branch(&self) -> Result<String, GitError> {
 //         let command = vec!["branch", "--show-current"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn get_remote_branches(&self) -> Result<Vec<String>, GitError> {
 //         let command = vec!["branch", "--remotes"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
@@ -200,17 +200,17 @@
 //             .map(|s| s.trim().to_string())
 //             .collect())
 //     }
-// 
+//
 //     pub fn get_current_normalized_path(&self) -> Result<NormalizedPath, GitError> {
 //         let mut base = NormalizedPath::from("");
 //         base.push(self.get_current_branch()?);
 //         Ok(base)
 //     }
-// 
+//
 //     pub fn get_virtual_root(&self) -> NodePath<VirtualRoot> {
 //         self.get_model().get_virtual_root()
 //     }
-// 
+//
 //     pub fn assert_path<T: SymbolicNodeType>(
 //         &self,
 //         path: &NormalizedPath,
@@ -218,7 +218,7 @@
 //         let tree_view = self.get_model().assert_path::<T>(path)?;
 //         Ok(tree_view)
 //     }
-// 
+//
 //     pub fn assert_paths<T: SymbolicNodeType>(
 //         &self,
 //         paths: &Vec<NormalizedPath>,
@@ -229,7 +229,7 @@
 //         }
 //         Ok(vec)
 //     }
-// 
+//
 //     pub fn assert_current_node_path<T: IsGitObject>(
 //         &self,
 //     ) -> Result<NodePath<T>, PathAssertionError> {
@@ -246,44 +246,44 @@
 //             },
 //         }
 //     }
-// 
+//
 //     pub fn get_current_area(&self) -> Result<NodePath<ConcreteArea>, GitError> {
 //         let current_qualified_path = self.get_current_normalized_path()?;
 //         let qualified_path = NormalizedPath::from(&current_qualified_path[1]);
 //         Ok(self.get_model().get_area(&qualified_path).unwrap())
 //     }
-// 
+//
 //     // all git commands
 //     pub fn initialize_repo(&self) -> Result<String, GitError> {
 //         let command = vec!["init", "--initial-branch=main"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn clone_repo<S: Into<String>>(&self, url: S) -> Result<String, GitError> {
 //         let repo = url.into();
 //         let command = vec!["clone", repo.as_str()];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn status(&self) -> Result<String, GitError> {
 //         let command = vec!["status"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub(crate) fn checkout_raw(&self, path: &NormalizedPath) -> Result<String, GitError> {
 //         let branch = path.to_git_branch();
 //         let command = vec!["checkout", branch.as_str()];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn checkout<T: IsGitObject>(&self, path: &NodePath<T>) -> Result<String, GitError> {
 //         self.checkout_raw(&path.to_normalized_path())
 //     }
-// 
+//
 //     fn create_branch_no_mut(&self, path: &NormalizedPath) -> Result<String, GitError> {
 //         let branch = path.to_git_branch();
 //         let command = vec!["branch", branch.as_str()];
@@ -292,7 +292,7 @@
 //             &command,
 //         )?)
 //     }
-// 
+//
 //     pub fn create_branch<T: SymbolicNodeType>(
 //         &self,
 //         path: &NormalizedPath,
@@ -313,18 +313,18 @@
 //         self.create_branch_no_mut(path)?;
 //         Ok(self.get_model().get_node_path(&path).unwrap())
 //     }
-// 
+//
 //     pub(crate) fn delete_branch_no_mut(&self, path: &NormalizedPath) -> Result<String, GitError> {
 //         let branch = path.to_git_branch();
 //         let command = vec!["branch", "-D", branch.as_str()];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn delete_branch<T: IsGitObject>(&mut self, path: NodePath<T>) -> Result<String, GitError> {
 //         self.delete_branch_no_mut(&path.to_normalized_path())
 //     }
-// 
+//
 //     pub fn merge<B: IsGitObject, T: IsGitObject>(
 //         &self,
 //         path: NodePath<T>,
@@ -358,7 +358,7 @@
 //         chain.push(status);
 //         Ok((chain, response))
 //     }
-// 
+//
 //     pub fn cherry_pick<B: IsGitObject, T: IsGitObject>(
 //         &self,
 //         path: NodePath<T>,
@@ -395,24 +395,24 @@
 //         chain.push(status);
 //         Ok((chain, response))
 //     }
-// 
+//
 //     pub fn abort_merge(&self) -> Result<String, GitError> {
 //         let command = vec!["merge", "--abort"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn abort_cherry_pick(&self) -> Result<String, GitError> {
 //         let command = vec!["cherry-pick", "--abort"];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn pending_merge(&self) -> Result<bool, GitError> {
 //         let status = self.status()?;
 //         Ok(status.contains("merg"))
 //     }
-// 
+//
 //     // pub fn create_tag(&mut self, tag: &QualifiedPath) -> Result<NodePath<Tag>, GitError> {
 //     //     let current_branch = self.get_current_qualified_path()?;
 //     //     let tagged = current_branch + tag.clone();
@@ -428,14 +428,14 @@
 //     //         .raw_git_interface
 //     //         .run(vec!["tag", "-d", tagged.to_git_branch().as_str()])?)
 //     // }
-// 
+//
 //     pub fn get_commit_from_hash(&self, hash: &CommitHash) -> Result<Commit, GitError> {
 //         let command = vec!["log", "--format=%B", "-n 1", hash.get_full_hash()];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         let message = output_to_result(out, &command)?;
 //         Ok(Commit::new(hash.clone(), message))
 //     }
-// 
+//
 //     pub fn iter_commit_history<T: IsGitObject>(
 //         &self,
 //         path: &NodePath<T>,
@@ -452,7 +452,7 @@
 //             .collect::<Vec<_>>();
 //         Ok(CommitIterator::new(all_hashes, &self))
 //     }
-// 
+//
 //     pub fn get_commit<T: IsGitObject>(&self, branch: &NodePath<T>) -> Result<Commit, GitError> {
 //         let iterator = self.iter_commit_history(&branch, 1)?;
 //         let mut commits: Vec<Commit> = vec![];
@@ -461,7 +461,7 @@
 //         }
 //         Ok(commits[0].clone())
 //     }
-// 
+//
 //     pub fn get_files_managed_by_branch<T: IsGitObject>(
 //         &self,
 //         branch: &NodePath<T>,
@@ -472,7 +472,7 @@
 //         let message = output_to_result(out, &command)?;
 //         Ok(message.split("\n").map(|e| e.to_string()).collect())
 //     }
-// 
+//
 //     pub fn get_files_changed_by_commit(
 //         &self,
 //         commit: &CommitHash,
@@ -488,7 +488,7 @@
 //         let message = output_to_result(out, &command)?;
 //         Ok(message.split("\n").map(|e| e.to_string()).collect())
 //     }
-// 
+//
 //     pub fn commit<S: Into<String>, T: IsGitObject>(
 //         &self,
 //         message: S,
@@ -514,27 +514,27 @@
 //         self.update_head_commit(&current)?;
 //         Ok(response)
 //     }
-// 
+//
 //     pub fn reset_hard(&self, commit: &CommitHash) -> Result<String, GitError> {
 //         let command = vec!["reset", "--hard", commit.get_full_hash()];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
-// 
+//
 //     pub fn track_branch(&self, local: &String, remote: &String) -> Result<String, GitError> {
 //         let command = vec!["branch", "--track", local, remote];
 //         let out = self.raw_git_interface.run_attached(&command)?;
 //         Ok(output_to_result(out, &command)?)
 //     }
 // }
-// 
+//
 // #[cfg(test)]
 // pub mod test_utils {
 //     use crate::core::git::error::GitError;
 //     use crate::core::model::git::GitCLI;
 //     use std::fs;
 //     use std::path::PathBuf;
-// 
+//
 //     pub fn prepare_empty_git_repo(path: PathBuf) -> Result<(), GitError> {
 //         let git = GitCLI::in_custom_directory(path.clone());
 //         git.run_attached(&vec!["init", "--initial-branch=main"])?;
@@ -545,7 +545,7 @@
 //         let out = git.run_attached(&vec!["commit", "-m", "initial commit"])?;
 //         Ok(())
 //     }
-// 
+//
 //     pub fn populate_with_features(path: PathBuf) -> Result<(), GitError> {
 //         let git = GitCLI::in_custom_directory(PathBuf::from(path));
 //         let branches = vec![
@@ -559,7 +559,7 @@
 //         }
 //         Ok(())
 //     }
-// 
+//
 //     pub fn populate_with_products(path: PathBuf) -> Result<(), GitError> {
 //         let git = GitCLI::in_custom_directory(PathBuf::from(path));
 //         let branches = vec!["_main/_product/myprod"];
@@ -569,13 +569,13 @@
 //         Ok(())
 //     }
 // }
-// 
+//
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
 //     use crate::core::model::git::test_utils::{populate_with_features, prepare_empty_git_repo};
 //     use tempfile::TempDir;
-// 
+//
 //     #[test]
 //     fn interface_populate_model() {
 //         let path = TempDir::new().unwrap();
@@ -595,7 +595,7 @@
 //             ]
 //         );
 //     }
-// 
+//
 //     #[test]
 //     fn interface_get_current_branch_absolute() {
 //         let path = TempDir::new().unwrap();

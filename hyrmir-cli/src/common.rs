@@ -3,22 +3,22 @@
 // use clap::{Arg, ArgAction};
 // use colored::Colorize;
 // use std::error::Error;
-// 
+//
 // pub const VERBOSE: &str = "verbose";
 // pub const SHOW_TAGS: &str = "show_tags";
-// 
+//
 // pub fn show_tags() -> Arg {
 //     Arg::new(SHOW_TAGS)
 //         .long("show-tags")
 //         .action(ArgAction::SetTrue)
 //         .help("Also show tags")
 // }
-// 
+//
 // pub fn delete(force: bool) -> Arg {
 //     let short = if force { 'D' } else { 'd' };
 //     Arg::new("delete").short(short)
 // }
-// 
+//
 // pub fn verbose() -> Arg {
 //     Arg::new(VERBOSE)
 //         .short('v')
@@ -29,11 +29,11 @@
 //             Verbosity increases with number of occurrences.",
 //         )
 // }
-// 
+//
 // pub fn format_command_help<S: Into<String>>(command: S) -> String {
 //     format!("\"{}\"", command.into())
 // }
-// 
+//
 // pub fn delete_path<T: IsGitObject>(
 //     path: &NormalizedPath,
 //     context: &mut CommandContext,

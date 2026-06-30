@@ -1,7 +1,7 @@
 // use crate::core::model::*;
 // use globset::{GlobBuilder, GlobMatcher};
 // use std::marker::PhantomData;
-// 
+//
 // pub trait NodePathTransformer<A, B>
 // where
 //     A: SymbolicNodeType,
@@ -15,7 +15,7 @@
 //         node_paths.filter_map(|path| self.apply(Some(path)))
 //     }
 // }
-// 
+//
 // pub struct HasBranchFilteringNodePathTransformer {
 //     has_branch: bool,
 // }
@@ -34,7 +34,7 @@
 //         }
 //     }
 // }
-// 
+//
 // pub enum FilteringMode {
 //     INCLUDE,
 //     EXCLUDE,
@@ -69,7 +69,7 @@
 //         }
 //     }
 // }
-// 
+//
 // pub struct ByGlobFilteringNodePathTransformer {
 //     globs: Vec<GlobMatcher>,
 //     filtering_mode: FilteringMode,
@@ -120,7 +120,7 @@
 //         }
 //     }
 // }
-// 
+//
 // pub struct ByTypeFilteringNodePathTransformer<In, Out>
 // where
 //     In: SymbolicNodeType,
@@ -150,9 +150,9 @@
 //         tree_view?.try_convert_to::<Out>()
 //     }
 // }
-// 
+//
 // // Compound transformers
-// 
+//
 // pub struct GlobToTypeNodePathTransformer<In, Out>
 // where
 //     In: SymbolicNodeType,
@@ -184,7 +184,7 @@
 //         self.type_filter.apply(self.glob_filter.apply(tree_view))
 //     }
 // }
-// 
+//
 // // #[cfg(test)]
 // // mod tests {
 // //     use super::*;

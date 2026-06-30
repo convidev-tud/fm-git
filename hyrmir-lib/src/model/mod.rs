@@ -4,6 +4,6 @@ pub mod transformer;
 pub mod tree_view;
 
 pub use node::*;
-pub use tree_view::*;
 pub use normalized_path::*;
 pub use transformer::*;
+pub use tree_view::*;

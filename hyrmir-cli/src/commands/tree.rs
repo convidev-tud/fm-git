@@ -7,15 +7,15 @@
 // use std::marker::PhantomData;
 // use hyrmir_lib::vcs::VCS;
 // use hyrmir_lib::workspace::Workspace;
-// 
+//
 // const TARGET: &str = "target";
 // const TREE: &str = "tree";
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct LSCommand<V: VCS> {
 //     phantom_data: PhantomData<V>
 // }
-// 
+//
 // impl<V: VCS> CommandDefinition<V> for LSCommand<V> {
 //     fn build_command(&self) -> Command {
 //         Command::new("ls")
@@ -32,7 +32,7 @@
 //             .arg(show_tags())
 //     }
 // }
-// 
+//
 // impl<V: VCS> CommandInterface<V> for LSCommand<V> {
 //     fn run_command(
 //         &self,
@@ -76,7 +76,7 @@
 //         }
 //         Ok(())
 //     }
-// 
+//
 //     fn shell_complete(
 //         &self,
 //         completion_helper: CompletionHelper,

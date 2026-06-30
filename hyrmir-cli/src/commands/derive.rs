@@ -10,7 +10,7 @@
 // use std::error::Error;
 // use std::fs::File;
 // use std::io::Read;
-// 
+//
 // const FEATURES: &str = "features";
 // const CONTINUE: &str = "continue";
 // const ABORT: &str = "abort";
@@ -18,35 +18,35 @@
 // const OPTIMIZE: &str = "optimize";
 // const UPDATE: &str = "update";
 // const FROM_FILE: &str = "from_file";
-// 
+//
 // fn fix_conflicts_hint() -> String {
 //     format!(
 //         "  (Fix all conflicts, then use {} to continue the derivation)",
 //         format_command_help("tangl derive --continue")
 //     )
 // }
-// 
+//
 // fn continue_hint() -> String {
 //     format!(
 //         "  (Use {} to continue the derivation)",
 //         format_command_help("tangl derive --continue")
 //     )
 // }
-// 
+//
 // fn reset_hint() -> String {
 //     format!(
 //         "  (Use {} to reset to the last state)",
 //         format_command_help("tangl derive --reset")
 //     )
 // }
-// 
+//
 // fn abort_hint() -> String {
 //     format!(
 //         "  (Use {} to abort the derivation)",
 //         format_command_help("tangl derive --abort")
 //     )
 // }
-// 
+//
 // pub fn normal_hint() -> String {
 //     format!(
 //         "  {}\n  {}\n  {}",
@@ -55,7 +55,7 @@
 //         abort_hint(),
 //     )
 // }
-// 
+//
 // pub fn conflict_hint() -> String {
 //     format!(
 //         "  {}\n  {}\n  {}",
@@ -64,7 +64,7 @@
 //         abort_hint(),
 //     )
 // }
-// 
+//
 // fn initialize_hint(
 //     state: &DerivationState,
 //     optimize: bool,
@@ -96,7 +96,7 @@
 //     }
 //     Ok(())
 // }
-// 
+//
 // fn initialize_error_hint() -> Box<dyn Error> {
 //     let messages = vec![
 //         "fatal: a derivation is already in progress".to_string(),
@@ -104,7 +104,7 @@
 //     ];
 //     messages.join("\n").into()
 // }
-// 
+//
 // fn handle_initialize(
 //     features: Vec<NodePath<Feature>>,
 //     optimize: bool,
@@ -122,7 +122,7 @@
 //         },
 //     }
 // }
-// 
+//
 // fn handle_continue(
 //     derivation_manager: &mut DerivationManager,
 //     logger: &CommandLogger,
@@ -172,7 +172,7 @@
 //     }
 //     Ok(())
 // }
-// 
+//
 // fn handle_update(
 //     optimize: bool,
 //     derivation_manager: &mut DerivationManager,
@@ -189,10 +189,10 @@
 //         },
 //     }
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct DeriveCommand;
-// 
+//
 // impl CommandDefinition for DeriveCommand {
 //     fn build_command(&self) -> Command {
 //         Command::new("derive")
@@ -236,7 +236,7 @@
 //             .arg(verbose())
 //     }
 // }
-// 
+//
 // impl CommandInterface for DeriveCommand {
 //     fn run_command(&self, context: &mut CommandContext) -> Result<(), Box<dyn Error>> {
 //         let current_area = context.git.get_current_area()?;
@@ -270,11 +270,11 @@
 //             .get_argument_value::<bool>(REVERT)
 //             .unwrap();
 //         let file_path = context.arg_helper.get_argument_value::<String>(FROM_FILE);
-// 
+//
 //         let features = context.git.assert_paths(&all_feature_paths)?;
 //         let mut derivation_manager =
 //             DerivationManager::new(&product_path, &context.git, &context.logger)?;
-// 
+//
 //         if revert {
 //             let state = derivation_manager.get_current_state();
 //             let data = state.get_data().unwrap();
@@ -288,7 +288,7 @@
 //                 return Ok(());
 //             }
 //         }
-// 
+//
 //         if abort_derivation {
 //             let state = derivation_manager.abort_derivation()?;
 //             context.logger.info(format!(
@@ -331,7 +331,7 @@
 //         };
 //         Ok(())
 //     }
-// 
+//
 //     fn shell_complete(
 //         &self,
 //         completion_helper: CompletionHelper,

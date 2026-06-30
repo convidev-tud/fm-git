@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod model;
-pub mod vcs;
-pub mod workspace;
-pub mod repository;
+pub mod conflict;
 pub mod derivation;
 pub mod git;
 pub mod importer;
-pub mod conflict;
+pub mod model;
+pub mod repository;
+pub mod vcs;
+pub mod workspace;

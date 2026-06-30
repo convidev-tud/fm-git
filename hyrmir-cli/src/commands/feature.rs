@@ -3,7 +3,7 @@
 // use crate::core::model::*;
 // use clap::{Arg, Command};
 // use std::error::Error;
-// 
+//
 // fn add_feature(
 //     feature: NormalizedPath,
 //     context: &mut CommandContext,
@@ -38,7 +38,7 @@
 //     }
 //     Ok(())
 // }
-// 
+//
 // #[derive(Clone, Debug)]
 // pub struct FeatureCommand;
 // impl CommandDefinition for FeatureCommand {

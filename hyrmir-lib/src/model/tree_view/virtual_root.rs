@@ -22,7 +22,7 @@ impl SymbolicNodeType for VirtualRoot {
 impl<'a, V: VCS> TreeView<'a, VirtualRoot, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
-        area: &NormalizedPath
+        area: &NormalizedPath,
     ) -> Result<TreeView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
         self.move_to(area)
     }
