@@ -137,5 +137,5 @@ impl<V: VCS> Repository<V> {
         Workspace::new(&self)
     }
 
-    pub fn test(&mut self) {}
+    pub fn test(&mut self, view: &StaticView<V::VersionId>) {}
 }

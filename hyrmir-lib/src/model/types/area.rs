@@ -1,27 +1,9 @@
-use crate::model::view::*;
+use crate::model::*;
 use crate::model::{NormalizedPath, ToNormalizedPath};
 use crate::vcs::VCS;
 use std::marker::PhantomData;
 
-/// Marker for an area node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Area<C: NodeClassification> {
-    _phantom: PhantomData<C>,
-}
 
-impl<C: NodeClassification> SymbolicNodeType for Area<C> {
-    type Classification = C;
-
-    fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-
-    fn compatible() -> Vec<NodeType> {
-        todo!()
-    }
-}
 
 impl<'a, C: NodeClassification, V: VCS> SemanticView<'a, Area<C>, V> {
     pub fn get_path_to_feature_root(&self) -> NormalizedPath {
