@@ -126,12 +126,14 @@ impl NormalizedPath {
     pub fn new() -> Self {
         Self { path: Vec::new() }
     }
+    
     pub fn push<S: Into<String>>(&mut self, path: S) {
         let qualified_str = path.into().replace("_", "");
         for split in qualified_str.trim().split(PATH_SEPARATOR) {
             self.path.push(split.to_lowercase());
         }
     }
+    
     pub fn get_version_appendix(&self) -> Option<String> {
         let last = self.last()?;
         if last.contains(VERSION_SEPARATOR) {
@@ -140,35 +142,39 @@ impl NormalizedPath {
             None
         }
     }
-    pub fn set_version_appendix<S: Into<String>>(&mut self, version_appendix: Option<S>) {
-        if let Some(version) = version_appendix {
-            let version = version.into();
-            let last = self.path.pop().unwrap();
-            if self.get_version_appendix().is_some() {
-                let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
-                self.push(format!("{}:{version}", split[0]));
-            } else {
-                self.push(format!("{last}:{version}"));
-            }
+    
+    pub fn set_version_appendix(&mut self, version_appendix: impl Into<String>) {
+        let version = version_appendix.into();
+        let last = self.path.pop().unwrap();
+        if self.get_version_appendix().is_some() {
+            let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
+            self.push(format!("{}:{version}", split[0]));
         } else {
-            if self.get_version_appendix().is_some() {
-                let last = self.path.pop().unwrap();
-                let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
-                self.push(format!("{}", split[0]));
-            }
+            self.push(format!("{last}:{version}"));
         }
     }
+    
+    pub fn remove_version_appendix(&mut self) {
+        if self.get_version_appendix().is_some() {
+            let last = self.path.pop().unwrap();
+            let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
+            self.push(format!("{}", split[0]));
+        }
+    }
+    
     pub fn strip_n(&self, n_left: usize, n_right: usize) -> NormalizedPath {
         NormalizedPath::from(self.path[n_left..n_right].to_vec())
     }
+    
     pub fn strip_n_left(&self, n: usize) -> NormalizedPath {
         self.strip_n(n, self.path.len())
     }
     pub fn strip_version(&self) -> NormalizedPath {
         let mut new = self.clone();
-        new.set_version_appendix::<String>(None);
+        new.remove_version_appendix();
         new
     }
+    
     pub fn strip_n_right(&self, n: usize) -> NormalizedPath {
         self.strip_n(0, n)
     }
@@ -192,58 +198,74 @@ impl NormalizedPath {
         }
         NormalizedPath::from(new_path)
     }
+    
     pub fn replace<S: Into<String>>(&self, index: usize, value: S) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.insert(index, value.into());
         NormalizedPath::from(new_path)
     }
+    
     pub fn first(&self) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.first()?.clone()))
     }
+    
     pub fn last(&self) -> Option<&String> {
         self.path.last()
     }
+    
     pub fn is_empty(&self) -> bool {
         self.path.is_empty()
     }
+    
     pub fn iter(&self) -> impl Iterator<Item = NormalizedPath> {
         self.iter_all_segments()
             .map(|s| NormalizedPath::from(s.clone()))
     }
+    
     pub fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
         self.path.iter()
     }
+    
     pub fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
         self.path[l..r].iter()
     }
+    
     pub fn get(&self, index: usize) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.get(index)?.clone()))
     }
+    
     pub fn starts_with(&self, prefix: &NormalizedPath) -> bool {
         self.to_string().starts_with(&prefix.to_string())
     }
+    
     pub fn last_is(&self, suffix: &NormalizedPath) -> bool {
         self.last() == suffix.last()
     }
+    
     pub fn len(&self) -> usize {
         self.path.len()
     }
+    
     pub fn as_dir(&self) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.push("".to_string());
         NormalizedPath::from(new_path)
     }
+    
     pub fn as_absolute(&self) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.insert(0, "".to_string());
         NormalizedPath::from(new_path)
     }
+    
     pub fn is_dir(&self) -> bool {
         self.path.len() > 1 && self.last().unwrap() == ""
     }
+    
     pub fn is_absolute(&self) -> bool {
         self.path.len() > 0 && self.first().unwrap() == ""
     }
+    
     pub fn formatted(&self, colored: bool) -> String {
         let base = if colored {
             self.to_string().blue().to_string()

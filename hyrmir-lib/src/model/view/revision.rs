@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::model::{AnyC, AnyType, InvalidTypeError, Node, NodeHolder, NodeType, NormalizedPath, PathDoesNotExistError, SymbolicNodeType, ToNormalizedPath, TreeViewError, VersionPointer};
+use crate::model::*;
 use crate::repository::Repository;
 use crate::vcs::VCS;
 
@@ -56,7 +56,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
 
     fn check_path_not_existent(self) -> Result<Self, PathDoesNotExistError<V::VersionId>> {
         if &self.get_real_type() == &NodeType::NonExistent {
-            let path = StaticView::new(self.path.clone(), VersionPointer::Default);
+            let path = FuzzyView::new(self.path.clone(), VersionPointer::Default);
             Err(PathDoesNotExistError::new(path))
         } else {
             Ok(self)
@@ -120,26 +120,26 @@ impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
     pub fn get_child(
         &self,
         name: &str,
-    ) -> Result<StaticView<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
+    ) -> Result<FuzzyView<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
         let mut path = self.path.clone();
         if let Some(child) = self.get_node().borrow().get_child(name) {
             path.push(child);
-            Ok(StaticView::new(path, VersionPointer::Default))
+            Ok(FuzzyView::new(path, VersionPointer::Default))
         } else {
             path.push(Rc::new(RefCell::new(Node::new(
                 name.to_string(),
                 NodeType::NonExistent,
                 None,
             ))));
-            Err(PathDoesNotExistError::new(StaticView::new(
+            Err(PathDoesNotExistError::new(FuzzyView::new(
                 path,
                 VersionPointer::Default,
             )))
         }
     }
 
-    pub fn as_static_view(&self) -> StaticView<V::VersionId> {
-        StaticView::new(self.path.clone(), VersionPointer::Default)
+    pub fn as_static_view(&self) -> FuzzyView<V::VersionId> {
+        FuzzyView::new(self.path.clone(), VersionPointer::Default)
     }
 
     pub fn has_children(&self) -> bool {
@@ -149,12 +149,12 @@ impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
 
 /// Iterators
 impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    pub fn iter_children(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
+    pub fn iter_children(&self) -> impl Iterator<Item = FuzzyView<V::VersionId>> {
         let path = self.as_static_view();
         path.iter_children()
     }
 
-    pub fn iter_children_req(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
+    pub fn iter_children_req(&self) -> impl Iterator<Item = FuzzyView<V::VersionId>> {
         let path = self.as_static_view();
         path.iter_children_req()
     }
@@ -250,3 +250,60 @@ impl<'a, S: SymbolicNodeType, V: VCS> PartialEq for RevisionView<'a, S, V> {
 }
 
 impl<'a, S: SymbolicNodeType, V: VCS> Eq for RevisionView<'a, S, V> {}
+
+/// Reachability for virtual root
+impl<'a, V: VCS> RevisionView<'a, VirtualRoot, V> {
+    pub fn move_to_area<C: NodeClassification>(
+        self,
+        area: &impl ToNormalizedPath,
+        repo: &'a Repository<V>,
+    ) -> Result<RevisionView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
+        self.move_to(area, repo)
+    }
+}
+
+impl<'a, C: NodeClassification, V: VCS> RevisionView<'a, Area<C>, V> {
+    pub fn get_path_to_feature_root(&self) -> NormalizedPath {
+        self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
+    }
+
+    pub fn get_path_to_product_root(&self) -> NormalizedPath {
+        self.to_normalized_path() + NormalizedPath::from(PRODUCT_ROOT)
+    }
+
+    pub fn move_to_feature_root(
+        self,
+        repo: &'a Repository<V>,
+    ) -> Result<RevisionView<'a, FeatureRoot, V>, TreeViewError<V::VersionId>> {
+        Ok(self.move_to(&NormalizedPath::from(FEATURE_ROOT), repo)?)
+    }
+
+    pub fn move_to_product_root(
+        self,
+        repo: &'a Repository<V>,
+    ) -> Result<RevisionView<'a, ProductRoot, V>, TreeViewError<V::VersionId>> {
+        Ok(self.move_to(&NormalizedPath::from(PRODUCT_ROOT), repo)?)
+    }
+}
+
+impl<'a, S: IsConcrete, V: VCS> RevisionView<'a, S, V> {
+    pub fn get_id(&self) -> usize {
+        self.get_node().borrow().get_branch_info().unwrap().get_id()
+    }
+}
+
+impl<'a, T: UnderArea, V: VCS> RevisionView<'a, T, V> {
+    pub fn get_area<C: NodeClassification>(
+        &self,
+        repo: &'a Repository<V>,
+    ) -> RevisionView<'a, Area<C>, V> {
+        self.get_at_index(1, repo).unwrap()
+    }
+
+    pub fn move_to_area<C: NodeClassification>(
+        self,
+        repo: &'a Repository<V>,
+    ) -> RevisionView<'a, Area<C>, V> {
+        self.move_to_index(1, repo).unwrap()
+    }
+}

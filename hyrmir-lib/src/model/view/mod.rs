@@ -1,18 +1,26 @@
+use std::cell::RefCell;
+use std::fmt::{Display, Formatter};
+use std::rc::Rc;
+use colored::Colorize;
 use thiserror::Error;
 
 mod structural;
 mod revision;
 mod fuzzy;
 
-
+pub use structural::*;
+pub use revision::*;
+pub use fuzzy::*;
+use crate::model::*;
+use crate::vcs::VersionId;
 
 #[derive(Error, Clone, Debug)]
 pub struct PathDoesNotExistError<V: VersionId> {
-    path: StaticView<V>,
+    path: FuzzyView<V>,
 }
 
 impl<V: VersionId> PathDoesNotExistError<V> {
-    pub fn new(path: StaticView<V>) -> Self {
+    pub fn new(path: FuzzyView<V>) -> Self {
         Self { path }
     }
 }

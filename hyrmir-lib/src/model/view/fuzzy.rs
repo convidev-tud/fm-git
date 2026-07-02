@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use colored::Colorize;
+use itertools::Itertools;
 use crate::model::{Node, NodeHolder, NormalizedPath, ToNormalizedPath, VersionPointer};
 use crate::vcs::VersionId;
 
@@ -94,7 +95,14 @@ impl<V: VersionId> NodeHolder<V> for FuzzyView<V> {
 
 impl<V: VersionId> ToNormalizedPath for FuzzyView<V> {
     fn to_normalized_path(&self) -> NormalizedPath {
-        self.path.to_normalized_path()
+        let mut path = self.path.to_normalized_path();
+        match &self.version {
+            VersionPointer::Default => {},
+            VersionPointer::Version(version) => {
+                path.set_version_appendix(version.get_full_id())
+            }
+        }
+        path
     }
 }
 

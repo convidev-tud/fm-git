@@ -1,11 +1,12 @@
 // use std::cmp::Ordering;
-// use crate::model::{ErrorState, IsConcrete, NodePath, NormalizedPath, ToNormalizedPaths, VirtualRoot};
-// use crate::vcs::VCS;
+// use crate::model::*;
+// use crate::vcs::{VersionId, VCS};
 // use colored::Colorize;
 // use itertools::Itertools;
 // use serde::{Deserialize, Serialize};
 // use std::fmt::{Display, Formatter};
 // use std::iter::once;
+// use crate::repository::Repository;
 //
 // #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 // pub enum MergeResult {
@@ -58,31 +59,32 @@
 // }
 //
 // #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-// pub struct MergeStatistic<T: IsConcrete, V: VCS> {
-//     path: NodePath<T, V>,
+// pub struct MergeStatistic<Vs: VersionId> {
+//     path: FuzzyView<Vs>,
 //     stat: MergeResult,
 // }
 //
-// impl<T: IsConcrete, V: VCS> MergeStatistic<T, V> {
-//     pub fn new(path: NodePath<T, V>, stat: MergeResult) -> Self {
+// impl<Vs: VersionId> MergeStatistic<Vs> {
+//     pub fn new(path: FuzzyView<Vs>, stat: MergeResult) -> Self {
 //         Self { path, stat }
 //     }
 //
-//     pub fn from_normalized(
+//     pub fn from_normalized<V: VCS>(
 //         stat: NormalizedMergeStatistic,
-//         root: NodePath<VirtualRoot, V>,
-//     ) -> Result<Self, NodePath<ErrorState, V>> {
-//         let path = root.move_to(stat.get_path())?;
-//         Ok(Self::new(path, stat.get_stat().clone()))
+//         repo: &Repository<V>,
+//     ) -> Result<MergeStatistic<V::VersionId>, V::VCSError> {
+//         let path = repo.get_path(stat.get_path())?;
+//         Ok(MergeStatistic::new(path, stat.get_stat().clone()))
 //     }
 //
 //     pub fn to_normalized(&self) -> NormalizedMergeStatistic {
 //         NormalizedMergeStatistic::new(
-//             self.path.to_normalized_path_with_version(),
+//             self.path.to_normalized_path(),
 //             self.stat.clone(),
 //         )
 //     }
-//     pub fn get_path(&self) -> &NodePath<T, V> {
+//
+//     pub fn get_path(&self) -> &NodePath<T, Vs> {
 //         &self.path
 //     }
 //

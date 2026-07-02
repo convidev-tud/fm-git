@@ -1,3 +1,4 @@
+use crate::model::*;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -156,7 +157,12 @@ impl SymbolicNodeType for ProductRoot {
     }
 }
 
-impl IsOrUnderArea for ProductRoot {}
+/// Defines a type as child of an area.
+pub trait UnderArea: SymbolicNodeType {}
+impl UnderArea for FeatureRoot {}
+impl<C: NodeClassification> UnderArea for Feature<C> {}
+impl UnderArea for ProductRoot {}
+impl<C: NodeClassification> UnderArea for Product<C> {}
 
 impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;

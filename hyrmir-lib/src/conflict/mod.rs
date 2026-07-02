@@ -1,2 +1,4 @@
 mod matrix;
-pub mod statistic;
+mod statistic;
+
+pub use statistic::*;

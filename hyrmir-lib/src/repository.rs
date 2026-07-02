@@ -91,19 +91,19 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn get_virtual_root_view(&self) -> SemanticView<VirtualRoot, V> {
-        SemanticView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
+    pub fn get_virtual_root_view(&self) -> RevisionView<VirtualRoot, V> {
+        RevisionView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
 
     pub fn get_view<S: SymbolicNodeType>(
         &self,
         path: &impl ToNormalizedPath,
-    ) -> Result<SemanticView<S, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<RevisionView<S, V>, TreeViewError<V::VersionId>> {
         let node_vec = self.get_node_vec(&path.to_normalized_path());
-        Ok(SemanticView::new(node_vec, &self)?)
+        Ok(RevisionView::new(node_vec, &self)?)
     }
 
-    pub fn get_path(&self, path: &NormalizedPath) -> Result<StaticView<V::VersionId>, V::VCSError> {
+    pub fn get_path(&self, path: &NormalizedPath) -> Result<FuzzyView<V::VersionId>, V::VCSError> {
         let node_vec = self.get_node_vec(path);
         let version = match path.get_version_appendix() {
             Some(version) => {
@@ -124,7 +124,7 @@ impl<V: VCS> Repository<V> {
             }
             None => VersionPointer::Default,
         };
-        Ok(StaticView::new(node_vec, version))
+        Ok(FuzzyView::new(node_vec, version))
     }
 
     pub fn get_path_by_id(&self, id: usize) -> Option<&NormalizedPath> {
@@ -132,10 +132,8 @@ impl<V: VCS> Repository<V> {
     }
 
     pub fn get_workspace<S: IsConcrete>(
-        &self,
-    ) -> Result<Workspace<S, V>, WorkSpaceError<V::VersionId, V::VCSError>> {
+        &'_ self,
+    ) -> Result<Workspace<'_, S, V>, WorkSpaceError<V::VersionId, V::VCSError>> {
         Workspace::new(&self)
     }
-
-    pub fn test(&mut self, view: &StaticView<V::VersionId>) {}
 }
