@@ -4,61 +4,16 @@ use std::rc::Rc;
 use colored::Colorize;
 use thiserror::Error;
 
-mod structural;
+mod semantic;
+mod r#static;
 mod revision;
-mod fuzzy;
 
-pub use structural::*;
+pub use semantic::*;
+pub use r#static::*;
 pub use revision::*;
-pub use fuzzy::*;
 use crate::model::*;
 use crate::vcs::VersionId;
 
-#[derive(Error, Clone, Debug)]
-pub struct PathDoesNotExistError<V: VersionId> {
-    path: FuzzyView<V>,
-}
-
-impl<V: VersionId> PathDoesNotExistError<V> {
-    pub fn new(path: FuzzyView<V>) -> Self {
-        Self { path }
-    }
-}
-
-impl<V: VersionId> Display for PathDoesNotExistError<V> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("Path '{}' does not exist", self.path).as_str())
-    }
-}
-
-#[derive(Error, Clone, Debug)]
-pub struct InvalidTypeError {
-    types_possible: Vec<NodeType>,
-    type_found: NodeType,
-}
-
-impl InvalidTypeError {
-    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType) -> Self {
-        Self {
-            types_possible,
-            type_found,
-        }
-    }
-}
-
-impl Display for InvalidTypeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("{} Path has invalid type", "Error:".red()).as_str())
-    }
-}
-
-#[derive(Error, Clone, Debug)]
-pub enum TreeViewError<V: VersionId> {
-    #[error(transparent)]
-    PathDoesNotExist(#[from] PathDoesNotExistError<V>),
-    #[error(transparent)]
-    InvalidType(#[from] InvalidTypeError),
-}
 
 impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
     fn to_normalized_path(&self) -> NormalizedPath {
@@ -76,10 +31,4 @@ pub trait NodeHolder<V: VersionId> {
     fn get_real_type(&self) -> NodeType {
         self.get_node().borrow().get_type().clone()
     }
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum VersionPointer<V: VersionId> {
-    Default,
-    Version(V),
 }

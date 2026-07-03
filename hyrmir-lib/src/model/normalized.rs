@@ -1,12 +1,27 @@
 use colored::Colorize;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
+use thiserror::Error;
 
 const PATH_SEPARATOR: char = '/';
-const VERSION_SEPARATOR: char = ':';
+const REVISION_SEPARATOR: char = ':';
 
-#[derive(Clone, Debug, Hash, Eq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum NormalizedRevision {
+    None,
+    Revision(String),
+}
+
+impl Display for NormalizedRevision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => f.write_str(""),
+            Self::Revision(revision) => f.write_str(revision),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, Ord, PartialOrd)]
 pub struct NormalizedPath {
     path: Vec<String>,
 }
@@ -38,12 +53,6 @@ impl From<Vec<String>> for NormalizedPath {
             path.push(v);
         }
         path
-    }
-}
-
-impl From<NormalizedPath> for String {
-    fn from(value: NormalizedPath) -> Self {
-        value.to_string()
     }
 }
 
@@ -134,45 +143,12 @@ impl NormalizedPath {
         }
     }
     
-    pub fn get_version_appendix(&self) -> Option<String> {
-        let last = self.last()?;
-        if last.contains(VERSION_SEPARATOR) {
-            Some(last.split(VERSION_SEPARATOR).collect::<Vec<_>>()[1].to_string())
-        } else {
-            None
-        }
-    }
-    
-    pub fn set_version_appendix(&mut self, version_appendix: impl Into<String>) {
-        let version = version_appendix.into();
-        let last = self.path.pop().unwrap();
-        if self.get_version_appendix().is_some() {
-            let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
-            self.push(format!("{}:{version}", split[0]));
-        } else {
-            self.push(format!("{last}:{version}"));
-        }
-    }
-    
-    pub fn remove_version_appendix(&mut self) {
-        if self.get_version_appendix().is_some() {
-            let last = self.path.pop().unwrap();
-            let split = last.split(VERSION_SEPARATOR).collect::<Vec<&str>>();
-            self.push(format!("{}", split[0]));
-        }
-    }
-    
     pub fn strip_n(&self, n_left: usize, n_right: usize) -> NormalizedPath {
         NormalizedPath::from(self.path[n_left..n_right].to_vec())
     }
     
     pub fn strip_n_left(&self, n: usize) -> NormalizedPath {
         self.strip_n(n, self.path.len())
-    }
-    pub fn strip_version(&self) -> NormalizedPath {
-        let mut new = self.clone();
-        new.remove_version_appendix();
-        new
     }
     
     pub fn strip_n_right(&self, n: usize) -> NormalizedPath {
@@ -276,17 +252,101 @@ impl NormalizedPath {
     }
 }
 
+#[derive(Error, Clone, Debug)]
+pub struct NormalizeError {
+    msg: String,
+}
+
+impl NormalizeError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        Self { msg: msg.into() }
+    }
+}
+
+impl Display for NormalizeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.msg.as_str())
+    }
+}
+
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Normalized {
+    path: NormalizedPath,
+    revision: NormalizedRevision,
+}
+
+impl Normalized {
+    pub fn new(path: NormalizedPath, revision: NormalizedRevision) -> Self {
+        Self { path, revision }
+    }
+    
+    pub fn from_string(value: &String) -> Result<Self, NormalizeError> {
+        let split = value.split(REVISION_SEPARATOR).collect::<Vec<&str>>();
+        if split.len() > 2 {
+            return Err(NormalizeError::new(format!(
+                "Cannot normalize '{value}': input is malformed"
+            )))
+        }
+        let path = NormalizedPath::from(split[0].to_string());
+        let revision = if split.len() == 2 {
+            NormalizedRevision::Revision(split[1].to_string())
+        } else {
+            NormalizedRevision::None
+        };
+        Ok(Normalized::new(path, revision))
+    }
+    
+    pub fn get_path(&self) -> &NormalizedPath {
+        &self.path
+    }
+    
+    pub fn get_revision(&self) -> &NormalizedRevision {
+        &self.revision
+    }
+}
+
+impl Display for Normalized {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s = match &self.revision {
+            NormalizedRevision::None => self.path.to_string(),
+            NormalizedRevision::Revision(revision) => {
+                format!(
+                    "{}:{revision}",
+                    self.path,
+                )
+            }
+        };
+        f.write_str(&s)
+    }
+}
+
+pub trait Normalize {
+    fn normalize(&self) -> Normalized;
+}
+
+pub trait FailableNormalize {
+    fn normalize(&self) -> Result<Normalized, NormalizeError>;
+}
+
+impl FailableNormalize for String {
+    fn normalize(&self) -> Result<Normalized, NormalizeError> {
+        Normalized::from_string(self)
+    }
+}
+
+impl FailableNormalize for &str {
+    fn normalize(&self) -> Result<Normalized, NormalizeError> {
+        self.to_string().normalize()
+    }
+}
+
 pub trait ToNormalizedPath {
     fn to_normalized_path(&self) -> NormalizedPath;
 }
 
-pub trait ToNormalizedPaths {
-    fn to_normalized_paths(&self) -> Vec<NormalizedPath>;
-}
-
 impl ToNormalizedPath for String {
     fn to_normalized_path(&self) -> NormalizedPath {
-        NormalizedPath::from(self.clone())
+        NormalizedPath::from(self)
     }
 }
 

@@ -21,23 +21,23 @@ impl CommandLogger {
     pub fn new() -> Self {
         Self
     }
-    pub fn trace<S: Into<String>>(&self, message: S) {
+    pub fn trace(&self, message: impl Into<String>) {
         self.log(message, LevelFilter::Trace)
     }
-    pub fn debug<S: Into<String>>(&self, message: S) {
+    pub fn debug(&self, message: impl Into<String>) {
         self.log(message, LevelFilter::Debug)
     }
-    pub fn info<S: Into<String>>(&self, message: S) {
+    pub fn info(&self, message: impl Into<String>) {
         self.log(message, LevelFilter::Info)
     }
-    pub fn warn<S: Into<String>>(&self, message: S) {
+    pub fn warn(&self, message: impl Into<String>) {
         self.log(message, LevelFilter::Warn)
     }
-    pub fn error<S: Into<String>>(&self, message: S) {
+    pub fn error(&self, message: impl Into<String>) {
         self.log(message, LevelFilter::Error)
     }
 
-    fn log<S: Into<String>>(&self, message: S, level: LevelFilter) {
+    fn log(&self, message: impl Into<String>, level: LevelFilter) {
         let converted = message.into();
         if !converted.is_empty() {
             match level {

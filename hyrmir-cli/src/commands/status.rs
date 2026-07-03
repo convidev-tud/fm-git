@@ -1,11 +1,10 @@
-use crate::CommandLogger;
+use std::error::Error;
 use crate::def::*;
+use crate::CommandLogger;
 use clap::Command;
-use hyrmir_lib::model::view::*;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
-use std::error::Error;
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
@@ -39,7 +38,7 @@ impl<V: VCS> CommandInterface<V> for StatusCommand<V> {
         let repo = loader.load_repo()?;
         let workspace = repo.get_workspace::<AnyType<Concrete>>()?;
         let current = workspace.get_current_view();
-        let current_msg = format!("Viewing {}", current.formatted(true, true, true),);
+        let current_msg = format!("Viewing {}", current.get_semantic_view().formatted(true, true, true),);
         let status = workspace.status(current_msg, "", "", true)?;
         logger.info(status);
         Ok(())

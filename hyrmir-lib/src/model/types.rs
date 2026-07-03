@@ -83,7 +83,6 @@ impl NodeClassification for AnyC {
 /// This exists for generic type parameters.
 pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     type Classification: NodeClassification;
-    fn new() -> Self;
     fn compatible() -> Vec<NodeType> {
         vec![]
     }
@@ -91,10 +90,6 @@ pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
 
 impl SymbolicNodeType for VirtualRoot {
     type Classification = Abstract;
-
-    fn new() -> Self {
-        Self
-    }
 
     fn compatible() -> Vec<NodeType> {
         vec![NodeType::VirtualRoot]
@@ -104,12 +99,6 @@ impl SymbolicNodeType for VirtualRoot {
 impl<C: NodeClassification> SymbolicNodeType for Area<C> {
     type Classification = C;
 
-    fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-
     fn compatible() -> Vec<NodeType> {
         todo!()
     }
@@ -118,10 +107,6 @@ impl<C: NodeClassification> SymbolicNodeType for Area<C> {
 impl SymbolicNodeType for FeatureRoot {
     type Classification = Abstract;
 
-    fn new() -> Self {
-        Self
-    }
-
     fn compatible() -> Vec<NodeType> {
         todo!()
     }
@@ -129,12 +114,6 @@ impl SymbolicNodeType for FeatureRoot {
 
 impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     type Classification = C;
-
-    fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
 
     fn compatible() -> Vec<NodeType> {
         match Self::Classification::requires_artifact() {
@@ -147,10 +126,6 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
 
 impl SymbolicNodeType for ProductRoot {
     type Classification = Abstract;
-
-    fn new() -> Self {
-        Self
-    }
 
     fn compatible() -> Vec<NodeType> {
         todo!()
@@ -167,12 +142,6 @@ impl<C: NodeClassification> UnderArea for Product<C> {}
 impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;
 
-    fn new() -> Self {
-        Self {
-            phantom_data: PhantomData,
-        }
-    }
-
     fn compatible() -> Vec<NodeType> {
         match C::requires_artifact() {
             Some(true) => vec![NodeType::Product(true)],
@@ -185,39 +154,39 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
 impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
     type Classification = C;
 
-    fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-
     fn compatible() -> Vec<NodeType> {
-        let mut base = vec![
-            NodeType::VirtualRoot,
-            NodeType::FeatureRoot,
-            NodeType::ProductRoot,
-        ];
         match Self::Classification::requires_artifact() {
             Some(true) => {
-                base.push(NodeType::Area(true));
-                base.push(NodeType::Feature(true));
-                base.push(NodeType::Product(true));
+                vec![
+                    NodeType::Area(true),
+                    NodeType::Feature(true),
+                    NodeType::Product(true),
+                ]
             }
             Some(false) => {
-                base.push(NodeType::Area(false));
-                base.push(NodeType::Feature(false));
-                base.push(NodeType::Product(false));
+                vec![
+                    NodeType::Area(false),
+                    NodeType::Feature(false),
+                    NodeType::Product(false),
+                    NodeType::VirtualRoot,
+                    NodeType::FeatureRoot,
+                    NodeType::ProductRoot,
+                ]
             }
             None => {
-                base.push(NodeType::Area(true));
-                base.push(NodeType::Feature(true));
-                base.push(NodeType::Product(true));
-                base.push(NodeType::Area(false));
-                base.push(NodeType::Feature(false));
-                base.push(NodeType::Product(false));
+                vec![
+                    NodeType::Area(true),
+                    NodeType::Feature(true),
+                    NodeType::Product(true),
+                    NodeType::Area(false),
+                    NodeType::Feature(false),
+                    NodeType::Product(false),
+                    NodeType::VirtualRoot,
+                    NodeType::FeatureRoot,
+                    NodeType::ProductRoot,
+                ]
             }
         }
-        base
     }
 }
 

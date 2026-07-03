@@ -265,6 +265,7 @@ dependencies = [
  "itertools",
  "log",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]

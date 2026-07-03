@@ -1,4 +1,4 @@
-use hyrmir_lib::model::{NormalizedPath, ToNormalizedPath};
+use hyrmir_lib::model::{NormalizedPath, Normalize, ToNormalizedPath};
 use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, VersionId};
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -203,11 +203,11 @@ impl VCS for Git {
         Ok(all_branches)
     }
 
-    fn get_version(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError> {
+    fn get_revision(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError> {
         todo!()
     }
 
-    fn version_exists_on_path(
+    fn revision_exists_on_path(
         &self,
         path: &NormalizedPath,
         version: &String,

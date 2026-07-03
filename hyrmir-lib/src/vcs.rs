@@ -43,9 +43,9 @@ pub trait VCS: Debug {
 
     fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError>;
 
-    fn get_version(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError>;
+    fn get_revision(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError>;
 
-    fn version_exists_on_path(
+    fn revision_exists_on_path(
         &self,
         path: &NormalizedPath,
         version: &String,

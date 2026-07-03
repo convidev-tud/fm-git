@@ -4,6 +4,7 @@ use crate::completion::CompletionHelper;
 use crate::logging::CommandLogger;
 use crate::*;
 use clap::{Arg, ArgMatches, Command};
+use colored::Colorize;
 use hyrmir_lib::importer::ImportFormat;
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
@@ -155,7 +156,8 @@ impl<V: VCS + 'static> EntryPoint<V> {
         match self.execute_recursive(repository, logger, context) {
             Ok(_) => {}
             Err(err) => {
-                logger.error(err.to_string());
+                let msg = format!("{} {}", "Error:".red(), err);
+                logger.error(msg);
             }
         }
     }

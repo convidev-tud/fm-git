@@ -170,11 +170,11 @@ impl<V: VersionId> BranchInfo<V> {
         &self.head
     }
 
-    pub fn insert_version(&mut self, version: V) {
+    pub fn add_known_version(&mut self, version: V) {
         self.known_versions.insert(version.get_full_id(), version);
     }
 
-    pub fn remove_version(&mut self, version: &V) {
+    pub fn remove_known_version(&mut self, version: &V) {
         self.known_versions.remove(&version.get_full_id());
     }
     

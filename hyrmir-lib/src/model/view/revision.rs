@@ -1,309 +1,82 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use crate::model::*;
-use crate::repository::Repository;
-use crate::vcs::VCS;
+use crate::vcs::{VCSError, VersionId, VCS};
+use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-/// Semantic view onto the path model.
-///
-/// This struct symbolizes a path in the tree model and is the primary interface to interact with the underlying VCS repository.
-/// Its capabilities are defined by:
-/// - the type of node it points to ([SymbolicNodeType] parameter),
-/// - the VCS implementation ([VCS] parameter).
+#[derive(Error, Clone, Debug)]
+pub enum RevisionError<VI: VersionId, VE: VCSError> {
+    Invalid(#[from] StaticView<VI>),
+    VCS(#[from] VE),
+}
+
+impl<VI: VersionId, VE: VCSError> Display for RevisionError<VI, VE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            RevisionError::Invalid(view) => {
+                format!(
+                    "Revision does not exist on this path\n  {}",
+                    view.formatted(true, true, true)
+                )
+            },
+            RevisionError::VCS(error) => error.to_string(),
+        };
+        f.write_str(&msg)
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+pub enum RevisionPointer<V: VersionId> {
+    Head,
+    Revision(V),
+}
+
 #[derive(Debug)]
-pub struct RevisionView<'a, S: SymbolicNodeType, V: VCS> {
-    path: Vec<Rc<RefCell<Node<V::VersionId>>>>,
-    sym_type: S,
-    repo: &'a Repository<V>,
-}
-
-/// Construction and transformation
-impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    pub fn test(&mut self) {}
-
-    pub(crate) fn new(
-        path: Vec<Rc<RefCell<Node<V::VersionId>>>>,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, S, V>, TreeViewError<V::VersionId>> {
-        let new = Self {
-            path,
-            repo,
-            sym_type: S::new(),
-        };
-        new.lock_node();
-        let new = new
-            .check_path_not_existent()?
-            .check_sym_type_compatibility()?;
-        Ok(new)
-    }
-
-    pub fn try_convert_to<To: SymbolicNodeType>(
-        self,
-    ) -> Result<RevisionView<'a, To, V>, InvalidTypeError> {
-        let new = RevisionView {
-            path: self.path.clone(),
-            repo: self.repo,
-            sym_type: To::new(),
-        };
-        new.lock_node();
-        let new = new.check_sym_type_compatibility()?;
-        Ok(new)
-    }
-
-    pub fn convert_to_any(self) -> RevisionView<'a, AnyType<AnyC>, V> {
-        self.try_convert_to().unwrap()
-    }
-
-    fn check_path_not_existent(self) -> Result<Self, PathDoesNotExistError<V::VersionId>> {
-        if &self.get_real_type() == &NodeType::NonExistent {
-            let path = FuzzyView::new(self.path.clone(), VersionPointer::Default);
-            Err(PathDoesNotExistError::new(path))
-        } else {
-            Ok(self)
-        }
-    }
-
-    fn check_sym_type_compatibility(self) -> Result<Self, InvalidTypeError> {
-        if !S::compatible().contains(&self.get_real_type()) {
-            let real_type = self.get_real_type();
-            Err(InvalidTypeError::new(S::compatible(), real_type))
-        } else {
-            Ok(self)
-        }
-    }
-
-    fn lock_node(&self) {
-        let mut node = self.get_node().borrow_mut();
-        let lock = node.try_lock();
-        drop(node);
-        if let Err(_) = lock {
-            let path = self.to_normalized_path();
-            panic!("Cannot lock path '{path}': a semantic view for this path already exists")
-        }
-    }
-
-    // fn check_version_compatibility(self) -> Result<Self, TreeViewError<V, V::VCSError>> {
-    //     match &self.version_pointer {
-    //         VersionPointer::Default => Ok(self),
-    //         VersionPointer::Version(v) => {
-    //             if !&self.get_real_type().accepts_explicit_version() {
-    //                 Err(TreeView::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotSupported).into())
-    //             }
-    //             else if !self.get_vcs().version_exists_on_path(&self.to_normalized_path(), &v)? {
-    //                 Err(TreeView::<ErrorState, V>::new(self.path, self.vcs, self.version_pointer, NodePathError::VersionNotOnPath).into())
-    //             } else {
-    //                 Ok(self)
-    //             }
-    //         }
-    //     }
-    // }
-}
-
-/// Getters and setters
-impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    fn get_repo(&self) -> &'a Repository<V> {
-        self.repo
-    }
-
-    pub fn get_vcs(&self) -> &V {
-        self.get_repo().get_vcs()
-    }
-
-    pub fn get_root(&self) -> &Rc<RefCell<Node<V::VersionId>>> {
-        self.path.first().unwrap()
-    }
-
-    pub fn get_sym_type(&self) -> &S {
-        &self.sym_type
-    }
-
-    pub fn get_child(
-        &self,
-        name: &str,
-    ) -> Result<FuzzyView<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
-        let mut path = self.path.clone();
-        if let Some(child) = self.get_node().borrow().get_child(name) {
-            path.push(child);
-            Ok(FuzzyView::new(path, VersionPointer::Default))
-        } else {
-            path.push(Rc::new(RefCell::new(Node::new(
-                name.to_string(),
-                NodeType::NonExistent,
-                None,
-            ))));
-            Err(PathDoesNotExistError::new(FuzzyView::new(
-                path,
-                VersionPointer::Default,
-            )))
-        }
-    }
-
-    pub fn as_static_view(&self) -> FuzzyView<V::VersionId> {
-        FuzzyView::new(self.path.clone(), VersionPointer::Default)
-    }
-
-    pub fn has_children(&self) -> bool {
-        self.get_node().borrow().has_children()
-    }
-}
-
-/// Iterators
-impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    pub fn iter_children(&self) -> impl Iterator<Item = FuzzyView<V::VersionId>> {
-        let path = self.as_static_view();
-        path.iter_children()
-    }
-
-    pub fn iter_children_req(&self) -> impl Iterator<Item = FuzzyView<V::VersionId>> {
-        let path = self.as_static_view();
-        path.iter_children_req()
-    }
-}
-
-/// Path pointer movement
-impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    pub fn get_at_index<To: SymbolicNodeType>(
-        &self,
-        index: usize,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, To, V>, TreeViewError<V::VersionId>> {
-        let path = self.path[0..index + 1].to_vec();
-        Ok(RevisionView::<'a, To, V>::new(path, repo)?)
-    }
-
-    /// Moves path to a specific index of the node vector.
-    pub fn move_to_index<To: SymbolicNodeType>(
-        self,
-        index: usize,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, To, V>, TreeViewError<V::VersionId>> {
-        self.get_at_index(index, repo)
-    }
-
-    pub fn get<To: SymbolicNodeType>(
-        &self,
-        path: &impl ToNormalizedPath,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, To, V>, TreeViewError<V::VersionId>> {
-        repo.get_view(path)
-    }
-
-    /// Move path to another node.
-    ///
-    /// Relative paths such as `..` are allowed.
-    ///
-    /// ## Example:
-    /// ```
-    /// let path = NormalizedPath::from("foo")
-    /// let node_path = NodePath::new(...)
-    /// node_path.move_to<Feature<Concrete>>(&path);
-    /// ```
-    pub fn move_to<To: SymbolicNodeType>(
-        self,
-        path: &impl ToNormalizedPath,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, To, V>, TreeViewError<V::VersionId>> {
-        drop(self);
-        repo.get_view(path)
-    }
-}
-
-/// Display and pretty printing
-impl<'a, S: SymbolicNodeType, V: VCS> RevisionView<'a, S, V> {
-    // pub fn display_tree(&self, show_tags: bool) -> String {
-    //     self.get_node().borrow().display_tree(show_tags)
-    // }
-
-    pub fn formatted(
-        &self,
-        show_type: bool,
-        show_version: bool,
-        colored: bool,
-    ) -> String {
-        self.as_static_view()
-            .formatted(show_type, show_version, colored)
-    }
-}
-
-impl<'a, S: SymbolicNodeType, V: VCS> NodeHolder<V::VersionId> for RevisionView<'a, S, V> {
-    fn get_node(&self) -> &Rc<RefCell<Node<V::VersionId>>> {
-        &self.path.last().unwrap()
-    }
-}
-
-impl<'a, S: SymbolicNodeType, V: VCS> Drop for RevisionView<'a, S, V> {
-    fn drop(&mut self) {
-        self.get_node().borrow_mut().unlock()
-    }
-}
-
-impl<'a, T: SymbolicNodeType, V: VCS> ToNormalizedPath for RevisionView<'a, T, V> {
-    fn to_normalized_path(&self) -> NormalizedPath {
-        self.path.to_normalized_path()
-    }
-}
-
-impl<'a, S: SymbolicNodeType, V: VCS> PartialEq for RevisionView<'a, S, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_normalized_path() == other.to_normalized_path()
-    }
-}
-
-impl<'a, S: SymbolicNodeType, V: VCS> Eq for RevisionView<'a, S, V> {}
-
-/// Reachability for virtual root
-impl<'a, V: VCS> RevisionView<'a, VirtualRoot, V> {
-    pub fn move_to_area<C: NodeClassification>(
-        self,
-        area: &impl ToNormalizedPath,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, Area<C>, V>, TreeViewError<V::VersionId>> {
-        self.move_to(area, repo)
-    }
-}
-
-impl<'a, C: NodeClassification, V: VCS> RevisionView<'a, Area<C>, V> {
-    pub fn get_path_to_feature_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
-    }
-
-    pub fn get_path_to_product_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(PRODUCT_ROOT)
-    }
-
-    pub fn move_to_feature_root(
-        self,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, FeatureRoot, V>, TreeViewError<V::VersionId>> {
-        Ok(self.move_to(&NormalizedPath::from(FEATURE_ROOT), repo)?)
-    }
-
-    pub fn move_to_product_root(
-        self,
-        repo: &'a Repository<V>,
-    ) -> Result<RevisionView<'a, ProductRoot, V>, TreeViewError<V::VersionId>> {
-        Ok(self.move_to(&NormalizedPath::from(PRODUCT_ROOT), repo)?)
-    }
+pub struct RevisionView<'a, S: IsConcrete, V: VCS> {
+    semantic_view: SemanticView<'a, S, V>,
+    revision_pointer: RevisionPointer<V::VersionId>,
 }
 
 impl<'a, S: IsConcrete, V: VCS> RevisionView<'a, S, V> {
-    pub fn get_id(&self) -> usize {
-        self.get_node().borrow().get_branch_info().unwrap().get_id()
+    pub(crate) fn new(
+        semantic_view: SemanticView<'a, S, V>,
+        revision: &NormalizedRevision,
+    ) -> Result<Self, RevisionError<V::VersionId, V::VCSError>> {
+        let revision = semantic_view.assert_revision(&revision)?;
+        let new = Self {
+            semantic_view,
+            revision_pointer: revision,
+        };
+        Ok(new)
+    }
+    
+    pub fn get_ref(&'a self) -> RevisionRef<'a, S, V> {
+        RevisionRef {
+            semantic_view: &self.semantic_view,
+            revision_pointer: self.revision_pointer.clone(),
+        }
+    }
+    
+    pub fn get_semantic_view(&self) -> &SemanticView<'a, S, V> {
+        &self.semantic_view
     }
 }
 
-impl<'a, T: UnderArea, V: VCS> RevisionView<'a, T, V> {
-    pub fn get_area<C: NodeClassification>(
-        &self,
-        repo: &'a Repository<V>,
-    ) -> RevisionView<'a, Area<C>, V> {
-        self.get_at_index(1, repo).unwrap()
-    }
+#[derive(Debug)]
+pub struct RevisionRef<'a, S: IsConcrete, V: VCS> {
+    semantic_view: &'a SemanticView<'a, S, V>,
+    revision_pointer: RevisionPointer<V::VersionId>,
+}
 
-    pub fn move_to_area<C: NodeClassification>(
-        self,
-        repo: &'a Repository<V>,
-    ) -> RevisionView<'a, Area<C>, V> {
-        self.move_to_index(1, repo).unwrap()
+impl<'a, S: IsConcrete, V: VCS> RevisionRef<'a, S, V> {
+    pub(crate) fn new(
+        semantic_view: &'a SemanticView<'a, S, V>,
+        revision: &NormalizedRevision,
+    ) -> Result<Self, RevisionError<V::VersionId, V::VCSError>> {
+        let revision = semantic_view.assert_revision(&revision)?;
+        let new = Self {
+            semantic_view, 
+            revision_pointer: revision,
+        };
+        Ok(new)
     }
 }

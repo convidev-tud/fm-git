@@ -1,6 +1,6 @@
 use crate::model::*;
-use crate::vcs::{VCS, VCSError, VersionId};
-use crate::workspace::{WorkSpaceError, Workspace};
+use crate::vcs::*;
+use crate::workspace::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -60,9 +60,8 @@ impl<V: VCS> Repository<V> {
     }
 
     fn get_node_vec(&self, path: &NormalizedPath) -> Vec<Rc<RefCell<Node<V::VersionId>>>> {
-        let no_version = path.strip_version();
         let mut new_node_vec = vec![self.virtual_root.clone()];
-        for p in no_version.iter_segments(1, path.len()) {
+        for p in path.iter_segments(1, path.len()) {
             let current = new_node_vec.last().unwrap();
             let node = if let Some(node) = current.borrow().get_child(p) {
                 node
@@ -91,40 +90,16 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn get_virtual_root_view(&self) -> RevisionView<VirtualRoot, V> {
-        RevisionView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
+    pub fn get_virtual_root_view(&self) -> SemanticView<VirtualRoot, V> {
+        SemanticView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
 
     pub fn get_view<S: SymbolicNodeType>(
         &self,
         path: &impl ToNormalizedPath,
-    ) -> Result<RevisionView<S, V>, TreeViewError<V::VersionId>> {
+    ) -> Result<SemanticView<S, V>, SemanticViewError<V::VersionId>> {
         let node_vec = self.get_node_vec(&path.to_normalized_path());
-        Ok(RevisionView::new(node_vec, &self)?)
-    }
-
-    pub fn get_path(&self, path: &NormalizedPath) -> Result<FuzzyView<V::VersionId>, V::VCSError> {
-        let node_vec = self.get_node_vec(path);
-        let version = match path.get_version_appendix() {
-            Some(version) => {
-                let version_id = if self
-                    .get_vcs()
-                    .version_exists_on_path(&node_vec.to_normalized_path(), &version)?
-                {
-                    let version_id = self.get_vcs().get_version(&version)?.unwrap();
-                    let mut node = node_vec.last().unwrap().borrow_mut();
-                    node.mut_get_branch_info()
-                        .unwrap()
-                        .insert_version(version_id.clone());
-                    version_id
-                } else {
-                    V::VersionId::new(version)
-                };
-                VersionPointer::Version(version_id)
-            }
-            None => VersionPointer::Default,
-        };
-        Ok(FuzzyView::new(node_vec, version))
+        Ok(SemanticView::new(node_vec, &self)?)
     }
 
     pub fn get_path_by_id(&self, id: usize) -> Option<&NormalizedPath> {

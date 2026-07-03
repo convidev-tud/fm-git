@@ -1,7 +1,7 @@
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
 use clap::{Arg, Command};
 use colored::Colorize;
-use hyrmir_lib::model::{AnyType, Concrete, ToNormalizedPath, TreeViewError};
+use hyrmir_lib::model::{AnyType, Concrete, FailableNormalize, SemanticViewError, ToNormalizedPath};
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
 use std::error::Error;
@@ -37,16 +37,17 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         // parameters
-        let target_string = context
+        let parsed_target = context
             .get_arg_helper()
             .get_argument_value::<String>(PATH)
-            .unwrap();
+            .unwrap()
+            .normalize()?;
 
         // repo allocations
         let repo = loader.load_repo()?;
         let workspace = repo.get_workspace::<AnyType<Concrete>>()?;
-        let current = workspace.get_current_view();
-        let target_path = current.to_normalized_path() + target_string.to_normalized_path();
+        let current = workspace.get_current_view().get_semantic_view();
+        let target_path = current.to_normalized_path() + parsed_target.get_path().clone();
 
         if current.to_normalized_path() == target_path {
             logger.info(format!(
@@ -60,24 +61,20 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             Ok(path) => path,
             Err(error) => {
                 return match error {
-                    TreeViewError::PathDoesNotExist(_) => Err(format!(
-                        "Cannot checkout {}: path does not exist",
-                        target_path.to_string().blue()
-                    )
-                    .into()),
-                    TreeViewError::InvalidType(_) => Err(format!(
-                        "Cannot checkout {}: target does not have a branch",
+                    SemanticViewError::PathDoesNotExist(path) => Err(path.into()),
+                    SemanticViewError::InvalidType(_) => Err(format!(
+                        "Cannot view {}: target does not have a branch",
                         target_path.to_string().blue()
                     )
                     .into()),
                 };
             }
         };
-        let workspace = workspace.switch_to(target)?;
+        let workspace = workspace.switch_to(target.to_head_view())?;
         let new_current = workspace.get_current_view();
         let msg = format!(
             "Now viewing {}",
-            new_current.formatted(true, true, true),
+            new_current.get_semantic_view().formatted(true, true, true),
         );
         let status = workspace.status(msg, "", "", true)?;
         logger.info(status);

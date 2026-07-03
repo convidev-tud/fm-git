@@ -6,7 +6,7 @@ use thiserror::Error;
 #[derive(Error, Clone, Debug)]
 pub enum WorkSpaceError<V: VersionId, VE: VCSError> {
     #[error(transparent)]
-    TreeView(#[from] TreeViewError<V>),
+    SemanticView(#[from] SemanticViewError<V>),
     #[error("There is no workspace attached to this repository.")]
     NoWorkspace,
     #[error(transparent)]
@@ -25,9 +25,10 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
         repository: &'a Repository<V>,
     ) -> Result<Self, WorkSpaceError<V::VersionId, V::VCSError>> {
         if let Some(current) = repository.get_vcs().get_current_path()? {
-            let current_path = repository.get_view(&current)?;
+            let current_semantic_view = repository.get_view(&current)?;
+            let current_view = current_semantic_view.to_head_view();
             Ok(Self {
-                current_view: current_path,
+                current_view,
                 repository,
             })
         } else {
@@ -68,12 +69,13 @@ impl<'a, S: IsConcrete, V: VCS> Workspace<'a, S, V> {
 
     pub fn switch_to<T: IsConcrete>(
         self,
-        path: RevisionView<'a, T, V>,
+        view: RevisionView<'a, T, V>,
     ) -> Result<Workspace<'a, T, V>, V::VCSError> {
-        let id = path.get_id();
-        self.repository.get_vcs().switch_to_branch(id, &path)?;
+        let semantic = view.get_semantic_view();
+        let id = semantic.get_id();
+        self.repository.get_vcs().switch_to_branch(id, semantic)?;
         let new = Workspace {
-            current_view: path,
+            current_view: view,
             repository: self.repository,
         };
         Ok(new)
