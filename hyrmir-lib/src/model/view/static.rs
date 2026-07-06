@@ -1,6 +1,7 @@
 use crate::model::*;
 use crate::vcs::VersionId;
 use colored::Colorize;
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
@@ -19,24 +20,35 @@ impl<V: VersionId> StaticView<V> {
         Self { path, version }
     }
 
-    pub fn formatted(
-        &self,
-        show_type: bool,
-        show_version: bool,
-        colored: bool,
-    ) -> String {
-        let mut path = self
-            .normalize()
-            .get_path()
-            .to_string()
-            .blue()
-            .to_string();
+    pub fn iter_children(&self) -> impl Iterator<Item = StaticView<V>> {
+        self.get_node()
+            .borrow()
+            .get_children()
+            .into_iter()
+            .map(|node| {
+                let mut path = self.path.clone();
+                path.push(node);
+                StaticView::new(path, RevisionPointer::Head)
+            })
+            .sorted()
+    }
+
+    pub fn iter_children_req(&self) -> impl Iterator<Item = StaticView<V>> {
+        self.iter_children().flat_map(|view| {
+            let mut to_iter = Vec::new();
+            to_iter.push(view.clone());
+            to_iter.extend(view.iter_children_req());
+            to_iter
+        })
+    }
+
+    pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
+        let mut path = self.normalize().get_path().to_string().blue().to_string();
         if show_type {
             let node = self.get_node().borrow();
             let node_type = node.get_type();
             let type_name = node_type.get_type_name();
-            let formatted = node_type
-                .format_node_display(format!("({type_name})").normal());
+            let formatted = node_type.format_node_display(format!("({type_name})").normal());
             path = path + " " + formatted.to_string().as_str();
         }
         if show_version {
@@ -45,14 +57,14 @@ impl<V: VersionId> StaticView<V> {
                     RevisionPointer::Head => {
                         let head = branch_info.get_head();
                         format!("({})", head.get_printable_id()).yellow()
-                    },
+                    }
                     RevisionPointer::Revision(version) => {
                         if branch_info.contains_version(version) {
                             format!("({})", version.get_printable_id()).yellow()
                         } else {
                             format!("(Invalid: {})", version.get_printable_id()).red()
                         }
-                    },
+                    }
                 };
                 path = path + " " + version.to_string().as_str();
             }
@@ -74,8 +86,10 @@ impl<V: VersionId> Normalize for StaticView<V> {
     fn normalize(&self) -> Normalized {
         let path = self.path.to_normalized_path();
         let revision = match &self.version {
-            RevisionPointer::Head => NormalizedRevision::None,
-            RevisionPointer::Revision(version) => NormalizedRevision::Revision(version.get_full_id()),
+            RevisionPointer::Head => NormalizedRevision::Head,
+            RevisionPointer::Revision(version) => {
+                NormalizedRevision::Revision(version.get_full_id())
+            }
         };
         Normalized::new(path, revision)
     }
@@ -103,8 +117,7 @@ impl<V: VersionId> Display for StaticView<V> {
 
 impl<V: VersionId> PartialOrd for StaticView<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.normalize()
-            .partial_cmp(&other.normalize())
+        self.normalize().partial_cmp(&other.normalize())
     }
 }
 

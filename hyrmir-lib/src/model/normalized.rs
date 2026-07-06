@@ -8,14 +8,14 @@ const REVISION_SEPARATOR: char = ':';
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum NormalizedRevision {
-    None,
+    Head,
     Revision(String),
 }
 
 impl Display for NormalizedRevision {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::None => f.write_str(""),
+            Self::Head => f.write_str(""),
             Self::Revision(revision) => f.write_str(revision),
         }
     }
@@ -135,22 +135,22 @@ impl NormalizedPath {
     pub fn new() -> Self {
         Self { path: Vec::new() }
     }
-    
+
     pub fn push<S: Into<String>>(&mut self, path: S) {
         let qualified_str = path.into().replace("_", "");
         for split in qualified_str.trim().split(PATH_SEPARATOR) {
             self.path.push(split.to_lowercase());
         }
     }
-    
+
     pub fn strip_n(&self, n_left: usize, n_right: usize) -> NormalizedPath {
         NormalizedPath::from(self.path[n_left..n_right].to_vec())
     }
-    
+
     pub fn strip_n_left(&self, n: usize) -> NormalizedPath {
         self.strip_n(n, self.path.len())
     }
-    
+
     pub fn strip_n_right(&self, n: usize) -> NormalizedPath {
         self.strip_n(0, n)
     }
@@ -174,74 +174,74 @@ impl NormalizedPath {
         }
         NormalizedPath::from(new_path)
     }
-    
+
     pub fn replace<S: Into<String>>(&self, index: usize, value: S) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.insert(index, value.into());
         NormalizedPath::from(new_path)
     }
-    
+
     pub fn first(&self) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.first()?.clone()))
     }
-    
+
     pub fn last(&self) -> Option<&String> {
         self.path.last()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.path.is_empty()
     }
-    
+
     pub fn iter(&self) -> impl Iterator<Item = NormalizedPath> {
         self.iter_all_segments()
             .map(|s| NormalizedPath::from(s.clone()))
     }
-    
+
     pub fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
         self.path.iter()
     }
-    
+
     pub fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
         self.path[l..r].iter()
     }
-    
+
     pub fn get(&self, index: usize) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.get(index)?.clone()))
     }
-    
+
     pub fn starts_with(&self, prefix: &NormalizedPath) -> bool {
         self.to_string().starts_with(&prefix.to_string())
     }
-    
+
     pub fn last_is(&self, suffix: &NormalizedPath) -> bool {
         self.last() == suffix.last()
     }
-    
+
     pub fn len(&self) -> usize {
         self.path.len()
     }
-    
+
     pub fn as_dir(&self) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.push("".to_string());
         NormalizedPath::from(new_path)
     }
-    
+
     pub fn as_absolute(&self) -> NormalizedPath {
         let mut new_path = self.path.clone();
         new_path.insert(0, "".to_string());
         NormalizedPath::from(new_path)
     }
-    
+
     pub fn is_dir(&self) -> bool {
         self.path.len() > 1 && self.last().unwrap() == ""
     }
-    
+
     pub fn is_absolute(&self) -> bool {
         self.path.len() > 0 && self.first().unwrap() == ""
     }
-    
+
     pub fn formatted(&self, colored: bool) -> String {
         let base = if colored {
             self.to_string().blue().to_string()
@@ -279,27 +279,27 @@ impl Normalized {
     pub fn new(path: NormalizedPath, revision: NormalizedRevision) -> Self {
         Self { path, revision }
     }
-    
+
     pub fn from_string(value: &String) -> Result<Self, NormalizeError> {
         let split = value.split(REVISION_SEPARATOR).collect::<Vec<&str>>();
         if split.len() > 2 {
             return Err(NormalizeError::new(format!(
                 "Cannot normalize '{value}': input is malformed"
-            )))
+            )));
         }
         let path = NormalizedPath::from(split[0].to_string());
         let revision = if split.len() == 2 {
             NormalizedRevision::Revision(split[1].to_string())
         } else {
-            NormalizedRevision::None
+            NormalizedRevision::Head
         };
         Ok(Normalized::new(path, revision))
     }
-    
+
     pub fn get_path(&self) -> &NormalizedPath {
         &self.path
     }
-    
+
     pub fn get_revision(&self) -> &NormalizedRevision {
         &self.revision
     }
@@ -308,12 +308,9 @@ impl Normalized {
 impl Display for Normalized {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let s = match &self.revision {
-            NormalizedRevision::None => self.path.to_string(),
+            NormalizedRevision::Head => self.path.to_string(),
             NormalizedRevision::Revision(revision) => {
-                format!(
-                    "{}:{revision}",
-                    self.path,
-                )
+                format!("{}:{revision}", self.path,)
             }
         };
         f.write_str(&s)

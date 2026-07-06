@@ -1,11 +1,13 @@
-use std::error::Error;
-use crate::def::*;
 use crate::CommandLogger;
+use crate::def::*;
 use clap::Command;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
+use hyrmir_lib::workspace::WorkspaceKind;
+use std::error::Error;
 use std::marker::PhantomData;
+use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
 pub struct StatusCommand<V: VCS + 'static> {
@@ -36,11 +38,19 @@ impl<V: VCS> CommandInterface<V> for StatusCommand<V> {
         _context: &CommandContext<V>,
     ) -> Result<(), Box<dyn Error>> {
         let repo = loader.load_repo()?;
-        let workspace = repo.get_workspace::<AnyType<Concrete>>()?;
-        let current = workspace.get_current_view();
-        let current_msg = format!("Viewing {}", current.get_semantic_view().formatted(true, true, true),);
-        let status = workspace.status(current_msg, "", "", true)?;
-        logger.info(status);
+        let path = PathBuf::from(".");
+        match repo.get_workspace::<AnyType<Concrete>>(path)? {
+            WorkspaceKind::Head(workspace) => {
+                let current = workspace.get_current_view();
+                let current_msg = format!(
+                    "Viewing {}",
+                    current.get_semantic_view().formatted(true, true, true),
+                );
+                let status = workspace.status(current_msg, "", "", true)?;
+                logger.info(status);
+            }
+            _ => unimplemented!(),
+        }
         Ok(())
     }
 }

@@ -165,7 +165,7 @@ impl<V: VersionId> BranchInfo<V> {
     pub fn get_id(&self) -> usize {
         self.id
     }
-    
+
     pub fn get_head(&self) -> &V {
         &self.head
     }
@@ -177,7 +177,7 @@ impl<V: VersionId> BranchInfo<V> {
     pub fn remove_known_version(&mut self, version: &V) {
         self.known_versions.remove(&version.get_full_id());
     }
-    
+
     pub fn contains_version(&self, version: &V) -> bool {
         self.known_versions.contains_key(&version.get_full_id())
     }

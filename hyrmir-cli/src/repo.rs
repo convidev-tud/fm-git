@@ -55,7 +55,7 @@ impl<V: VCS + 'static> CommandDefinition<V> for RootCommand<V> {
             // Box::new(SpreadCommand),
             // Box::new(UntieCommand),
             // Box::new(CommitCommand),
-            // Box::new(HiddenCompletionCommand),
+            Box::new(HiddenCompletionCommand::new()),
         ]
     }
 }

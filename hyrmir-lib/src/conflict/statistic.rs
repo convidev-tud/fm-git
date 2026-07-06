@@ -52,20 +52,14 @@
 //     }
 // }
 //
-// impl ToNormalizedPaths for Vec<NormalizedMergeStatistic> {
-//     fn to_normalized_paths(&self) -> Vec<NormalizedPath> {
-//         self.iter().map(|s| s.get_path().clone()).collect()
-//     }
-// }
-//
 // #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 // pub struct MergeStatistic<Vs: VersionId> {
-//     path: FuzzyView<Vs>,
+//     path: StaticView<Vs>,
 //     stat: MergeResult,
 // }
 //
 // impl<Vs: VersionId> MergeStatistic<Vs> {
-//     pub fn new(path: FuzzyView<Vs>, stat: MergeResult) -> Self {
+//     pub fn new(path: StaticView<Vs>, stat: MergeResult) -> Self {
 //         Self { path, stat }
 //     }
 //

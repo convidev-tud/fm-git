@@ -201,8 +201,3 @@ impl<T: SymbolicNodeType<Classification = Concrete>> IsConcrete for T {}
 /// Is automatically implemented if [Abstract] is used as parameter.
 pub trait IsAbstract {}
 impl<T: SymbolicNodeType<Classification = Abstract>> IsAbstract for T {}
-
-
-
-
-

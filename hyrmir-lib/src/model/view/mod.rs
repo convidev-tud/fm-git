@@ -1,19 +1,18 @@
+use colored::Colorize;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-use colored::Colorize;
 use thiserror::Error;
 
+mod revision;
 mod semantic;
 mod r#static;
-mod revision;
 
-pub use semantic::*;
-pub use r#static::*;
-pub use revision::*;
 use crate::model::*;
 use crate::vcs::VersionId;
-
+pub use revision::*;
+pub use semantic::*;
+pub use r#static::*;
 
 impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
     fn to_normalized_path(&self) -> NormalizedPath {

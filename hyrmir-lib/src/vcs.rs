@@ -1,6 +1,7 @@
-use crate::model::{NormalizedPath, ToNormalizedPath};
+use crate::model::*;
 use std::error::Error;
 use std::fmt::Debug;
+use std::path::PathBuf;
 
 pub trait VCSError: Error {}
 
@@ -39,16 +40,19 @@ pub trait VCS: Debug {
 
     type VersionId: VersionId;
 
-    fn get_current_path(&self) -> Result<Option<NormalizedPath>, Self::VCSError>;
+    fn get_current_path(&self, path: &PathBuf) -> Result<Option<Normalized>, Self::VCSError>;
 
     fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError>;
 
-    fn get_revision(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError>;
+    fn get_revision(
+        &self,
+        version: impl Into<String>,
+    ) -> Result<Option<Self::VersionId>, Self::VCSError>;
 
     fn revision_exists_on_path(
         &self,
         path: &NormalizedPath,
-        version: &String,
+        version: impl Into<String>,
     ) -> Result<bool, Self::VCSError>;
 
     fn iter_versions(
@@ -90,5 +94,6 @@ pub trait VCS: Debug {
         &self,
         id: usize,
         path: &impl ToNormalizedPath,
+        dir: &PathBuf,
     ) -> Result<String, Self::VCSError>;
 }

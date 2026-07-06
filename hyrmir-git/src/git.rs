@@ -1,4 +1,4 @@
-use hyrmir_lib::model::{NormalizedPath, Normalize, ToNormalizedPath};
+use hyrmir_lib::model::*;
 use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, VersionId};
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -169,13 +169,16 @@ impl VCS for Git {
     type VCSError = GitError;
     type VersionId = Commit;
 
-    fn get_current_path(&self) -> Result<Option<NormalizedPath>, Self::VCSError> {
+    fn get_current_path(&self, _: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
         let command = vec!["branch", "--show-current"];
         let out = self.git_cli.run_attached(&command)?;
         let path_string = output_to_result(out, &command)?;
         if !path_string.is_empty() {
             let (path, _) = self.split_branch(&path_string);
-            Ok(Some(NormalizedPath::from_git_branch(path).as_absolute()))
+            Ok(Some(Normalized::new(
+                NormalizedPath::from_git_branch(path).as_absolute(),
+                NormalizedRevision::Head,
+            )))
         } else {
             Ok(None)
         }
@@ -203,14 +206,17 @@ impl VCS for Git {
         Ok(all_branches)
     }
 
-    fn get_revision(&self, version: &str) -> Result<Option<Self::VersionId>, Self::VCSError> {
+    fn get_revision(
+        &self,
+        version: impl Into<String>,
+    ) -> Result<Option<Self::VersionId>, Self::VCSError> {
         todo!()
     }
 
     fn revision_exists_on_path(
         &self,
         path: &NormalizedPath,
-        version: &String,
+        version: impl Into<String>,
     ) -> Result<bool, Self::VCSError> {
         todo!()
     }
@@ -238,6 +244,7 @@ impl VCS for Git {
         &self,
         id: usize,
         path: &impl ToNormalizedPath,
+        _: &PathBuf,
     ) -> Result<String, Self::VCSError> {
         let path = path.to_normalized_path();
         let branch = path.to_git_branch(id);

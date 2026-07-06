@@ -1,6 +1,7 @@
 use crate::model::*;
 use crate::repository::Repository;
-use crate::vcs::{VersionId, VCS};
+use crate::vcs::{VCS, VersionId};
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
@@ -20,7 +21,13 @@ impl<V: VersionId> PathDoesNotExistError<V> {
 
 impl<V: VersionId> Display for PathDoesNotExistError<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("Path '{}' does not exist", self.path.formatted(true, true, true)).as_str())
+        f.write_str(
+            format!(
+                "Path '{}' does not exist",
+                self.path.formatted(true, true, true)
+            )
+            .as_str(),
+        )
     }
 }
 
@@ -32,11 +39,7 @@ pub struct InvalidTypeError<V: VersionId> {
 }
 
 impl<V: VersionId> InvalidTypeError<V> {
-    pub fn new(
-        types_possible: Vec<NodeType>,
-        type_found: NodeType,
-        path: StaticView<V>,
-    ) -> Self {
+    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType, path: StaticView<V>) -> Self {
         Self {
             types_possible,
             type_found,
@@ -65,12 +68,15 @@ impl<V: VersionId> Display for InvalidTypeError<V> {
             .map(|t| t.get_formatted_name())
             .collect::<Vec<_>>()
             .join(", ");
-        f.write_str(format!(
-            "Path {} has invalid type\n\
+        f.write_str(
+            format!(
+                "Path '{}' has invalid type\n\
             Found type {} but expected one of the following:\n  {expected}",
-            self.path.formatted(false, false, true),
-            self.type_found.get_formatted_name(),
-        ).as_str())
+                self.path.formatted(false, false, true),
+                self.type_found.get_formatted_name(),
+            )
+            .as_str(),
+        )
     }
 }
 
@@ -146,7 +152,11 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
     fn check_sym_type_compatibility(self) -> Result<Self, InvalidTypeError<V::VersionId>> {
         if !S::compatible().contains(&self.get_real_type()) {
             let real_type = self.get_real_type();
-            Err(InvalidTypeError::new(S::compatible(), real_type, self.to_static_view()))
+            Err(InvalidTypeError::new(
+                S::compatible(),
+                real_type,
+                self.to_static_view(),
+            ))
         } else {
             Ok(self)
         }
@@ -205,14 +215,18 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
 
 // /// Iterators
 // impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
-//     pub fn iter_children(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
-//         let path = self.as_static_view();
-//         path.iter_children()
+//     pub fn iter_children_static(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
+//         let view = self.to_static_view();
+//         view.iter_children()
 //     }
 //
-//     pub fn iter_children_req(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
-//         let path = self.as_static_view();
-//         path.iter_children_req()
+//     pub fn iter_children_static_req(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
+//         self.iter_children_static().flat_map(|view| {
+//             let mut to_iter = Vec::new();
+//             to_iter.push(view.clone());
+//             to_iter.extend(view.iter_children_req());
+//             to_iter
+//         })
 //     }
 // }
 
@@ -270,12 +284,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
     //     self.get_node().borrow().display_tree(show_tags)
     // }
 
-    pub fn formatted(
-        &self,
-        show_type: bool,
-        show_version: bool,
-        colored: bool,
-    ) -> String {
+    pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
         self.to_static_view()
             .formatted(show_type, show_version, colored)
     }
@@ -355,50 +364,55 @@ impl<'a, S: IsConcrete, V: VCS> SemanticView<'a, S, V> {
         self.get_node().borrow().get_branch_info().unwrap().get_id()
     }
 
-    pub fn get_head_ref(&'a self) -> RevisionRef<'a, S, V> {
-        RevisionRef::new(self, &NormalizedRevision::None).unwrap()
+    pub fn get_head(&'a self) -> RevisionRef<'a, S, V> {
+        let head = self
+            .get_node()
+            .borrow()
+            .get_branch_info()
+            .unwrap()
+            .get_head()
+            .clone();
+        let rev = Rev::new(head);
+        RevisionRef::new_no_check(&self, rev)
     }
 
-    pub fn get_revision_ref(
+    pub fn get_rev(
         &'a self,
-        revision: &NormalizedRevision,
+        revision: impl Into<String>,
     ) -> Result<RevisionRef<'a, S, V>, RevisionError<V::VersionId, V::VCSError>> {
         RevisionRef::new(self, revision)
     }
 
-    pub fn to_head_view(self) -> RevisionView<'a, S, V> {
-        RevisionView::new(self, &NormalizedRevision::None).unwrap()
+    pub fn head(self) -> RevisionView<'a, S, Head, V> {
+        RevisionView::<'a, S, Head, V>::new(self)
     }
 
-    pub fn to_revision_view(
+    pub fn rev(
         self,
-        revision: &NormalizedRevision
-    ) -> Result<RevisionView<'a, S, V>, RevisionError<V::VersionId, V::VCSError>> {
-        RevisionView::new(self, revision)
+        revision: impl Into<String>,
+    ) -> Result<RevisionView<'a, S, Rev<V::VersionId>, V>, RevisionError<V::VersionId, V::VCSError>>
+    {
+        RevisionView::<'a, S, Rev<V::VersionId>, V>::new(self, revision)
     }
 
     pub fn assert_revision(
         &self,
-        revision: &NormalizedRevision
-    ) -> Result<RevisionPointer<V::VersionId>, RevisionError<V::VersionId, V::VCSError>> {
-        match revision {
-            NormalizedRevision::None => Ok(RevisionPointer::Head),
-            NormalizedRevision::Revision(revision) => {
-                if self
-                    .get_vcs()
-                    .revision_exists_on_path(&self.to_normalized_path(), revision)? {
-                    let revision = self.get_vcs().get_revision(revision)?.unwrap();
-                    self
-                        .get_node()
-                        .borrow_mut()
-                        .mut_get_branch_info()
-                        .unwrap()
-                        .add_known_version(revision.clone());
-                    Ok(RevisionPointer::Revision(revision))
-                } else {
-                    Err(self.to_static_view().into())
-                }
-            }
+        revision: impl Into<String>,
+    ) -> Result<V::VersionId, RevisionError<V::VersionId, V::VCSError>> {
+        let rev = revision.into();
+        if self
+            .get_vcs()
+            .revision_exists_on_path(&self.to_normalized_path(), &rev)?
+        {
+            let revision = self.get_vcs().get_revision(&rev)?.unwrap();
+            self.get_node()
+                .borrow_mut()
+                .mut_get_branch_info()
+                .unwrap()
+                .add_known_version(revision.clone());
+            Ok(revision)
+        } else {
+            Err(self.to_static_view().into())
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::vcs::*;
 use crate::workspace::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -108,7 +109,8 @@ impl<V: VCS> Repository<V> {
 
     pub fn get_workspace<S: IsConcrete>(
         &'_ self,
-    ) -> Result<Workspace<'_, S, V>, WorkSpaceError<V::VersionId, V::VCSError>> {
-        Workspace::new(&self)
+        path: PathBuf,
+    ) -> Result<WorkspaceKind<'_, S, V>, GetWorkSpaceError<V::VersionId, V::VCSError>> {
+        WorkspaceKind::<S, V>::get(path, &self)
     }
 }
