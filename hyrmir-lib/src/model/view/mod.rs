@@ -6,13 +6,13 @@ use thiserror::Error;
 
 mod revision;
 mod semantic;
-mod r#static;
+mod dynamic;
 
 use crate::model::*;
 use crate::vcs::VersionId;
 pub use revision::*;
 pub use semantic::*;
-pub use r#static::*;
+pub use dynamic::*;
 
 impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
     fn to_normalized_path(&self) -> NormalizedPath {

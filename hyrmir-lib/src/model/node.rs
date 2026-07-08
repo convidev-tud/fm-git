@@ -169,6 +169,15 @@ impl<V: VersionId> BranchInfo<V> {
     pub fn get_head(&self) -> &V {
         &self.head
     }
+    
+    pub fn get_known_version(&self, id: impl Into<String>) -> Option<&V> {
+        let id = id.into();
+        if id == "HEAD" {
+            Some(&self.head)
+        } else {
+            self.known_versions.get(&id)
+        }
+    }
 
     pub fn add_known_version(&mut self, version: V) {
         self.known_versions.insert(version.get_full_id(), version);

@@ -8,19 +8,23 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-/// A static view onto the model.
+/// A dynamic view onto the model without static guarantees.
 #[derive(Clone, Debug)]
-pub struct StaticView<V: VersionId> {
+pub struct DynamicView<V: VersionId> {
     path: Vec<Rc<RefCell<Node<V>>>>,
     version: RevisionPointer<V>,
 }
 
-impl<V: VersionId> StaticView<V> {
-    pub fn new(path: Vec<Rc<RefCell<Node<V>>>>, version: RevisionPointer<V>) -> Self {
+impl<V: VersionId> DynamicView<V> {
+    pub(crate) fn new(path: Vec<Rc<RefCell<Node<V>>>>, version: RevisionPointer<V>) -> Self {
         Self { path, version }
     }
+    
+    pub(crate) fn get_path(&self) -> &Vec<Rc<RefCell<Node<V>>>> {
+        &self.path
+    }
 
-    pub fn iter_children(&self) -> impl Iterator<Item = StaticView<V>> {
+    pub fn iter_children(&self) -> impl Iterator<Item = DynamicView<V>> + use<V> {
         self.get_node()
             .borrow()
             .get_children()
@@ -28,12 +32,12 @@ impl<V: VersionId> StaticView<V> {
             .map(|node| {
                 let mut path = self.path.clone();
                 path.push(node);
-                StaticView::new(path, RevisionPointer::Head)
+                DynamicView::new(path, RevisionPointer::Head)
             })
             .sorted()
     }
 
-    pub fn iter_children_req(&self) -> impl Iterator<Item = StaticView<V>> {
+    pub fn iter_children_req(&self) -> impl Iterator<Item = DynamicView<V>> + use<V> {
         self.iter_children().flat_map(|view| {
             let mut to_iter = Vec::new();
             to_iter.push(view.clone());
@@ -76,13 +80,13 @@ impl<V: VersionId> StaticView<V> {
     }
 }
 
-impl<V: VersionId> NodeHolder<V> for StaticView<V> {
+impl<V: VersionId> NodeHolder<V> for DynamicView<V> {
     fn get_node(&self) -> &Rc<RefCell<Node<V>>> {
         &self.path.last().unwrap()
     }
 }
 
-impl<V: VersionId> Normalize for StaticView<V> {
+impl<V: VersionId> Normalize for DynamicView<V> {
     fn normalize(&self) -> Normalized {
         let path = self.path.to_normalized_path();
         let revision = match &self.version {
@@ -95,33 +99,33 @@ impl<V: VersionId> Normalize for StaticView<V> {
     }
 }
 
-impl<V: VersionId> Eq for StaticView<V> {}
+impl<V: VersionId> Eq for DynamicView<V> {}
 
-impl<V: VersionId> Hash for StaticView<V> {
+impl<V: VersionId> Hash for DynamicView<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.normalize().hash(state);
     }
 }
 
-impl<V: VersionId> PartialEq for StaticView<V> {
-    fn eq(&self, other: &StaticView<V>) -> bool {
+impl<V: VersionId> PartialEq for DynamicView<V> {
+    fn eq(&self, other: &DynamicView<V>) -> bool {
         self.normalize() == other.normalize()
     }
 }
 
-impl<V: VersionId> Display for StaticView<V> {
+impl<V: VersionId> Display for DynamicView<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.normalize().to_string().as_str())
     }
 }
 
-impl<V: VersionId> PartialOrd for StaticView<V> {
+impl<V: VersionId> PartialOrd for DynamicView<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.normalize().partial_cmp(&other.normalize())
     }
 }
 
-impl<V: VersionId> Ord for StaticView<V> {
+impl<V: VersionId> Ord for DynamicView<V> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(&other).unwrap()
     }

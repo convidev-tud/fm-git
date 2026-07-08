@@ -78,8 +78,8 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             }
         };
         let workspace = match workspace {
-            WorkspaceKind::Head(w) => w.switch_to(target.head())?,
-            WorkspaceKind::Rev(w) => w.switch_to(target.head())?,
+            WorkspaceKind::Head(w) => w.switch_to(target.to_head_rev())?,
+            WorkspaceKind::Rev(w) => w.switch_to(target.to_head_rev())?,
         };
         let new_current = workspace.get_current_view();
         let msg = format!(
@@ -112,10 +112,11 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
                 .get_semantic_view()
                 .to_normalized_path(),
         };
-        let root = repo.get_virtual_root_view().to_static_view();
+        let root = repo.get_virtual_root_view();
         let all_branches = root
             .iter_children_req()
-            .map(|p| p.normalize().get_path().clone());
+            .filter_map(FilterByType::<AnyType<Concrete>>::filter)
+            .map(|p| p.to_normalized_path());
         let result = match maybe_editing.unwrap().get_id().as_str() {
             PATH => completion_helper.complete_normalized_paths(current, all_branches),
             _ => vec![],

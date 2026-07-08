@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Error, Clone, Debug)]
 pub enum GetWorkSpaceError<V: VersionId, VE: VCSError> {
     #[error(transparent)]
-    SemanticView(#[from] SemanticViewError<V>),
+    View(#[from] SemanticViewError<V>),
     #[error("There is no workspace attached at this path.")]
     NoWorkspace,
     #[error(transparent)]
@@ -16,7 +16,7 @@ pub enum GetWorkSpaceError<V: VersionId, VE: VCSError> {
 
 pub enum WorkspaceKind<'a, S: IsConcrete, V: VCS> {
     Head(Workspace<'a, S, Head, V>),
-    Rev(Workspace<'a, S, Rev<V::VersionId>, V>),
+    Rev(Workspace<'a, S, Rev, V>),
 }
 
 impl<'a, S: IsConcrete, V: VCS> WorkspaceKind<'a, S, V> {
@@ -28,13 +28,13 @@ impl<'a, S: IsConcrete, V: VCS> WorkspaceKind<'a, S, V> {
             let current_semantic_view = repository.get_view(current.get_path())?;
             match current.get_revision() {
                 NormalizedRevision::Head => {
-                    let current_view = current_semantic_view.head();
+                    let current_view = current_semantic_view.to_head_rev();
                     let new = Workspace::<S, Head, V> { current_view, path };
                     Ok(WorkspaceKind::Head(new))
                 }
                 NormalizedRevision::Revision(revision) => {
-                    let current_view = current_semantic_view.rev(revision).unwrap();
-                    let new = Workspace::<S, Rev<V::VersionId>, V> { current_view, path };
+                    let current_view = current_semantic_view.to_rev(revision).unwrap();
+                    let new = Workspace::<S, Rev, V> { current_view, path };
                     Ok(WorkspaceKind::Rev(new))
                 }
             }

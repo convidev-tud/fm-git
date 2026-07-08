@@ -1,6 +1,6 @@
 use crate::model::*;
 use crate::repository::Repository;
-use crate::vcs::{VCS, VersionId};
+use crate::vcs::{VersionId, VCS};
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
@@ -10,11 +10,11 @@ use thiserror::Error;
 
 #[derive(Error, Clone, Debug)]
 pub struct PathDoesNotExistError<V: VersionId> {
-    path: StaticView<V>,
+    path: DynamicView<V>,
 }
 
 impl<V: VersionId> PathDoesNotExistError<V> {
-    pub fn new(path: StaticView<V>) -> Self {
+    pub fn new(path: DynamicView<V>) -> Self {
         Self { path }
     }
 }
@@ -35,11 +35,11 @@ impl<V: VersionId> Display for PathDoesNotExistError<V> {
 pub struct InvalidTypeError<V: VersionId> {
     types_possible: Vec<NodeType>,
     type_found: NodeType,
-    path: StaticView<V>,
+    path: DynamicView<V>,
 }
 
 impl<V: VersionId> InvalidTypeError<V> {
-    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType, path: StaticView<V>) -> Self {
+    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType, path: DynamicView<V>) -> Self {
         Self {
             types_possible,
             type_found,
@@ -55,7 +55,7 @@ impl<V: VersionId> InvalidTypeError<V> {
         &self.type_found
     }
 
-    pub fn path(&self) -> &StaticView<V> {
+    pub fn path(&self) -> &DynamicView<V> {
         &self.path
     }
 }
@@ -112,7 +112,6 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
             repo,
             _sym_marker: PhantomData,
         };
-        new.lock_node();
         let new = new
             .check_path_not_existent()?
             .check_sym_type_compatibility()?;
@@ -127,7 +126,6 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
             repo: self.repo,
             _sym_marker: PhantomData,
         };
-        new.lock_node();
         let new = new.check_sym_type_compatibility()?;
         Ok(new)
     }
@@ -136,13 +134,13 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
         self.try_convert_to().unwrap()
     }
 
-    pub fn to_static_view(&self) -> StaticView<V::VersionId> {
-        StaticView::new(self.path.clone(), RevisionPointer::Head)
+    pub fn to_dynamic_view(&self) -> DynamicView<V::VersionId> {
+        DynamicView::new(self.path.clone(), RevisionPointer::Head)
     }
 
     fn check_path_not_existent(self) -> Result<Self, PathDoesNotExistError<V::VersionId>> {
         if &self.get_real_type() == &NodeType::NonExistent {
-            let path = StaticView::new(self.path.clone(), RevisionPointer::Head);
+            let path = DynamicView::new(self.path.clone(), RevisionPointer::Head);
             Err(PathDoesNotExistError::new(path))
         } else {
             Ok(self)
@@ -155,20 +153,10 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
             Err(InvalidTypeError::new(
                 S::compatible(),
                 real_type,
-                self.to_static_view(),
+                self.to_dynamic_view(),
             ))
         } else {
             Ok(self)
-        }
-    }
-
-    fn lock_node(&self) {
-        let mut node = self.get_node().borrow_mut();
-        let lock = node.try_lock();
-        drop(node);
-        if let Err(_) = lock {
-            let path = self.to_normalized_path();
-            panic!("Cannot lock path '{path}': a semantic view for this path already exists")
         }
     }
 }
@@ -190,18 +178,18 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
     pub fn get_child(
         &self,
         name: &str,
-    ) -> Result<StaticView<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
+    ) -> Result<DynamicView<V::VersionId>, PathDoesNotExistError<V::VersionId>> {
         let mut path = self.path.clone();
         if let Some(child) = self.get_node().borrow().get_child(name) {
             path.push(child);
-            Ok(StaticView::new(path, RevisionPointer::Head))
+            Ok(DynamicView::new(path, RevisionPointer::Head))
         } else {
             path.push(Rc::new(RefCell::new(Node::new(
                 name.to_string(),
                 NodeType::NonExistent,
                 None,
             ))));
-            Err(PathDoesNotExistError::new(StaticView::new(
+            Err(PathDoesNotExistError::new(DynamicView::new(
                 path,
                 RevisionPointer::Head,
             )))
@@ -213,22 +201,28 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
     }
 }
 
-// /// Iterators
-// impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
-//     pub fn iter_children_static(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
-//         let view = self.to_static_view();
-//         view.iter_children()
-//     }
-//
-//     pub fn iter_children_static_req(&self) -> impl Iterator<Item = StaticView<V::VersionId>> {
-//         self.iter_children_static().flat_map(|view| {
-//             let mut to_iter = Vec::new();
-//             to_iter.push(view.clone());
-//             to_iter.extend(view.iter_children_req());
-//             to_iter
-//         })
-//     }
-// }
+/// Iterators
+impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
+    pub fn iter_children(&self) -> impl Iterator<Item = SemanticView<'a, AnyType<AnyC>, V>> {
+        let dynamic = self.to_dynamic_view();
+        dynamic
+            .iter_children()
+            .map(move |v| SemanticView::<AnyType<AnyC>, V>::new(
+                v.get_path().clone(),
+                self.repo,
+            ).unwrap())
+    }
+
+    pub fn iter_children_req(&self) -> impl Iterator<Item = SemanticView<'a, AnyType<AnyC>, V>> {
+        let dynamic = self.to_dynamic_view();
+        dynamic
+            .iter_children_req()
+            .map(move |v| SemanticView::<AnyType<AnyC>, V>::new(
+                v.get_path().clone(),
+                self.repo,
+            ).unwrap())
+    }
+}
 
 /// Path pointer movement
 impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
@@ -285,7 +279,7 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
     // }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
-        self.to_static_view()
+        self.to_dynamic_view()
             .formatted(show_type, show_version, colored)
     }
 }
@@ -293,12 +287,6 @@ impl<'a, S: SymbolicNodeType, V: VCS> SemanticView<'a, S, V> {
 impl<'a, S: SymbolicNodeType, V: VCS> NodeHolder<V::VersionId> for SemanticView<'a, S, V> {
     fn get_node(&self) -> &Rc<RefCell<Node<V::VersionId>>> {
         &self.path.last().unwrap()
-    }
-}
-
-impl<'a, S: SymbolicNodeType, V: VCS> Drop for SemanticView<'a, S, V> {
-    fn drop(&mut self) {
-        self.get_node().borrow_mut().unlock()
     }
 }
 
@@ -364,47 +352,16 @@ impl<'a, S: IsConcrete, V: VCS> SemanticView<'a, S, V> {
         self.get_node().borrow().get_branch_info().unwrap().get_id()
     }
 
-    pub fn get_head(&'a self) -> RevisionRef<'a, S, V> {
-        let head = self
-            .get_node()
-            .borrow()
-            .get_branch_info()
-            .unwrap()
-            .get_head()
-            .clone();
-        let rev = Rev::new(head);
-        RevisionRef::new_no_check(&self, rev)
-    }
-
-    pub fn get_rev(
-        &'a self,
-        revision: impl Into<String>,
-    ) -> Result<RevisionRef<'a, S, V>, RevisionError<V::VersionId, V::VCSError>> {
-        RevisionRef::new(self, revision)
-    }
-
-    pub fn head(self) -> RevisionView<'a, S, Head, V> {
-        RevisionView::<'a, S, Head, V>::new(self)
-    }
-
-    pub fn rev(
-        self,
-        revision: impl Into<String>,
-    ) -> Result<RevisionView<'a, S, Rev<V::VersionId>, V>, RevisionError<V::VersionId, V::VCSError>>
-    {
-        RevisionView::<'a, S, Rev<V::VersionId>, V>::new(self, revision)
-    }
-
     pub fn assert_revision(
         &self,
         revision: impl Into<String>,
     ) -> Result<V::VersionId, RevisionError<V::VersionId, V::VCSError>> {
         let rev = revision.into();
-        if self
-            .get_vcs()
+        let vcs = self.get_vcs();
+        if vcs
             .revision_exists_on_path(&self.to_normalized_path(), &rev)?
         {
-            let revision = self.get_vcs().get_revision(&rev)?.unwrap();
+            let revision = vcs.get_revision(&rev)?.unwrap();
             self.get_node()
                 .borrow_mut()
                 .mut_get_branch_info()
@@ -412,8 +369,20 @@ impl<'a, S: IsConcrete, V: VCS> SemanticView<'a, S, V> {
                 .add_known_version(revision.clone());
             Ok(revision)
         } else {
-            Err(self.to_static_view().into())
+            Err(self.to_dynamic_view().into())
         }
+    }
+
+    pub fn to_head_rev(self) -> RevisionView<'a, S, Head, V> {
+        RevisionView::<'a, S, Head, V>::new(self)
+    }
+
+    pub fn to_rev(
+        self,
+        revision: impl Into<String>,
+    ) -> Result<RevisionView<'a, S, Rev, V>, RevisionError<V::VersionId, V::VCSError>>
+    {
+        RevisionView::<'a, S, Rev, V>::new(self, revision)
     }
 }
 
@@ -430,5 +399,22 @@ impl<'a, T: UnderArea, V: VCS> SemanticView<'a, T, V> {
         repo: &'a Repository<V>,
     ) -> SemanticView<'a, Area<C>, V> {
         self.move_to_index(1, repo).unwrap()
+    }
+}
+
+pub struct FilterByType<T: SymbolicNodeType> {
+    _marker: PhantomData<T>,
+}
+
+impl<T: SymbolicNodeType> FilterByType<T> {
+    pub fn filter<S, V>(view: SemanticView<S, V>) -> Option<SemanticView<T, V>>
+    where
+        S: SymbolicNodeType,
+        V: VCS
+    {
+        match view.try_convert_to::<T>() {
+            Ok(view) => Some(view),
+            Err(_) => None,
+        }
     }
 }
