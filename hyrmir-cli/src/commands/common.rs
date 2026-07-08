@@ -1,7 +1,6 @@
 use crate::completion::CompletionHelper;
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
-use clap::{Arg, Command};
-use colored::Colorize;
+use clap::{Arg, ArgAction, Command};
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
@@ -10,30 +9,59 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-const VIEW: &str = "view";
-const PATH: &str = "path";
+pub const VERBOSE: &str = "verbose";
+pub const SHOW_TAGS: &str = "show_tags";
+pub const ADD: &str = "add";
+pub const PATH_TO_ADD: &str = "path";
+
+pub fn show_tags() -> Arg {
+    Arg::new(SHOW_TAGS)
+        .long("show-tags")
+        .action(ArgAction::SetTrue)
+        .help("Also show tags")
+}
+
+pub fn verbose() -> Arg {
+    Arg::new(VERBOSE)
+        .short('v')
+        .long("verbose")
+        .action(ArgAction::Count)
+        .help(
+            "Set verbosity of output. \
+            Verbosity increases with number of occurrences.",
+        )
+}
+
+pub fn format_command_help<S: Into<String>>(command: S) -> String {
+    format!("\"{}\"", command.into())
+}
 
 #[derive(Clone, Debug)]
-pub struct ViewCommand<V: VCS + 'static> {
+pub struct AddPathCommand<V: VCS + 'static> {
+    short_help: String,
     _vcs: PhantomData<V>,
 }
 
-impl<V: VCS> ViewCommand<V> {
-    pub fn new() -> Self {
-        Self { _vcs: PhantomData }
+impl<V: VCS> AddPathCommand<V> {
+    pub fn new(short_help: impl Into<String>) -> Self {
+        Self {
+            short_help: short_help.into(),
+            _vcs: PhantomData
+        }
     }
 }
 
-impl<V: VCS> CommandDefinition<V> for ViewCommand<V> {
+impl<V: VCS> CommandDefinition<V> for AddPathCommand<V> {
     fn build_command(&self) -> Command {
-        Command::new(VIEW)
-            .about("Switch views")
+        let help = self.short_help.clone();
+        Command::new(ADD)
+            .about(help)
             .disable_help_subcommand(true)
-            .arg(Arg::new(PATH).required(true))
+            .arg(Arg::new(PATH_TO_ADD).required(true))
     }
 }
 
-impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
+impl<V: VCS> CommandInterface<V> for AddPathCommand<V> {
     fn run_command(
         &self,
         loader: &mut RepositoryLoader<V>,
@@ -43,9 +71,13 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         // parameters
         let parsed_target = context
             .get_arg_helper()
-            .get_argument_value::<String>(PATH)
+            .get_argument_value::<String>(PATH_TO_ADD)
             .unwrap()
             .normalize()?;
+        if let NormalizedRevision::Revision(_) = parsed_target.get_revision() {
+            return Err("Explicit versioning does not make sense during path creation".into())
+        }
+        let target_path = parsed_target.get_path();
 
         // repo allocations
         let repo = loader.load_repo()?;
@@ -57,38 +89,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         };
         let target_path = current.to_normalized_path() + parsed_target.get_path().clone();
 
-        if current.to_normalized_path() == target_path {
-            logger.info(format!(
-                "Already viewing {}",
-                target_path.to_string().blue(),
-            ));
-            return Ok(());
-        }
 
-        let target = match repo.get_view::<AnyType<Concrete>>(&target_path) {
-            Ok(path) => path,
-            Err(error) => {
-                return match error {
-                    SemanticViewError::PathDoesNotExist(path) => Err(path.into()),
-                    SemanticViewError::InvalidType(_) => Err(format!(
-                        "Cannot view {}: target does not have a branch",
-                        target_path.to_string().blue()
-                    )
-                    .into()),
-                };
-            }
-        };
-        let workspace = match workspace {
-            WorkspaceKind::Head(w) => w.switch_to(target.to_head_rev())?,
-            WorkspaceKind::Rev(w) => w.switch_to(target.to_head_rev())?,
-        };
-        let new_current = workspace.get_current_view();
-        let msg = format!(
-            "Now viewing {}",
-            new_current.get_semantic_view().formatted(true, true, true),
-        );
-        let status = workspace.status(msg, "", "", true)?;
-        logger.info(status);
         Ok(())
     }
 
