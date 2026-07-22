@@ -36,7 +36,7 @@ impl<V: VCS> RepositoryLoader<V> {
 
 #[derive(Debug)]
 pub struct Repository<V: VCS> {
-    virtual_root: Rc<RefCell<Node<V::VersionId>>>,
+    virtual_root: Rc<RefCell<Node<V>>>,
     id_to_path: HashMap<usize, NormalizedPath>,
     vcs: V,
 }
@@ -53,29 +53,11 @@ impl<V: VCS> Repository<V> {
             };
             let id = path_info.get_id();
             let head = path_info.get_version();
-            let info = BranchInfo::<V::VersionId>::new(id, head.clone());
+            let info = BranchInfo::new(id, head.clone());
             root.insert_path(p, Some(info))?;
             self.id_to_path.insert(id, path.clone());
         }
         Ok(())
-    }
-
-    fn get_node_vec(&self, path: &NormalizedPath) -> Vec<Rc<RefCell<Node<V::VersionId>>>> {
-        let mut new_node_vec = vec![self.virtual_root.clone()];
-        for p in path.iter_segments(1, path.len()) {
-            let current = new_node_vec.last().unwrap();
-            let node = if let Some(node) = current.borrow().get_child(p) {
-                node
-            } else {
-                Rc::new(RefCell::new(Node::new(
-                    p.clone(),
-                    NodeType::NonExistent,
-                    None,
-                )))
-            };
-            new_node_vec.push(node);
-        }
-        new_node_vec
     }
 
     pub fn new(vcs: V) -> Self {
@@ -91,16 +73,16 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn get_virtual_root_view(&self) -> SemanticView<VirtualRoot, V> {
-        SemanticView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
+    pub fn get_virtual_root_view(&self) -> StructureView<VirtualRoot, V> {
+        StructureView::<VirtualRoot, V>::new(vec![self.virtual_root.clone()], &self).unwrap()
     }
 
     pub fn get_view<S: SymbolicNodeType>(
         &self,
         path: &impl ToNormalizedPath,
-    ) -> Result<SemanticView<S, V>, SemanticViewError<V::VersionId>> {
+    ) -> Result<StructureView<S, V>, SemanticViewError<V::VersionId>> {
         let node_vec = self.get_node_vec(&path.to_normalized_path());
-        Ok(SemanticView::new(node_vec, &self)?)
+        Ok(StructureView::new(node_vec, &self)?)
     }
 
     pub fn get_path_by_id(&self, id: usize) -> Option<&NormalizedPath> {

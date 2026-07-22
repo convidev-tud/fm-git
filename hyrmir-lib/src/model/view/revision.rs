@@ -1,15 +1,15 @@
 use crate::model::*;
-use crate::vcs::{VCS, VCSError, VersionId};
+use crate::vcs::{VCSError, VersionId, VCS};
 use std::fmt::{Debug, Display, Formatter};
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug)]
-pub enum RevisionError<VI: VersionId, VE: VCSError> {
-    Invalid(#[from] DynamicView<VI>),
+pub enum RevisionError<V: VCS, VE: VCSError> {
+    Invalid(#[from] DynamicView<V>),
     VCS(#[from] VE),
 }
 
-impl<VI: VersionId, VE: VCSError> Display for RevisionError<VI, VE> {
+impl<V: VCS, VE: VCSError> Display for RevisionError<V, VE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let msg = match self {
             RevisionError::Invalid(view) => {
@@ -24,10 +24,25 @@ impl<VI: VersionId, VE: VCSError> Display for RevisionError<VI, VE> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum RevisionPointer<V: VersionId> {
-    Head,
-    Revision(V),
+#[derive(Error, Clone, Debug)]
+pub struct RevisionLockError {
+    path: NormalizedPath,
+}
+
+impl RevisionLockError {
+    pub fn new(path: NormalizedPath) -> Self {
+        Self { path }
+    }
+}
+
+impl Display for RevisionLockError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = format!(
+            "Cannot lock '{}': a revision view for this path already exists",
+            self.path
+        );
+        f.write_str(&formatted)
+    }
 }
 
 pub trait RevPointer: Debug + Clone {
@@ -69,33 +84,39 @@ impl RevPointer for Rev {
 }
 
 #[derive(Debug)]
-pub struct RevisionView<'a, S: IsConcrete, R: RevPointer, V: VCS> {
-    semantic_view: SemanticView<'a, S, V>,
-    revision: R,
-}
-
-impl<'a, S, R, V> RevisionView<'a, S, R, V>
+pub struct RevisionView<S, R, M>
 where
     S: IsConcrete,
     R: RevPointer,
-    V: VCS,
+    M: AccessMode,
 {
-    fn lock_node(&self) {
+    semantic_view: StructureView<S, M>,
+    revision: R,
+}
+
+impl<S, R, M> RevisionView<S, R, M>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    M: AccessMode,
+{
+    fn lock_node(&self) -> Result<(), RevisionLockError> {
         let view = self.get_semantic_view();
         let mut node = view.get_node().borrow_mut();
         let lock = node.try_lock();
         drop(node);
         if let Err(_) = lock {
-            let path = view.to_normalized_path();
-            panic!("Cannot lock path '{path}': a semantic view for this path already exists")
+            Err(RevisionLockError::new(self.semantic_view.to_normalized_path()))
+        } else {
+            Ok(())
         }
     }
     
-    pub fn get_semantic_view(&self) -> &SemanticView<'a, S, V> {
+    pub fn get_semantic_view(&self) -> &StructureView<S, M> {
         &self.semantic_view
     }
     
-    pub fn get_revision_id(&self) -> V::VersionId {
+    pub fn get_revision_id(&self) -> <M::V as VCS>::VersionId {
         self
             .get_semantic_view()
             .get_node()
@@ -107,7 +128,7 @@ where
             .clone()
     }
 
-    pub fn get_head(&'a self) -> RevisionRef<'a, S, V> {
+    pub fn get_head(&self) -> RevisionRef<S, M> {
         let view = self.get_semantic_view();
         let head = view
             .get_node()
@@ -120,23 +141,23 @@ where
     }
 
     pub fn get_rev(
-        &'a self,
+        &self,
         revision: impl Into<String>,
-    ) -> Result<RevisionRef<'a, S, V>, RevisionError<V::VersionId, V::VCSError>> {
+    ) -> Result<RevisionRef<S, M>, RevisionError<M::VersionId, M::VCSError>> {
         RevisionRef::new(self.get_semantic_view(), revision)
     }
     
-    pub fn to_rev(&'a self) -> RevisionRef<'a, S, V> {
+    pub fn to_rev(&'a self) -> RevisionRef<S, M> {
         RevisionRef::new_no_check(self.get_semantic_view(), self.get_revision_id())
     }
 }
 
-impl<'a, S, V> RevisionView<'a, S, Head, V>
+impl<S, V> RevisionView<S, Head, V>
 where
     S: IsConcrete,
     V: VCS,
 {
-    pub(crate) fn new(semantic_view: SemanticView<'a, S, V>) -> Self {
+    pub(crate) fn new(semantic_view: StructureView<S, V>) -> Self {
         let new = Self {
             semantic_view,
             revision: Head::new(),
@@ -146,13 +167,13 @@ where
     }
 }
 
-impl<'a, S, V> RevisionView<'a, S, Rev, V>
+impl<S, V> RevisionView<S, Rev, V>
 where
     S: IsConcrete,
     V: VCS,
 {
     pub(crate) fn new(
-        semantic_view: SemanticView<'a, S, V>,
+        semantic_view: StructureView<S, V>,
         revision: impl Into<String>,
     ) -> Result<Self, RevisionError<V::VersionId, V::VCSError>> {
         let revision = semantic_view.assert_revision(revision)?;
@@ -165,7 +186,7 @@ where
     }
 }
 
-impl<'a, S, R, V> Drop for RevisionView<'a, S, R, V>
+impl<S, R, V> Drop for RevisionView<S, R, V>
 where
     S: IsConcrete,
     R: RevPointer,
@@ -181,20 +202,20 @@ where
 }
 
 #[derive(Debug)]
-pub struct RevisionRef<'a, S: IsConcrete, V: VCS> {
-    semantic_view: &'a SemanticView<'a, S, V>,
-    revision: V::VersionId,
+pub struct RevisionRef<'a, S: IsConcrete, M: AccessMode> {
+    semantic_view: &'a StructureView<S, M>,
+    revision: <M::V as VCS>::VersionId,
 }
 
-impl<'a, S, V> RevisionRef<'a, S, V>
+impl<'a, S, M> RevisionRef<'a, S, M>
 where
     S: IsConcrete,
-    V: VCS,
+    M: AccessMode,
 {
     pub(crate) fn new(
-        semantic_view: &'a SemanticView<'a, S, V>,
+        semantic_view: &'a StructureView<S, M>,
         revision: impl Into<String>,
-    ) -> Result<Self, RevisionError<V::VersionId, V::VCSError>> {
+    ) -> Result<Self, RevisionError<M::VersionId, M::VCSError>> {
         let revision = semantic_view.assert_revision(revision)?;
         let new = Self {
             semantic_view,
@@ -204,8 +225,8 @@ where
     }
 
     pub(crate) fn new_no_check(
-        semantic_view: &'a SemanticView<'a, S, V>,
-        revision: V::VersionId,
+        semantic_view: &'a StructureView<S, M>,
+        revision: M::VersionId,
     ) -> Self {
         Self {
             semantic_view,

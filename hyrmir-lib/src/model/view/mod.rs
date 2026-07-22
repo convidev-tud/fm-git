@@ -1,20 +1,17 @@
-use colored::Colorize;
 use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-use thiserror::Error;
 
 mod revision;
-mod semantic;
+mod structure;
 mod dynamic;
 
 use crate::model::*;
-use crate::vcs::VersionId;
-pub use revision::*;
-pub use semantic::*;
+use crate::vcs::{VersionId, VCS};
 pub use dynamic::*;
+pub use revision::*;
+pub use structure::*;
 
-impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
+impl<V: VCS> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
     fn to_normalized_path(&self) -> NormalizedPath {
         let mut path = NormalizedPath::new();
         for p in self.iter() {
@@ -24,7 +21,7 @@ impl<V: VersionId> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
     }
 }
 
-pub trait NodeHolder<V: VersionId> {
+pub trait NodeHolder<V: VCS> {
     fn get_node(&self) -> &Rc<RefCell<Node<V>>>;
 
     fn get_real_type(&self) -> NodeType {

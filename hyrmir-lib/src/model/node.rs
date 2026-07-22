@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::vcs::VersionId;
+use crate::vcs::{VersionId, VCS};
 use colored::{ColoredString, Colorize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -147,14 +147,14 @@ impl NodeType {
 }
 
 #[derive(Debug)]
-pub struct BranchInfo<V: VersionId> {
+pub struct BranchInfo<V: VCS> {
     id: usize,
-    head: V,
-    known_versions: HashMap<String, V>,
+    head: V::VersionId,
+    known_versions: HashMap<String, V::VersionId>,
 }
 
-impl<V: VersionId> BranchInfo<V> {
-    pub fn new(id: usize, head: V) -> Self {
+impl<V: VCS> BranchInfo<V> {
+    pub fn new(id: usize, head: V::VersionId) -> Self {
         Self {
             id,
             head,
@@ -166,11 +166,11 @@ impl<V: VersionId> BranchInfo<V> {
         self.id
     }
 
-    pub fn get_head(&self) -> &V {
+    pub fn get_head(&self) -> &V::VersionId {
         &self.head
     }
     
-    pub fn get_known_version(&self, id: impl Into<String>) -> Option<&V> {
+    pub fn get_known_version(&self, id: impl Into<String>) -> Option<&V::VersionId> {
         let id = id.into();
         if id == "HEAD" {
             Some(&self.head)
@@ -179,21 +179,21 @@ impl<V: VersionId> BranchInfo<V> {
         }
     }
 
-    pub fn add_known_version(&mut self, version: V) {
+    pub fn add_known_version(&mut self, version: V::VersionId) {
         self.known_versions.insert(version.get_full_id(), version);
     }
 
-    pub fn remove_known_version(&mut self, version: &V) {
+    pub fn remove_known_version(&mut self, version: &V::VersionId) {
         self.known_versions.remove(&version.get_full_id());
     }
 
-    pub fn contains_version(&self, version: &V) -> bool {
+    pub fn contains_version(&self, version: &V::VersionId) -> bool {
         self.known_versions.contains_key(&version.get_full_id())
     }
 }
 
 #[derive(Debug)]
-pub struct Node<V: VersionId> {
+pub struct Node<V: VCS> {
     name: String,
     node_type: NodeType,
     branch_info: Option<BranchInfo<V>>,
@@ -201,7 +201,7 @@ pub struct Node<V: VersionId> {
     lock: bool,
 }
 
-impl<V: VersionId> Node<V> {
+impl<V: VCS> Node<V> {
     pub fn new(
         name: impl Into<String>,
         node_type: NodeType,
