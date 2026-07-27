@@ -14,7 +14,7 @@ uuid = { version = "1", features = ["v4"] }
 itertools = "0"
 globset = "0"
 thiserror = "2.0.18"
-slotmap = "1"
+indextree = "4"
 
 [dev-dependencies]
 tempfile = "3"

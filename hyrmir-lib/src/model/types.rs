@@ -3,40 +3,10 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-/// Marker for the virtual root node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct VirtualRoot;
-
-/// Marker for an area node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Area<C: NodeClassification> {
-    _phantom: PhantomData<C>,
-}
-
-/// Marker for the feature root node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct FeatureRoot;
-
-/// Marker for the product root node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ProductRoot;
-
-/// Marker of a feature node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Feature<C: NodeClassification> {
-    _phantom: PhantomData<C>,
-}
-
-/// Marker of a product node.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Product<C: NodeClassification> {
-    phantom_data: PhantomData<C>,
-}
-
-/// Placeholder if the exact node type is unknown or does not matter.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct AnyType<C: NodeClassification> {
-    _phantom: PhantomData<C>,
+/// Some paths have the option of being concrete (with attached artifacts) or abstract.
+/// This is the base trait for this classification.
+pub trait NodeClassification: Clone + Debug + Eq + PartialEq + Hash {
+    fn requires_artifact() -> Option<bool>;
 }
 
 /// Defines a compatible [SymbolicNodeType] as concrete (with associated artifact).
@@ -45,33 +15,27 @@ pub struct AnyType<C: NodeClassification> {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Concrete;
 
-/// Defines a [SymbolicNodeType] as abstract (without associated artifact).
-///
-/// The trait [IsAbstract] is automatically implemented if this is used as parameter.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Abstract;
-
-/// Placeholder if a concretized classification ([Concrete] or [Abstract]) does not matter or is impossible.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct AnyC;
-
-/// Some paths have the option of being concrete (with attached artifacts) or abstract.
-/// This is the base trait for this classification.
-pub trait NodeClassification: Clone + Debug + Eq + PartialEq + Hash {
-    fn requires_artifact() -> Option<bool>;
-}
-
 impl NodeClassification for Concrete {
     fn requires_artifact() -> Option<bool> {
         Some(true)
     }
 }
 
+/// Defines a [SymbolicNodeType] as abstract (without associated artifact).
+///
+/// The trait [IsAbstract] is automatically implemented if this is used as parameter.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Abstract;
+
 impl NodeClassification for Abstract {
     fn requires_artifact() -> Option<bool> {
         Some(false)
     }
 }
+
+/// Placeholder if a concretized classification ([Concrete] or [Abstract]) does not matter or is impossible.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct AnyC;
 
 impl NodeClassification for AnyC {
     fn requires_artifact() -> Option<bool> {
@@ -88,12 +52,25 @@ pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     }
 }
 
+/// Defines a type as child of an area.
+pub trait UnderArea: SymbolicNodeType {}
+
+/// Marker for the virtual root node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct VirtualRoot;
+
 impl SymbolicNodeType for VirtualRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
         vec![NodeType::VirtualRoot]
     }
+}
+
+/// Marker for an area node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Area<C: NodeClassification> {
+    _phantom: PhantomData<C>,
 }
 
 impl<C: NodeClassification> SymbolicNodeType for Area<C> {
@@ -104,12 +81,24 @@ impl<C: NodeClassification> SymbolicNodeType for Area<C> {
     }
 }
 
+/// Marker for the feature root node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct FeatureRoot;
+
 impl SymbolicNodeType for FeatureRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
         todo!()
     }
+}
+
+impl UnderArea for FeatureRoot {}
+
+/// Marker of a feature node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Feature<C: NodeClassification> {
+    _phantom: PhantomData<C>,
 }
 
 impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
@@ -124,6 +113,12 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     }
 }
 
+impl<C: NodeClassification> UnderArea for Feature<C> {}
+
+/// Marker for the product root node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct ProductRoot;
+
 impl SymbolicNodeType for ProductRoot {
     type Classification = Abstract;
 
@@ -132,12 +127,13 @@ impl SymbolicNodeType for ProductRoot {
     }
 }
 
-/// Defines a type as child of an area.
-pub trait UnderArea: SymbolicNodeType {}
-impl UnderArea for FeatureRoot {}
-impl<C: NodeClassification> UnderArea for Feature<C> {}
 impl UnderArea for ProductRoot {}
-impl<C: NodeClassification> UnderArea for Product<C> {}
+
+/// Marker of a product node.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Product<C: NodeClassification> {
+    phantom_data: PhantomData<C>,
+}
 
 impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     type Classification = C;
@@ -149,6 +145,14 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
             None => vec![NodeType::Product(true), NodeType::Product(false)],
         }
     }
+}
+
+impl<C: NodeClassification> UnderArea for Product<C> {}
+
+/// Placeholder if the exact node type is unknown or does not matter.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct AnyType<C: NodeClassification> {
+    _phantom: PhantomData<C>,
 }
 
 impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {

@@ -30,7 +30,7 @@ impl<V: VersionId> PathInfo<V> {
         &self.path
     }
 
-    pub fn get_version(&self) -> &V {
+    pub fn get_head(&self) -> &V {
         &self.version
     }
 }

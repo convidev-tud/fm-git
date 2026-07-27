@@ -1,10 +1,9 @@
 use crate::model::*;
 use crate::vcs::*;
 use crate::workspace::*;
-use std::cell::RefCell;
+use indextree::{Arena, NodeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -36,14 +35,79 @@ impl<V: VCS> RepositoryLoader<V> {
 
 #[derive(Debug)]
 pub struct Repository<V: VCS> {
-    virtual_root: Rc<RefCell<Node<V>>>,
-    id_to_path: HashMap<usize, NormalizedPath>,
+    arena: Arena<NodeData<V>>,
+    root_id: NodeId,
+    vcs_id_to_node_id: HashMap<usize, NodeId>,
     vcs: V,
 }
 
 impl<V: VCS> Repository<V> {
+    fn add_node(
+        &mut self,
+        parent_id: NodeId,
+        name: impl Into<String>,
+        branch_info: Option<BranchInfo<V>>,
+    ) -> Result<NodeId, MalformedModelError> {
+        let name = name.into();
+        let parent = self.arena[parent_id].get();
+        let node_type = parent.get_type().decide_next_type(&name, branch_info.is_some())?;
+        let new_node = NodeData::new(name.clone(), node_type, branch_info);
+        let new_id = self.arena.new_node(new_node);
+        let parent_mut = self.arena[parent_id].get_mut();
+        parent_mut.add_child(new_id, name);
+        Ok(new_id)
+    }
+
+    fn update_node(
+        &mut self,
+        id: NodeId,
+        name: impl Into<String>,
+        branch_info: Option<BranchInfo<V>>
+    ) -> Result<NodeId, MalformedModelError> {
+        let name = name.into();
+        let old_name = self.arena.get(id).unwrap().get().get_name().clone();
+        let parent_id = id.parent(&self.arena).unwrap();
+        let parent_data = self.arena.get_mut(parent_id).unwrap().get_mut();
+        let new_type = parent_data.get_type().decide_next_type(&name, branch_info.is_some())?;
+        parent_data.remove_child(&old_name);
+        parent_data.add_child(id, name);
+        let node_data = self.arena.get_mut(id).unwrap().get_mut();
+        node_data.update_type(new_type);
+        node_data.update_branch_info(branch_info);
+        Ok(id)
+    }
+
+    fn insert_path(
+        &mut self,
+        path: &NormalizedPath,
+        branch_info: BranchInfo<V>,
+    ) -> Result<NodeId, MalformedModelError> {
+        let mut current = self.root_id;
+        let mut current_node = self.arena[current].get();
+        for (index, p) in path.iter_all_segments().enumerate() {
+            if index == path.len() - 1 {
+                let id = match current_node.get_child(p)
+                {
+                    Some(id) => self.update_node(id.clone(), p, Some(branch_info))?,
+                    None => self.add_node(current, p, Some(branch_info))?,
+                };
+                return Ok(id);
+            } else {
+                let next = match current_node.get_child(p)
+                {
+                    Some(id) => *id,
+                    None => {
+                        self.add_node(current, p, None)?
+                    }
+                };
+                current = next;
+                current_node = self.arena[current].get();
+            }
+        }
+        Ok(current)
+    }
+
     fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
-        let mut root = self.virtual_root.borrow_mut();
         for path_info in self.vcs.get_local_paths()? {
             let path = path_info.get_path();
             let p = if path.is_absolute() {
@@ -51,20 +115,23 @@ impl<V: VCS> Repository<V> {
             } else {
                 panic!("Paths must be absolute when loaded into repository")
             };
-            let id = path_info.get_id();
-            let head = path_info.get_version();
-            let info = BranchInfo::new(id, head.clone());
-            root.insert_path(p, Some(info))?;
-            self.id_to_path.insert(id, path.clone());
+            let vcs_id = path_info.get_id();
+            let head = path_info.get_head();
+            let info = BranchInfo::new(vcs_id, head.clone());
+            let id = self.insert_path(p, info)?;
+            self.vcs_id_to_node_id.insert(vcs_id, id);
         }
         Ok(())
     }
 
     pub fn new(vcs: V) -> Self {
-        let root = Node::new("".to_string(), NodeType::VirtualRoot, None);
+        let root = NodeData::new("".to_string(), NodeType::VirtualRoot, None);
+        let mut arena = Arena::new();
+        let root_id = arena.new_node(root);
         Self {
-            virtual_root: Rc::new(RefCell::new(root)),
-            id_to_path: HashMap::new(),
+            arena,
+            root_id,
+            vcs_id_to_node_id: HashMap::new(),
             vcs,
         }
     }
@@ -86,7 +153,7 @@ impl<V: VCS> Repository<V> {
     }
 
     pub fn get_path_by_id(&self, id: usize) -> Option<&NormalizedPath> {
-        self.id_to_path.get(&id)
+        self.vcs_id_to_node_id.get(&id)
     }
 
     pub fn get_workspace<S: IsConcrete>(

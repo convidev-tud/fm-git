@@ -16,16 +16,16 @@ pub enum RevisionPointer<V: VCS> {
 /// A dynamic view onto the model without static guarantees.
 #[derive(Clone, Debug)]
 pub struct DynamicView<V: VCS> {
-    path: Vec<Rc<RefCell<Node<V>>>>,
+    path: Vec<Rc<RefCell<NodeData<V>>>>,
     version: RevisionPointer<V>,
 }
 
 impl<V: VCS> DynamicView<V> {
-    pub(crate) fn new(path: Vec<Rc<RefCell<Node<V>>>>, version: RevisionPointer<V>) -> Self {
+    pub(crate) fn new(path: Vec<Rc<RefCell<NodeData<V>>>>, version: RevisionPointer<V>) -> Self {
         Self { path, version }
     }
     
-    pub(crate) fn get_path(&self) -> &Vec<Rc<RefCell<Node<V>>>> {
+    pub(crate) fn get_path(&self) -> &Vec<Rc<RefCell<NodeData<V>>>> {
         &self.path
     }
 
@@ -64,7 +64,7 @@ impl<V: VCS> DynamicView<V> {
 }
 
 impl<V: VCS> NodeHolder<V> for DynamicView<V> {
-    fn get_node(&self) -> &Rc<RefCell<Node<V>>> {
+    fn get_node(&self) -> &Rc<RefCell<NodeData<V>>> {
         &self.path.last().unwrap()
     }
 }

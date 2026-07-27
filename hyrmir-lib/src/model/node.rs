@@ -1,11 +1,10 @@
 use crate::model::*;
 use crate::vcs::{VersionId, VCS};
 use colored::{ColoredString, Colorize};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
-use std::rc::Rc;
+use indextree::NodeId;
 use thiserror::Error;
 
 pub const FEATURE_ROOT: &str = "feature";
@@ -193,15 +192,15 @@ impl<V: VCS> BranchInfo<V> {
 }
 
 #[derive(Debug)]
-pub struct Node<V: VCS> {
+pub struct NodeData<V: VCS> {
     name: String,
     node_type: NodeType,
     branch_info: Option<BranchInfo<V>>,
-    children: HashMap<String, Rc<RefCell<Node<V>>>>,
+    children: HashMap<String, NodeId>,
     lock: bool,
 }
 
-impl<V: VCS> Node<V> {
+impl<V: VCS> NodeData<V> {
     pub fn new(
         name: impl Into<String>,
         node_type: NodeType,
@@ -224,6 +223,22 @@ impl<V: VCS> Node<V> {
         self.branch_info = branch_info;
     }
 
+    pub(crate) fn add_child(
+        &mut self,
+        id: NodeId,
+        name: impl Into<String>,
+    ) {
+        self.children.insert(name.into(), id);
+    }
+    
+    pub(crate) fn remove_child(
+        &mut self,
+        name: &str,
+    ) {
+        self.children.remove(name);
+    }
+    
+
     pub(crate) fn try_lock(&mut self) -> Result<(), NodeLockError> {
         if !self.lock {
             self.lock = true;
@@ -237,32 +252,6 @@ impl<V: VCS> Node<V> {
         self.lock = false;
     }
 
-    // fn build_display_tree(&self, show_tags: bool) -> Tree<String> {
-    //     let mut formatted = ColoredString::from(self.name.clone());
-    //     if self.branch.has_branch() {
-    //         formatted = formatted.blue()
-    //     }
-    //     let type_display = match self.node_type {
-    //         NodeType::AbstractFeature | NodeType::AbstractProduct => None,
-    //         _ => Some(self.node_type.get_formatted_short_name()),
-    //     };
-    //     let content = if let Some(type_display) = type_display {
-    //         format!("{formatted} [{type_display}]")
-    //     } else {
-    //         formatted.to_string()
-    //     };
-    //     let mut tree = Tree::<String>::new(content);
-    //     let children = self.children.borrow();
-    //     let mut sorted_children = children.iter().collect::<Vec<_>>();
-    //     sorted_children.sort_by(|a, b| b.0.chars().cmp(a.0.chars()));
-    //     sorted_children.reverse();
-    //     for (_, child) in sorted_children {
-    //         tree.leaves
-    //             .push(child.borrow().build_display_tree(show_tags));
-    //     }
-    //     tree
-    // }
-
     fn decide_child_type(
         &self,
         name: &str,
@@ -275,33 +264,12 @@ impl<V: VCS> Node<V> {
         self.node_type.decide_next_type(name, concrete)
     }
 
-    fn add_child(
-        &mut self,
-        name: String,
-        branch_info: Option<BranchInfo<V>>,
-    ) -> Result<NodeType, MalformedModelError> {
-        let node_type = self.decide_child_type(name.as_str(), &branch_info)?;
-        // let child = ;
-        let child = Node::new(name.clone(), node_type.clone(), branch_info);
-        self.children.insert(name, Rc::new(RefCell::new(child)));
-        Ok(node_type)
-    }
-
-    fn update_child(
-        &self,
-        name: String,
-        branch_info: Option<BranchInfo<V>>,
-    ) -> Result<NodeType, MalformedModelError> {
-        let new_type = self.decide_child_type(name.as_str(), &branch_info)?;
-        let child = self.get_child(&name).unwrap();
-        let mut child = child.borrow_mut();
-        child.update_type(new_type.clone());
-        child.update_branch_info(branch_info);
-        Ok(new_type)
-    }
-
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub(crate) fn get_child(&self, name: &str) -> Option<&NodeId> {
+        self.children.get(name)
     }
 
     pub fn get_branch_info(&self) -> Option<&BranchInfo<V>> {
@@ -315,51 +283,4 @@ impl<V: VCS> Node<V> {
     pub fn get_type(&self) -> &NodeType {
         &self.node_type
     }
-
-    pub fn get_child(&self, name: &str) -> Option<Rc<RefCell<Node<V>>>> {
-        Some(self.children.get(name)?.clone())
-    }
-
-    pub fn has_children(&self) -> bool {
-        !self.children.is_empty()
-    }
-
-    pub fn get_children(&self) -> Vec<Rc<RefCell<Node<V>>>> {
-        self.children.values().cloned().collect()
-    }
-
-    pub fn insert_path(
-        &mut self,
-        path: &NormalizedPath,
-        branch_info: Option<BranchInfo<V>>,
-    ) -> Result<NodeType, MalformedModelError> {
-        match path.len() {
-            0 => Ok(self.node_type.clone()),
-            1 => {
-                let name = path.get(0).unwrap().to_string();
-                let new_type = match self.get_child(&name) {
-                    Some(_) => self.update_child(name, branch_info),
-                    None => self.add_child(name, branch_info),
-                };
-                new_type
-            }
-            _ => {
-                let name = path.get(0).unwrap().to_string();
-                let next_child = match self.get_child(&name) {
-                    Some(node) => node,
-                    None => {
-                        self.add_child(name.clone(), None)?;
-                        self.get_child(&name).unwrap()
-                    }
-                };
-                next_child
-                    .borrow_mut()
-                    .insert_path(&path.strip_n_left(1), branch_info)
-            }
-        }
-    }
-
-    // pub fn display_tree(&self, show_tags: bool) -> String {
-    //     self.build_display_tree(show_tags).to_string()
-    // }
 }

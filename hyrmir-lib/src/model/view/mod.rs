@@ -11,7 +11,7 @@ pub use dynamic::*;
 pub use revision::*;
 pub use structure::*;
 
-impl<V: VCS> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
+impl<V: VCS> ToNormalizedPath for Vec<Rc<RefCell<NodeData<V>>>> {
     fn to_normalized_path(&self) -> NormalizedPath {
         let mut path = NormalizedPath::new();
         for p in self.iter() {
@@ -22,7 +22,7 @@ impl<V: VCS> ToNormalizedPath for Vec<Rc<RefCell<Node<V>>>> {
 }
 
 pub trait NodeHolder<V: VCS> {
-    fn get_node(&self) -> &Rc<RefCell<Node<V>>>;
+    fn get_node(&self) -> &Rc<RefCell<NodeData<V>>>;
 
     fn get_real_type(&self) -> NodeType {
         self.get_node().borrow().get_type().clone()

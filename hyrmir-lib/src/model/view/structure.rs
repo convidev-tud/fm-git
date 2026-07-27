@@ -139,7 +139,7 @@ where
     S: SymbolicNodeType,
     M: AccessMode,
 {
-    path: Vec<Rc<RefCell<Node<M::V>>>>,
+    path: Vec<Rc<RefCell<NodeData<M::V>>>>,
     mode: M,
     _sym_marker: PhantomData<S>,
 }
@@ -147,7 +147,7 @@ where
 /// Construction and transformation
 impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
     pub(crate) fn new(
-        path: Vec<Rc<RefCell<Node<M::V>>>>,
+        path: Vec<Rc<RefCell<NodeData<M::V>>>>,
         mode: M,
     ) -> Result<Self, SemanticViewError<M::V>> {
         let new = Self {
@@ -210,7 +210,7 @@ impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
         self.mode.get_repo()
     }
 
-    fn get_root(&self) -> &Rc<RefCell<Node<M::V>>> {
+    fn get_root(&self) -> &Rc<RefCell<NodeData<M::V>>> {
         self.path.first().unwrap()
     }
 
@@ -285,7 +285,7 @@ impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
             let node = if let Some(node) = current.borrow().get_child(p) {
                 node
             } else {
-                Rc::new(RefCell::new(Node::new(
+                Rc::new(RefCell::new(NodeData::new(
                     p.clone(),
                     NodeType::NonExistent,
                     None,
@@ -321,7 +321,7 @@ impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
 }
 
 impl<S: SymbolicNodeType, M: AccessMode> NodeHolder<M::V> for StructureView<S, M> {
-    fn get_node(&self) -> &Rc<RefCell<Node<M::V>>> {
+    fn get_node(&self) -> &Rc<RefCell<NodeData<M::V>>> {
         &self.path.last().unwrap()
     }
 }
