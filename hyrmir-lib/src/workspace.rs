@@ -14,46 +14,6 @@ pub enum GetWorkSpaceError<V: VCS, VE: VCSError> {
     VCS(#[from] VE),
 }
 
-pub enum WorkspaceKind<'a, S, V>
-where
-    S: IsConcrete,
-    V: VCS,
-{
-    Head(Workspace<'a, S, Head, Shared, V>),
-    Rev(Workspace<'a, S, Rev, Shared, V>),
-}
-
-impl<'a, S, V> WorkspaceKind<'a, S, V>
-where
-    S: IsConcrete,
-    V: VCS,
-{
-    pub fn get(
-        path: PathBuf,
-        repository: &'a Repository<V>,
-    ) -> Result<WorkspaceKind<'a, S, V>, GetWorkSpaceError<V, V::VCSError>> {
-        if let Some(current) = repository.get_vcs().get_current_path(&path)? {
-            let current_semantic_view = repository
-                .root_view()
-                .move_to(current.get_path(), repository)?;
-            match current.get_revision() {
-                NormalizedRevision::Head => {
-                    let current_view = current_semantic_view.to_head_rev();
-                    let new = Workspace::<S, Head, Shared, V> { current_view, path };
-                    Ok(WorkspaceKind::Head(new))
-                }
-                NormalizedRevision::Revision(revision) => {
-                    let current_view = current_semantic_view.to_rev(revision).unwrap();
-                    let new = Workspace::<S, Rev, Shared, V> { current_view, path };
-                    Ok(WorkspaceKind::Rev(new))
-                }
-            }
-        } else {
-            Err(GetWorkSpaceError::NoWorkspace)
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Workspace<'a, S, R, M, V>
 where
@@ -122,5 +82,33 @@ where
 
     pub fn commit(&self) {
         todo!()
+    }
+}
+
+impl<'a, S, V> Workspace<'a, S, Rev, Shared, V>
+where
+    S: IsConcrete,
+    V: VCS,
+{
+    pub(crate) fn new(
+        path: PathBuf,
+        repository: &'a Repository<V>,
+    ) -> Result<Self, GetWorkSpaceError<V, V::VCSError>> {
+        if let Some(current) = repository.get_vcs().get_current_path(&path)? {
+            let current_semantic_view = repository
+                .root_view()
+                .move_to(current.get_path(), repository)?;
+            let current_view = match current.get_revision() {
+                NormalizedRevision::Head => {
+                    current_semantic_view.to_head_rev().convert_to_rev()
+                }
+                NormalizedRevision::Revision(revision) => {
+                    current_semantic_view.to_rev(revision).unwrap()
+                }
+            };
+            Ok(Workspace::<S, Rev, Shared, V> { current_view, path })
+        } else {
+            Err(GetWorkSpaceError::NoWorkspace)
+        }
     }
 }

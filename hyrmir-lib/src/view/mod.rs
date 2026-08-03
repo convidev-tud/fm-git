@@ -1,6 +1,7 @@
 mod frozen;
 mod revision;
 mod structure;
+pub mod normalized;
 
 use crate::model::{NodeData, NormalizedPath, ToNormalizedPath};
 use crate::vcs::VCS;

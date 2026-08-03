@@ -126,10 +126,6 @@ where
     M: AccessMode,
     V: VCS,
 {
-    fn get_repo(&self) -> &Repository<V> {
-        self.repo
-    }
-
     fn get_arena(&self) -> &Arena<RefCell<NodeData<V>>> {
         self.get_repo().get_arena()
     }
@@ -230,6 +226,10 @@ where
 
     pub(crate) fn get_node(&self) -> &Node<RefCell<NodeData<V>>> {
         self.repo.get_node(self.get_node_id()).unwrap()
+    }
+
+    pub(crate) fn get_repo(&self) -> &Repository<V> {
+        self.repo
     }
 
     pub fn get_node_id(&self) -> NodeId {
@@ -377,6 +377,10 @@ where
     S: SymbolicNodeType,
     V: VCS,
 {
+    pub(crate) fn clone_private(&self) -> Self {
+        Self::new(self.id, self.repo).unwrap()
+    }
+    
     pub fn clone(&self, repo: &'a Repository<V>) -> Self {
         Self::new(self.id, repo).unwrap()
     }

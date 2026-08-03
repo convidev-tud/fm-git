@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::vcs::{VCS, VCSError};
+use crate::vcs::{VCSError, VCS};
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -160,7 +160,20 @@ where
         let revision_pointer = if R::is_head() {
             RevisionPointer::Head(revision.clone())
         } else {
-            RevisionPointer::Revision(revision.clone())
+            let node = self
+                .get_structure_view()
+                .get_node()
+                .get()
+                .borrow();
+            let head = node
+                .get_branch_info()
+                .unwrap()
+                .get_head();
+            if revision == head {
+                RevisionPointer::Head(revision.clone())
+            } else {
+                RevisionPointer::Revision(revision.clone())
+            }
         };
         self.get_structure_view().to_frozen_view(revision_pointer)
     }
@@ -194,6 +207,15 @@ where
         };
         new.assert_lock();
         new
+    }
+
+    pub fn convert_to_rev(self) -> RevisionView<'a, S, Rev, M, V> {
+        RevisionView::<'a, S, Rev, M, V> {
+            structure_view: self.structure_view.clone_private(),
+            revision: self.revision.clone(),
+            _revision_type: PhantomData,
+            _access_mode: PhantomData,
+        }
     }
 }
 

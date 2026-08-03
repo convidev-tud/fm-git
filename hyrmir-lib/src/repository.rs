@@ -180,7 +180,7 @@ impl<V: VCS> Repository<V> {
     pub fn get_workspace<S: IsConcrete>(
         &'_ self,
         path: PathBuf,
-    ) -> Result<WorkspaceKind<'_, S, V>, GetWorkSpaceError<V, V::VCSError>> {
-        WorkspaceKind::<S, V>::get(path, &self)
+    ) -> Result<Workspace<'_, S, Rev, Shared, V>, GetWorkSpaceError<V, V::VCSError>> {
+        Workspace::new(path, self)
     }
 }

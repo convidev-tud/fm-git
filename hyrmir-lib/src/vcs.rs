@@ -5,19 +5,19 @@ use std::path::PathBuf;
 
 pub trait VCSError: Error {}
 
-pub trait VersionId: Debug + Clone {
+pub trait RevisionId: Debug + Clone + PartialEq + Eq {
     fn new(id: impl Into<String>) -> Self;
     fn get_full_id(&self) -> String;
     fn get_printable_id(&self) -> String;
 }
 
-pub struct PathInfo<V: VersionId> {
+pub struct PathInfo<V: RevisionId> {
     id: usize,
     path: NormalizedPath,
     version: V,
 }
 
-impl<V: VersionId> PathInfo<V> {
+impl<V: RevisionId> PathInfo<V> {
     pub fn new(id: usize, path: NormalizedPath, version: V) -> Self {
         Self { id, path, version }
     }
@@ -38,7 +38,7 @@ impl<V: VersionId> PathInfo<V> {
 pub trait VCS: Debug {
     type VCSError: VCSError;
 
-    type RevisionId: VersionId;
+    type RevisionId: RevisionId;
 
     fn get_current_path(&self, path: &PathBuf) -> Result<Option<Normalized>, Self::VCSError>;
 

@@ -5,7 +5,6 @@ use colored::Colorize;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
 use hyrmir_lib::vcs::VCS;
-use hyrmir_lib::workspace::WorkspaceKind;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -14,13 +13,11 @@ const VIEW: &str = "view";
 const PATH: &str = "path";
 
 #[derive(Clone, Debug)]
-pub struct ViewCommand<V: VCS + 'static> {
-    _vcs: PhantomData<V>,
-}
+pub struct ViewCommand<V: VCS + 'static>(PhantomData<V>);
 
 impl<V: VCS> ViewCommand<V> {
     pub fn new() -> Self {
-        Self { _vcs: PhantomData }
+        Self { 0: PhantomData }
     }
 }
 
@@ -51,10 +48,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         let repo = loader.load_repo()?;
         let path = PathBuf::from(".");
         let workspace = repo.get_workspace::<AnyType<Concrete>>(path)?;
-        let current = match &workspace {
-            WorkspaceKind::Head(w) => w.get_current_view().get_structure_view(),
-            WorkspaceKind::Rev(w) => w.get_current_view().get_structure_view(),
-        };
+        let current = workspace.get_current_view().get_structure_view();
         let target_path = current.to_normalized_path() + parsed_target.get_path().clone();
 
         if current.to_normalized_path() == target_path {
@@ -81,10 +75,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
                 };
             }
         };
-        let workspace = match workspace {
-            WorkspaceKind::Head(w) => w.switch_to(target.to_head_rev())?,
-            WorkspaceKind::Rev(w) => w.switch_to(target.to_head_rev())?,
-        };
+        let workspace = workspace.switch_to(target.to_head_rev())?;
         let new_current = workspace.get_current_view();
         let msg = format!("Now viewing {}", new_current.formatted(true, true, true),);
         let status = workspace.status(msg, "", "", true)?;
@@ -103,16 +94,11 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             return Ok(vec![]);
         }
         let repo = loader.load_repo()?;
-        let current = match repo.get_workspace::<AnyType<Concrete>>(PathBuf::from("."))? {
-            WorkspaceKind::Head(w) => w
-                .get_current_view()
-                .get_structure_view()
-                .to_normalized_path(),
-            WorkspaceKind::Rev(w) => w
-                .get_current_view()
-                .get_structure_view()
-                .to_normalized_path(),
-        };
+        let current = repo
+            .get_workspace::<AnyType<Concrete>>(PathBuf::from("."))?
+            .get_current_view()
+            .get_structure_view()
+            .to_normalized_path();
         let root = repo.root_view();
         let all_branches = root
             .iter_children_req(repo)

@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::vcs::{VCS, VersionId};
+use crate::vcs::{VCS, RevisionId};
 use colored::{ColoredString, Colorize};
 use itertools::Itertools;
 use std::cmp::Ordering;
@@ -62,7 +62,7 @@ impl<V: VCS> FrozenView<V> {
     }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
-        let mut path = self.normalize().get_path().to_string().blue().to_string();
+        let path = self.normalize().get_path().to_string().blue().to_string();
         let mut info: Vec<String> = vec![];
 
         if show_type {

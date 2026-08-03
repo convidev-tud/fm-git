@@ -1,5 +1,5 @@
 use hyrmir_lib::model::*;
-use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, VersionId};
+use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, RevisionId};
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::PathBuf;
@@ -39,12 +39,12 @@ pub enum GitError {
 
 impl VCSError for GitError {}
 
-#[derive(Debug, Clone)]
-pub struct Commit {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommitHash {
     hash: String,
 }
 
-impl VersionId for Commit {
+impl RevisionId for CommitHash {
     fn new(id: impl Into<String>) -> Self {
         Self { hash: id.into() }
     }
@@ -167,7 +167,7 @@ impl Git {
 
 impl VCS for Git {
     type VCSError = GitError;
-    type RevisionId = Commit;
+    type RevisionId = CommitHash;
 
     fn get_current_path(&self, _: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
         let command = vec!["branch", "--show-current"];
@@ -199,7 +199,7 @@ impl VCS for Git {
                 PathInfo::new(
                     id.parse().unwrap(),
                     NormalizedPath::from_git_branch(path).as_absolute(),
-                    Commit::new(hash),
+                    CommitHash::new(hash),
                 )
             })
             .collect();
