@@ -1,5 +1,5 @@
 use crate::arg::ArgHelper;
-use crate::completion::RelativePathCompleter;
+use crate::completion::NormalizedPathCompleter;
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use hyrmir_lib::model::NormalizedPath;
@@ -11,6 +11,7 @@ pub struct CompletionHelper<'a> {
     cli_content: Vec<&'a str>,
     arg_matches: ArgMatches,
 }
+
 impl<'a> CompletionHelper<'a> {
     pub fn new(root_command: &'a Command, cli_content: Vec<&'a str>) -> Self {
         let arg_matches = root_command
@@ -39,6 +40,7 @@ impl<'a> CompletionHelper<'a> {
             arg_matches: matches.clone(),
         }
     }
+    
     pub fn get_last(&self) -> Option<String> {
         Some(self.cli_content.last()?.to_string())
     }
@@ -108,6 +110,7 @@ impl<'a> CompletionHelper<'a> {
             },
         }
     }
+    
     /// Returns if the passed target is the currently one edited on the console.
     ///
     /// Examples:
@@ -119,6 +122,7 @@ impl<'a> CompletionHelper<'a> {
     pub fn currently_editing(&self) -> Option<&Arg> {
         Some(self.currently_editing_with_range()?.1)
     }
+    
     pub fn get_appendix_of(&self, name: &str) -> Vec<String> {
         let helper = ArgHelper::new(self.arg_matches.clone());
         if !helper.has_arg(name) {
@@ -126,6 +130,7 @@ impl<'a> CompletionHelper<'a> {
         }
         helper.get_argument_values(name).unwrap()
     }
+    
     pub fn get_appendix_of_currently_edited(&self) -> Vec<String> {
         let maybe_currently_editing = self.currently_editing_with_range();
         if maybe_currently_editing.is_none() {
@@ -134,17 +139,17 @@ impl<'a> CompletionHelper<'a> {
         let currently_editing = maybe_currently_editing.unwrap().1;
         self.get_appendix_of(currently_editing.get_id().as_str())
     }
+    
     pub fn complete_normalized_paths(
         &self,
-        reference: NormalizedPath,
+        completer: &impl NormalizedPathCompleter,
         paths: impl Iterator<Item = NormalizedPath>,
     ) -> Vec<String> {
         let maybe_last = self.get_last();
         if maybe_last.is_none() {
             return vec![];
         }
-        RelativePathCompleter::new(reference)
-            .complete(NormalizedPath::from(maybe_last.unwrap()), paths)
+        completer.complete(NormalizedPath::from(maybe_last.unwrap()), paths)
     }
 }
 

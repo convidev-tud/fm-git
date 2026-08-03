@@ -1,4 +1,4 @@
-use crate::completion::CompletionHelper;
+use crate::completion::*;
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
 use clap::{Arg, Command};
 use colored::Colorize;
@@ -104,8 +104,9 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             .iter_children_req(repo)
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)
             .map(|p| p.to_normalized_path());
+        let strategy = NameSearchPathCompleter::new(current);
         let result = match maybe_editing.unwrap().get_id().as_str() {
-            PATH => completion_helper.complete_normalized_paths(current, all_branches),
+            PATH => completion_helper.complete_normalized_paths(&strategy, all_branches),
             _ => vec![],
         };
         Ok(result)

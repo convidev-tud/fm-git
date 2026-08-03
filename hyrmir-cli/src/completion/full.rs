@@ -1,63 +1,32 @@
+use crate::completion::NormalizedPathCompleter;
 use hyrmir_lib::model::NormalizedPath;
-use std::collections::HashSet;
 
-pub struct RelativePathCompleter {
+pub struct FullRelativePathCompleter {
     reference_path: NormalizedPath,
 }
-impl RelativePathCompleter {
+
+impl FullRelativePathCompleter {
     pub fn new(reference_path: NormalizedPath) -> Self {
         if reference_path.is_empty() {
             panic!("Reference path must not be empty")
         }
         Self { reference_path }
     }
-    pub fn complete(
-        &self,
-        prefix: NormalizedPath,
-        paths: impl Iterator<Item = NormalizedPath>,
-    ) -> Vec<String> {
-        let filtered: Vec<NormalizedPath> = self
-            .transform_and_filter_path(prefix.clone(), paths)
-            .collect();
-        match filtered.len() {
-            0 => vec![],
-            1 => vec![filtered[0].to_string()],
-            _ => {
-                let current_index = prefix.len();
-                let all = filtered
-                    .iter()
-                    .map(|path| {
-                        let to_index = path.strip_n_right(current_index);
-                        let to_return = if path.len() == current_index {
-                            to_index
-                        } else {
-                            to_index.as_dir()
-                        };
-                        to_return.to_string()
-                    })
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect::<Vec<String>>();
-                if all.len() == 1 {
-                    filtered.iter().map(|path| path.to_string()).collect()
-                } else {
-                    all
-                }
-            }
-        }
-    }
-    fn transform_and_filter_path<'a>(
-        &self,
-        prefix: NormalizedPath,
-        paths: impl Iterator<Item = NormalizedPath>,
-    ) -> impl Iterator<Item = NormalizedPath> {
-        let transformed_prefix = if prefix.last().is_some() {
-            match prefix.last().unwrap().as_str() {
+}
+
+impl NormalizedPathCompleter for FullRelativePathCompleter {
+    fn transform_and_filter_path(
+        &self, 
+        prefix: &NormalizedPath, 
+        paths: impl Iterator<Item=NormalizedPath>
+    ) -> impl Iterator<Item=NormalizedPath> {
+        let transformed_prefix = if prefix.last_segment().is_some() {
+            match prefix.last_segment().unwrap().as_str() {
                 "." | ".." => prefix.as_dir(),
-                _ => prefix,
+                _ => prefix.clone(),
             }
         } else {
-            prefix
+            prefix.clone()
         };
         let current_position = self.reference_path.clone() + transformed_prefix.clone();
         let current_index = current_position.len() - 1;

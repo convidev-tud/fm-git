@@ -1,4 +1,6 @@
 use colored::Colorize;
+use itertools::Itertools;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
 use thiserror::Error;
@@ -136,11 +138,23 @@ impl NormalizedPath {
         Self { path: Vec::new() }
     }
 
-    pub fn push<S: Into<String>>(&mut self, path: S) {
+    pub fn push(&mut self, path: impl Into<String>) {
         let qualified_str = path.into().replace("_", "");
         for split in qualified_str.trim().split(PATH_SEPARATOR) {
             self.path.push(split.to_lowercase());
         }
+    }
+
+    pub fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
+        self.path.iter()
+    }
+
+    pub fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
+        self.path[l..r].iter()
+    }
+
+    pub fn last_segment(&self) -> Option<&String> {
+        self.path.last()
     }
 
     pub fn strip_n(&self, n_left: usize, n_right: usize) -> NormalizedPath {
@@ -181,12 +195,8 @@ impl NormalizedPath {
         NormalizedPath::from(new_path)
     }
 
-    pub fn first(&self) -> Option<NormalizedPath> {
-        Some(NormalizedPath::from(self.path.first()?.clone()))
-    }
-
-    pub fn last(&self) -> Option<&String> {
-        self.path.last()
+    pub fn first_segment(&self) -> Option<&String> {
+        self.path.first()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -198,14 +208,6 @@ impl NormalizedPath {
             .map(|s| NormalizedPath::from(s.clone()))
     }
 
-    pub fn iter_all_segments(&self) -> impl Iterator<Item = &String> {
-        self.path.iter()
-    }
-
-    pub fn iter_segments(&self, l: usize, r: usize) -> impl Iterator<Item = &String> {
-        self.path[l..r].iter()
-    }
-
     pub fn get(&self, index: usize) -> Option<NormalizedPath> {
         Some(NormalizedPath::from(self.path.get(index)?.clone()))
     }
@@ -215,7 +217,7 @@ impl NormalizedPath {
     }
 
     pub fn last_is(&self, suffix: &NormalizedPath) -> bool {
-        self.last() == suffix.last()
+        self.last_segment() == suffix.last_segment()
     }
 
     pub fn len(&self) -> usize {
@@ -235,11 +237,11 @@ impl NormalizedPath {
     }
 
     pub fn is_dir(&self) -> bool {
-        self.path.len() > 1 && self.last().unwrap() == ""
+        self.path.len() > 1 && self.last_segment() == Some(&"".to_string())
     }
 
     pub fn is_absolute(&self) -> bool {
-        self.path.len() > 0 && self.first().unwrap() == ""
+        self.path.len() > 0 && self.first_segment() == Some(&"".to_string())
     }
 
     pub fn formatted(&self, colored: bool) -> String {
@@ -357,6 +359,30 @@ impl ToNormalizedPath for NormalizedPath {
     fn to_normalized_path(&self) -> NormalizedPath {
         self.clone()
     }
+}
+
+/*
+    ############################
+    # Transformers and Filters #
+    ############################
+*/
+
+pub fn collect_paths_by_name(paths: impl Iterator<Item=NormalizedPath>) -> HashMap<String, Vec<NormalizedPath>> {
+    let mut names = HashMap::new();
+    for path in paths {
+        if let Some(name) = path.last_segment() {
+            if !names.contains_key(name) {
+                names.insert(name.to_string(), vec![path]);
+            } else {
+                let paths_vec = names.get_mut(name).unwrap();
+                // removes duplicates
+                if !paths_vec.contains(&path) {
+                    paths_vec.push(path);
+                }
+            }
+        };
+    };
+    names
 }
 
 #[cfg(test)]

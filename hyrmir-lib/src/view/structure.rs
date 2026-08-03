@@ -387,9 +387,9 @@ where
 }
 
 /*
-    #######################################
-        Important trait implementations
-    #######################################
+    ###################################
+    # Important trait implementations #
+    ###################################
 */
 
 impl<'a, S, M, V> ToNormalizedPath for StructureView<'a, S, M, V>
@@ -575,9 +575,9 @@ where
 }
 
 /*
-    ##########################
-    # Filter implementations #
-    ##########################
+    ############################
+    # Transformers and Filters #
+    ############################
 */
 
 pub struct FilterByType<T: SymbolicNodeType>(PhantomData<T>);
