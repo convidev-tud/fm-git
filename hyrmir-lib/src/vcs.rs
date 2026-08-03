@@ -38,16 +38,16 @@ impl<V: VersionId> PathInfo<V> {
 pub trait VCS: Debug {
     type VCSError: VCSError;
 
-    type VersionId: VersionId;
+    type RevisionId: VersionId;
 
     fn get_current_path(&self, path: &PathBuf) -> Result<Option<Normalized>, Self::VCSError>;
 
-    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError>;
+    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError>;
 
     fn get_revision(
         &self,
         version: impl Into<String>,
-    ) -> Result<Option<Self::VersionId>, Self::VCSError>;
+    ) -> Result<Option<Self::RevisionId>, Self::VCSError>;
 
     fn revision_exists_on_path(
         &self,
@@ -58,7 +58,7 @@ pub trait VCS: Debug {
     fn iter_versions(
         &self,
         path: &NormalizedPath,
-    ) -> impl Iterator<Item = Result<Self::VersionId, Self::VCSError>>;
+    ) -> impl Iterator<Item = Result<Self::RevisionId, Self::VCSError>>;
 
     fn get_status_without_current_branch(&self, colored: bool) -> Result<String, Self::VCSError>;
 

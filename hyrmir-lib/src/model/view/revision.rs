@@ -1,6 +1,7 @@
 use crate::model::*;
-use crate::vcs::{VCSError, VersionId, VCS};
+use crate::vcs::{VCS, VCSError};
 use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
 use thiserror::Error;
 
 /*
@@ -58,47 +59,31 @@ impl Display for RevisionLockError {
 */
 
 pub trait RevPointer: Debug + Clone {
-    fn get_revision(&self) -> &String;
+    fn is_head() -> bool;
 }
 
 #[derive(Debug, Clone)]
-pub struct Head {
-    head: String,
-}
-
-impl Head {
-    pub fn new() -> Self {
-        Self { head: "HEAD".to_string() }
-    }
-}
+pub struct Head;
 
 impl RevPointer for Head {
-    fn get_revision(&self) -> &String {
-        &self.head
+    fn is_head() -> bool {
+        true
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Rev {
-    revision: String,
-}
-
-impl Rev {
-    pub fn new(revision: impl Into<String>) -> Self {
-        Self { revision: revision.into() }
-    }
-}
+pub struct Rev;
 
 impl RevPointer for Rev {
-    fn get_revision(&self) -> &String {
-        &self.revision
+    fn is_head() -> bool {
+        false
     }
 }
 
 /*
-    #######################
-        Main Definition
-    #######################
+    ###################
+    # Main Definition #
+    ###################
 */
 
 #[derive(Debug)]
@@ -109,8 +94,10 @@ where
     M: AccessMode,
     V: VCS,
 {
-    structure_view: StructureView<'a, S, M, V>,
-    revision: R,
+    structure_view: StructureView<'a, S, Shared, V>,
+    revision: V::RevisionId,
+    _revision_type: PhantomData<R>,
+    _access_mode: PhantomData<M>,
 }
 
 impl<'a, S, R, M, V> RevisionView<'a, S, R, M, V>
@@ -145,42 +132,42 @@ where
     }
 
     pub fn assert_revision(
-        structure_view: &StructureView<S, M, V>,
+        structure_view: &StructureView<S, Shared, V>,
         revision: impl Into<String>,
-    ) -> Result<V::VersionId, RevisionError<V, V::VCSError>> {
+    ) -> Result<V::RevisionId, RevisionError<V, V::VCSError>> {
         let rev = revision.into();
         let vcs = structure_view.get_vcs();
-        if vcs
-            .revision_exists_on_path(&structure_view.to_normalized_path(), &rev)?
-        {
+        if vcs.revision_exists_on_path(&structure_view.to_normalized_path(), &rev)? {
             let revision = vcs.get_revision(&rev)?.unwrap();
-            structure_view.get_node()
-                .get()
-                .borrow_mut()
-                .mut_get_branch_info()
-                .unwrap()
-                .add_known_version(revision.clone());
             Ok(revision)
         } else {
-            Err(structure_view.to_frozen_view(RevisionPointer::Invalid(rev)).into())
+            Err(structure_view
+                .to_frozen_view(RevisionPointer::Invalid(rev))
+                .into())
         }
     }
-    
-    pub fn get_structure_view(&self) -> &StructureView<'a, S, M, V> {
+
+    pub fn get_structure_view(&self) -> &StructureView<'a, S, Shared, V> {
         &self.structure_view
     }
-    
-    pub fn get_revision_id(&self) -> V::VersionId {
-        self
-            .get_structure_view()
-            .get_node()
-            .get()
-            .borrow()
-            .get_branch_info()
-            .unwrap()
-            .get_known_version(self.revision.get_revision())
-            .unwrap()
-            .clone()
+
+    pub fn get_revision(&self) -> &V::RevisionId {
+        &self.revision
+    }
+
+    pub fn to_frozen_view(&self) -> FrozenView<V> {
+        let revision = self.get_revision();
+        let revision_pointer = if R::is_head() {
+            RevisionPointer::Head(revision.clone())
+        } else {
+            RevisionPointer::Revision(revision.clone())
+        };
+        self.get_structure_view().to_frozen_view(revision_pointer)
+    }
+
+    pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
+        self.to_frozen_view()
+            .formatted(show_type, show_version, colored)
     }
 }
 
@@ -190,10 +177,20 @@ where
     M: AccessMode,
     V: VCS,
 {
-    pub(crate) fn new(structure_view: StructureView<'a, S, M, V>) -> Self {
+    pub(crate) fn new(structure_view: StructureView<'a, S, Shared, V>) -> Self {
+        let revision = structure_view
+            .get_node()
+            .get()
+            .borrow()
+            .get_branch_info()
+            .unwrap()
+            .get_head()
+            .clone();
         let new = Self {
             structure_view,
-            revision: Head::new(),
+            revision,
+            _revision_type: PhantomData,
+            _access_mode: PhantomData,
         };
         new.assert_lock();
         new
@@ -207,13 +204,15 @@ where
     V: VCS,
 {
     pub(crate) fn new(
-        structure_view: StructureView<'a, S, M, V>,
+        structure_view: StructureView<'a, S, Shared, V>,
         revision: impl Into<String>,
     ) -> Result<Self, RevisionError<V, V::VCSError>> {
         let revision = Self::assert_revision(&structure_view, revision)?;
         let new = Self {
             structure_view,
-            revision: Rev::new(revision.get_full_id()),
+            revision,
+            _revision_type: PhantomData,
+            _access_mode: PhantomData,
         };
         new.assert_lock();
         Ok(new)
@@ -228,11 +227,7 @@ where
     V: VCS,
 {
     fn drop(&mut self) {
-        let mut node = self
-            .get_structure_view()
-            .get_node()
-            .get()
-            .borrow_mut();
+        let mut node = self.get_structure_view().get_node().get().borrow_mut();
         if M::lock() {
             node.unlock_revision()
         }

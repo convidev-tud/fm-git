@@ -10,9 +10,9 @@ use std::marker::PhantomData;
 use thiserror::Error;
 
 /*
-    ##############
-        Errors
-    ##############
+    ##########
+    # Errors #
+    ##########
 */
 
 #[derive(Error, Clone, Debug)]
@@ -116,7 +116,7 @@ where
 {
     id: NodeId,
     repo: &'a Repository<V>,
-    _mode_marker: PhantomData<M>,
+    _access_mode: PhantomData<M>,
     _type_marker: PhantomData<S>,
 }
 
@@ -134,7 +134,7 @@ where
         self.get_repo().get_arena()
     }
 
-    fn iter_path(&self) -> impl Iterator<Item=NodeId> {
+    fn iter_path(&self) -> impl Iterator<Item = NodeId> {
         self.get_node_id().ancestors(self.get_arena())
     }
 
@@ -145,8 +145,7 @@ where
     }
 
     fn get_node_path(&self) -> Vec<&Node<RefCell<NodeData<V>>>> {
-        self
-            .get_id_path()
+        self.get_id_path()
             .iter()
             .map(|id| self.get_arena().get(*id).unwrap())
             .collect()
@@ -160,21 +159,20 @@ where
         self.repo.get_root_node()
     }
 
-    fn path_to_static(&self) -> Vec<StaticNode> {
+    fn path_to_frozen(&self) -> Vec<FrozenNode> {
         let mut path = self.iter_path().collect_vec();
         path.reverse();
-        path
-            .iter()
+        path.iter()
             .map(|id| {
                 let node = self.repo.get_node(*id).unwrap().get().borrow();
-                StaticNode::new(node.get_name().clone(), node.get_type().clone())
+                FrozenNode::new(node.get_name().clone(), node.get_type().clone())
             })
             .collect()
     }
 
     fn check_path_not_existent(&self) -> Result<(), PathDoesNotExistError<V>> {
         if &self.get_real_type() == &NodeType::NonExistent {
-            let path = FrozenView::new(self.path_to_static(), RevisionPointer::None);
+            let path = FrozenView::new(self.path_to_frozen(), RevisionPointer::None);
             Err(PathDoesNotExistError::new(path))
         } else {
             Ok(())
@@ -199,7 +197,7 @@ where
         if node.is_structure_locked() {
             drop(node);
             panic!(
-                "Cannot create structure view for for '{}': node is locked",
+                "Cannot create structure view for '{}': node is locked",
                 self.to_normalized_path(),
             )
         }
@@ -217,14 +215,11 @@ where
         node.reference_structure_view();
     }
 
-    pub(crate) fn new(
-        id: NodeId,
-        repo: &'a Repository<V>,
-    ) -> Result<Self, SemanticViewError<V>> {
+    pub(crate) fn new(id: NodeId, repo: &'a Repository<V>) -> Result<Self, SemanticViewError<V>> {
         let new = Self {
             id,
             repo,
-            _mode_marker: PhantomData,
+            _access_mode: PhantomData,
             _type_marker: PhantomData,
         };
         new.check_path_not_existent()?;
@@ -255,7 +250,7 @@ where
         let new = StructureView {
             id: self.id,
             repo: self.repo,
-            _mode_marker: PhantomData,
+            _access_mode: PhantomData,
             _type_marker: PhantomData,
         };
         new.check_sym_type_compatibility()?;
@@ -267,7 +262,7 @@ where
     }
 
     pub fn to_frozen_view(&self, revision: RevisionPointer<V>) -> FrozenView<V> {
-        FrozenView::new(self.path_to_static(), revision)
+        FrozenView::new(self.path_to_frozen(), revision)
     }
 
     pub fn iter_children(
@@ -275,11 +270,8 @@ where
         repo: &'a Repository<V>,
     ) -> impl Iterator<Item = StructureView<'a, AnyType<AnyC>, Shared, V>> {
         let id = self.get_node_id();
-        id
-            .children(self.get_repo().get_arena())
-            .map(|child| {
-                StructureView::new(child, repo).unwrap()
-            })
+        id.children(self.get_repo().get_arena())
+            .map(|child| StructureView::new(child, repo).unwrap())
     }
 
     pub fn iter_children_req(
@@ -287,11 +279,8 @@ where
         repo: &'a Repository<V>,
     ) -> impl Iterator<Item = StructureView<AnyType<AnyC>, Shared, V>> {
         let id = self.get_node_id();
-        id
-            .descendants(self.get_repo().get_arena())
-            .map(|child| {
-                StructureView::new(child, repo).unwrap()
-            })
+        id.descendants(self.get_repo().get_arena())
+            .map(|child| StructureView::new(child, repo).unwrap())
     }
 
     /// Moves path to a specific index on the node vector.
@@ -319,11 +308,8 @@ where
         path: &impl ToNormalizedPath,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
-        fn make_error_node(name: String) -> StaticNode {
-            StaticNode::new(
-                name,
-                NodeType::NonExistent,
-            )
+        fn make_error_node(name: String) -> FrozenNode {
+            FrozenNode::new(name, NodeType::NonExistent)
         }
 
         // set path to absolute from root
@@ -331,7 +317,7 @@ where
         let root = self.get_root_id();
         let mut current = Some(root);
         let mut id_vec: Vec<NodeId> = vec![root];
-        let mut error_nodes: Vec<StaticNode> = vec![];
+        let mut error_nodes: Vec<FrozenNode> = vec![];
         // iter path
         for p in path.iter_segments(1, path.len()) {
             match current {
@@ -360,10 +346,7 @@ where
                 .iter()
                 .map(|id| {
                     let node = self.repo.get_node(*id).unwrap().get().borrow();
-                    StaticNode::new(
-                        node.get_name().clone(),
-                        node.get_type().clone(),
-                    )
+                    FrozenNode::new(node.get_name().clone(), node.get_type().clone())
                 })
                 .collect::<Vec<_>>();
             nodes.extend(error_nodes);
@@ -432,7 +415,8 @@ where
     S: SymbolicNodeType,
     M: AccessMode,
     V: VCS,
-{}
+{
+}
 
 impl<'a, S, M, V> PartialOrd for StructureView<'a, S, M, V>
 where
@@ -441,7 +425,8 @@ where
     V: VCS,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.to_normalized_path().partial_cmp(&other.to_normalized_path())
+        self.to_normalized_path()
+            .partial_cmp(&other.to_normalized_path())
     }
 }
 
@@ -484,7 +469,12 @@ where
     V: VCS,
 {
     pub fn get_vcs_id(&self) -> usize {
-        self.get_node().get().borrow().get_branch_info().unwrap().get_id()
+        self.get_node()
+            .get()
+            .borrow()
+            .get_branch_info()
+            .unwrap()
+            .get_id()
     }
 }
 
@@ -499,16 +489,16 @@ where
         drop(self);
         StructureView::new(id, repo).unwrap()
     }
-    
-    pub fn to_head_rev(self) -> RevisionView<'a, S, Head, M, V> {
-        RevisionView::<'a, S, Head, V>::new(self)
+
+    pub fn to_head_rev(self) -> RevisionView<'a, S, Head, Shared, V> {
+        RevisionView::<'a, S, Head, Shared, V>::new(self)
     }
 
     pub fn to_rev(
         self,
         revision: impl Into<String>,
-    ) -> Result<RevisionView<'a, S, Rev, M, V>, RevisionError<V, V::VCSError>> {
-        RevisionView::<'a, S, Rev, V>::new(self, revision)
+    ) -> Result<RevisionView<'a, S, Rev, Shared, V>, RevisionError<V, V::VCSError>> {
+        RevisionView::<'a, S, Rev, Shared, V>::new(self, revision)
     }
 }
 
@@ -593,7 +583,7 @@ impl<T: SymbolicNodeType> FilterByType<T> {
     where
         S: SymbolicNodeType,
         M: AccessMode,
-        V: VCS
+        V: VCS,
     {
         match view.try_convert_to::<T>() {
             Ok(view) => Some(view),

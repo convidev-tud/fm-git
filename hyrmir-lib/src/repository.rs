@@ -1,10 +1,11 @@
-use std::cell::RefCell;
 use crate::model::*;
 use crate::vcs::*;
 use crate::workspace::*;
 use indextree::{Arena, Node, NodeId};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use itertools::Itertools;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -51,7 +52,10 @@ impl<V: VCS> Repository<V> {
     ) -> Result<NodeId, MalformedModelError> {
         let name = name.into();
         let parent = self.arena[parent_id].get();
-        let node_type = parent.borrow().get_type().decide_next_type(&name, branch_info.is_some())?;
+        let node_type = parent
+            .borrow()
+            .get_type()
+            .decide_next_type(&name, branch_info.is_some())?;
         let new_node = NodeData::new(name.clone(), node_type, branch_info);
         let new_id = self.arena.new_node(RefCell::new(new_node));
         parent_id.append(new_id, &mut self.arena);
@@ -64,13 +68,17 @@ impl<V: VCS> Repository<V> {
         &self,
         id: NodeId,
         new_name: impl Into<String>,
-        branch_info: Option<BranchInfo<V>>
+        branch_info: Option<BranchInfo<V>>,
     ) -> Result<NodeId, MalformedModelError> {
         let new_name = new_name.into();
         let mut node = self.arena[id].get().borrow_mut();
-        let mut parent = self.arena[id.parent(&self.arena).unwrap()].get().borrow_mut();
+        let mut parent = self.arena[id.parent(&self.arena).unwrap()]
+            .get()
+            .borrow_mut();
         let old_name = node.get_name();
-        let new_type = parent.get_type().decide_next_type(&new_name, branch_info.is_some())?;
+        let new_type = parent
+            .get_type()
+            .decide_next_type(&new_name, branch_info.is_some())?;
         parent.remove_child(&old_name);
         parent.add_child(id, &new_name);
         node.update_name(new_name);
@@ -89,18 +97,20 @@ impl<V: VCS> Repository<V> {
         for (index, p) in path.iter_all_segments().enumerate() {
             let borrowed = current_node.borrow();
             if index == path.len() - 1 {
-                let id = match borrowed.get_child(p)
-                {
-                    Some(id) => self.update_node(id.clone(), p, Some(branch_info))?,
+                let id = match borrowed.get_child(p) {
+                    Some(child) => {
+                        let child = *child;
+                        drop(borrowed);
+                        self.update_node(child, p, Some(branch_info))?
+                    }
                     None => {
                         drop(borrowed);
-                        self.add_node(current, p, Some(branch_info))? 
+                        self.add_node(current, p, Some(branch_info))?
                     }
                 };
                 return Ok(id);
             } else {
-                let next = match borrowed.get_child(p)
-                {
+                let next = match borrowed.get_child(p) {
                     Some(id) => *id,
                     None => {
                         drop(borrowed);
@@ -150,11 +160,11 @@ impl<V: VCS> Repository<V> {
             vcs,
         }
     }
-    
+
     pub fn get_arena(&self) -> &Arena<RefCell<NodeData<V>>> {
         &self.arena
     }
-    
+
     pub fn get_node(&self, id: NodeId) -> Option<&Node<RefCell<NodeData<V>>>> {
         self.arena.get(id)
     }
@@ -170,7 +180,7 @@ impl<V: VCS> Repository<V> {
     pub fn get_workspace<S: IsConcrete>(
         &'_ self,
         path: PathBuf,
-    ) -> Result<WorkspaceKind<'_, S, V>, GetWorkSpaceError<V::VersionId, V::VCSError>> {
+    ) -> Result<WorkspaceKind<'_, S, V>, GetWorkSpaceError<V, V::VCSError>> {
         WorkspaceKind::<S, V>::get(path, &self)
     }
 }

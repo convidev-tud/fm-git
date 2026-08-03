@@ -42,10 +42,7 @@ impl<V: VCS> CommandInterface<V> for StatusCommand<V> {
         match repo.get_workspace::<AnyType<Concrete>>(path)? {
             WorkspaceKind::Head(workspace) => {
                 let current = workspace.get_current_view();
-                let current_msg = format!(
-                    "Viewing {}",
-                    current.get_semantic_view().formatted(true, true, true),
-                );
+                let current_msg = format!("Viewing {}", current.formatted(true, true, true),);
                 let status = workspace.status(current_msg, "", "", true)?;
                 logger.info(status);
             }

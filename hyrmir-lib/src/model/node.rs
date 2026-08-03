@@ -1,9 +1,9 @@
-use crate::vcs::{VersionId, VCS};
+use crate::vcs::{VCS, VersionId};
 use colored::{ColoredString, Colorize};
+use indextree::NodeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
-use indextree::NodeId;
 use thiserror::Error;
 
 pub const FEATURE_ROOT: &str = "feature";
@@ -147,46 +147,20 @@ impl NodeType {
 #[derive(Debug)]
 pub struct BranchInfo<V: VCS> {
     id: usize,
-    head: V::VersionId,
-    known_versions: HashMap<String, V::VersionId>,
+    head: V::RevisionId,
 }
 
 impl<V: VCS> BranchInfo<V> {
-    pub fn new(id: usize, head: V::VersionId) -> Self {
-        Self {
-            id,
-            head,
-            known_versions: HashMap::new(),
-        }
+    pub fn new(id: usize, head: V::RevisionId) -> Self {
+        Self { id, head }
     }
 
     pub fn get_id(&self) -> usize {
         self.id
     }
 
-    pub fn get_head(&self) -> &V::VersionId {
+    pub fn get_head(&self) -> &V::RevisionId {
         &self.head
-    }
-    
-    pub fn get_known_version(&self, id: impl Into<String>) -> Option<&V::VersionId> {
-        let id = id.into();
-        if id == "HEAD" {
-            Some(&self.head)
-        } else {
-            self.known_versions.get(&id)
-        }
-    }
-
-    pub fn add_known_version(&mut self, version: V::VersionId) {
-        self.known_versions.insert(version.get_full_id(), version);
-    }
-
-    pub fn remove_known_version(&mut self, version: &V::VersionId) {
-        self.known_versions.remove(&version.get_full_id());
-    }
-
-    pub fn contains_version(&self, version: &V::VersionId) -> bool {
-        self.known_versions.contains_key(&version.get_full_id())
     }
 }
 
@@ -232,18 +206,11 @@ impl<V: VCS> NodeData<V> {
         self.branch_info = branch_info;
     }
 
-    pub(crate) fn add_child(
-        &mut self,
-        id: NodeId,
-        name: impl Into<String>,
-    ) {
+    pub(crate) fn add_child(&mut self, id: NodeId, name: impl Into<String>) {
         self.children.insert(name.into(), id);
     }
-    
-    pub(crate) fn remove_child(
-        &mut self,
-        name: &str,
-    ) {
+
+    pub(crate) fn remove_child(&mut self, name: &str) {
         self.children.remove(name);
     }
 

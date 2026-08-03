@@ -1,6 +1,7 @@
 mod check;
 mod clone;
 mod commit;
+pub mod common;
 mod complete;
 mod derive;
 mod feature;
@@ -12,7 +13,6 @@ mod tag;
 mod tree;
 mod untie;
 mod view;
-pub mod common;
 
 pub use check::*;
 pub use clone::*;

@@ -24,7 +24,7 @@ impl<V: VCS> CommandDefinition<V> for FeatureCommand<V> {
         Command::new(FEATURE)
             .about("Manage features")
             .disable_help_subcommand(true)
-            // .arg(show_tags())
+        // .arg(show_tags())
     }
 }
 impl<V: VCS> CommandInterface<V> for FeatureCommand<V> {
@@ -64,7 +64,7 @@ impl<V: VCS> CommandInterface<V> for FeatureCommand<V> {
         // }
         Ok(())
     }
-    
+
     // fn shell_complete(
     //     &self,
     //     completion_helper: CompletionHelper,

@@ -1,6 +1,7 @@
 use crate::model::*;
-use crate::vcs::{VersionId, VCS};
-use colored::Colorize;
+use crate::vcs::{VCS, VersionId};
+use colored::{ColoredString, Colorize};
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -8,33 +9,37 @@ use std::hash::{Hash, Hasher};
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum RevisionPointer<V: VCS> {
     None,
-    Head(V::VersionId),
-    Revision(V::VersionId),
+    Head(V::RevisionId),
+    Revision(V::RevisionId),
     Invalid(String),
 }
 
 #[derive(Clone, Debug)]
-pub struct StaticNode {
+pub struct FrozenNode {
     name: String,
     node_type: NodeType,
 }
 
-impl StaticNode {
+impl FrozenNode {
     pub fn new(name: String, node_type: NodeType) -> Self {
         Self { name, node_type }
     }
-    
-    pub fn name(&self) -> &String {
+
+    pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    pub fn get_type(&self) -> &NodeType {
+        &self.node_type
     }
 }
 
-impl ToNormalizedPath for Vec<StaticNode> {
+impl ToNormalizedPath for Vec<FrozenNode> {
     fn to_normalized_path(&self) -> NormalizedPath {
         let mut path = NormalizedPath::new();
         for node in self {
             path.push(node.name.clone());
-        };
+        }
         path
     }
 }
@@ -43,49 +48,60 @@ impl ToNormalizedPath for Vec<StaticNode> {
 /// Does not react to changes in the source tree.
 #[derive(Clone, Debug)]
 pub struct FrozenView<V: VCS> {
-    path: Vec<StaticNode>,
+    path: Vec<FrozenNode>,
     version: RevisionPointer<V>,
 }
 
 impl<V: VCS> FrozenView<V> {
-    pub(crate) fn new(
-        path: Vec<StaticNode>,
-        version: RevisionPointer<V>,
-    ) -> Self {
+    fn get_node(&self) -> &FrozenNode {
+        &self.path.last().unwrap()
+    }
+
+    pub(crate) fn new(path: Vec<FrozenNode>, version: RevisionPointer<V>) -> Self {
         Self { path, version }
     }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
         let mut path = self.normalize().get_path().to_string().blue().to_string();
+        let mut info: Vec<String> = vec![];
+
         if show_type {
-            let node = self.get_node().borrow();
+            let node = self.get_node();
             let node_type = node.get_type();
-            let type_name = node_type.get_type_name();
-            let formatted = node_type.format_node_display(format!("({type_name})").normal());
-            path = path + " " + formatted.to_string().as_str();
+            let type_name = node_type.get_formatted_name();
+            info.push(type_name);
         }
+
         if show_version {
-            if let Some(branch_info) = self.get_node().borrow().get_branch_info() {
-                let version = match &self.version {
-                    RevisionPointer::None => {
-                        let head = branch_info.get_head();
-                        format!("({})", head.get_printable_id()).yellow()
-                    }
-                    RevisionPointer::Revision(version) => {
-                        if branch_info.contains_version(version) {
-                            format!("({})", version.get_printable_id()).yellow()
-                        } else {
-                            format!("(Invalid: {})", version.get_printable_id()).red()
-                        }
-                    }
-                };
-                path = path + " " + version.to_string().as_str();
+            let version: Option<ColoredString> = match &self.version {
+                RevisionPointer::None => None,
+                RevisionPointer::Head(head) => {
+                    Some(format!("Head -> {}", head.get_printable_id()).yellow())
+                }
+                RevisionPointer::Revision(rev) => Some(rev.get_printable_id().yellow()),
+                RevisionPointer::Invalid(invalid) => Some(invalid.red()),
+            };
+            if let Some(version) = version {
+                info.push(version.to_string())
             }
         }
+
+        let mut output = if info.is_empty() {
+            path
+        } else {
+            format!(
+                "{} {}{}{}",
+                path,
+                "(".yellow(),
+                info.join(", ".yellow().to_string().as_str()),
+                ")".yellow(),
+            )
+        };
+
         if !colored {
-            path = path.normal().to_string();
+            output = output.normal().to_string();
         }
-        path
+        output
     }
 }
 
@@ -93,10 +109,9 @@ impl<V: VCS> Normalize for FrozenView<V> {
     fn normalize(&self) -> Normalized {
         let path = self.path.to_normalized_path();
         let revision = match &self.version {
-            RevisionPointer::None => NormalizedRevision::Head,
-            RevisionPointer::Revision(version) => {
-                NormalizedRevision::Revision(version.get_full_id())
-            }
+            RevisionPointer::None | RevisionPointer::Head(_) => NormalizedRevision::Head,
+            RevisionPointer::Revision(rev) => NormalizedRevision::Revision(rev.get_full_id()),
+            RevisionPointer::Invalid(invalid) => NormalizedRevision::Revision(invalid.clone()),
         };
         Normalized::new(path, revision)
     }

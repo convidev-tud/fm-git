@@ -1,15 +1,15 @@
+mod frozen;
 mod revision;
 mod structure;
-mod frozen;
 
-use std::cell::RefCell;
-use std::fmt::Debug;
-use indextree::Node;
-pub use frozen::*;
-pub use revision::*;
-pub use structure::*;
 use crate::model::{NodeData, NormalizedPath, ToNormalizedPath};
 use crate::vcs::VCS;
+pub use frozen::*;
+use indextree::Node;
+pub use revision::*;
+use std::cell::RefCell;
+use std::fmt::Debug;
+pub use structure::*;
 /*
     ####################
         Access Modes
@@ -25,7 +25,7 @@ pub struct Shared;
 
 impl AccessMode for Shared {
     fn lock() -> bool {
-        true
+        false
     }
 }
 
@@ -34,7 +34,7 @@ pub struct Locked;
 
 impl AccessMode for Locked {
     fn lock() -> bool {
-        false
+        true
     }
 }
 

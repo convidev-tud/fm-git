@@ -167,7 +167,7 @@ impl Git {
 
 impl VCS for Git {
     type VCSError = GitError;
-    type VersionId = Commit;
+    type RevisionId = Commit;
 
     fn get_current_path(&self, _: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
         let command = vec!["branch", "--show-current"];
@@ -184,10 +184,10 @@ impl VCS for Git {
         }
     }
 
-    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::VersionId>>, Self::VCSError> {
+    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError> {
         let branch_command = vec!["branch", "--format=%(refname:short) %(objectname)"];
         let branch_output = self.git_cli.run_attached(&branch_command)?;
-        let all_branches: Vec<PathInfo<Self::VersionId>> = String::from_utf8(branch_output.stdout)
+        let all_branches: Vec<PathInfo<Self::RevisionId>> = String::from_utf8(branch_output.stdout)
             .unwrap()
             .trim()
             .split("\n")
@@ -209,7 +209,7 @@ impl VCS for Git {
     fn get_revision(
         &self,
         version: impl Into<String>,
-    ) -> Result<Option<Self::VersionId>, Self::VCSError> {
+    ) -> Result<Option<Self::RevisionId>, Self::VCSError> {
         todo!()
     }
 
@@ -224,7 +224,7 @@ impl VCS for Git {
     fn iter_versions(
         &self,
         path: &NormalizedPath,
-    ) -> impl Iterator<Item = Result<Self::VersionId, Self::VCSError>> {
+    ) -> impl Iterator<Item = Result<Self::RevisionId, Self::VCSError>> {
         vec![].into_iter()
     }
 

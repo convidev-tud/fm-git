@@ -1,6 +1,6 @@
 use crate::completion::CompletionHelper;
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
-use clap::{Arg, Command, ValueHint};
+use clap::{Arg, Command};
 use colored::Colorize;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
@@ -52,8 +52,8 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         let path = PathBuf::from(".");
         let workspace = repo.get_workspace::<AnyType<Concrete>>(path)?;
         let current = match &workspace {
-            WorkspaceKind::Head(w) => w.get_current_view().get_semantic_view(),
-            WorkspaceKind::Rev(w) => w.get_current_view().get_semantic_view(),
+            WorkspaceKind::Head(w) => w.get_current_view().get_structure_view(),
+            WorkspaceKind::Rev(w) => w.get_current_view().get_structure_view(),
         };
         let target_path = current.to_normalized_path() + parsed_target.get_path().clone();
 
@@ -65,13 +65,16 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             return Ok(());
         }
 
-        let target = match repo.get_view::<AnyType<Concrete>>(&target_path) {
+        let target = match repo
+            .root_view()
+            .move_to::<AnyType<Concrete>>(&target_path, repo)
+        {
             Ok(path) => path,
             Err(error) => {
                 return match error {
                     SemanticViewError::PathDoesNotExist(path) => Err(path.into()),
                     SemanticViewError::InvalidType(_) => Err(format!(
-                        "Cannot view {}: target does not have a branch",
+                        "Cannot view {}: target does not have an associated artifact",
                         target_path.to_string().blue()
                     )
                     .into()),
@@ -83,10 +86,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             WorkspaceKind::Rev(w) => w.switch_to(target.to_head_rev())?,
         };
         let new_current = workspace.get_current_view();
-        let msg = format!(
-            "Now viewing {}",
-            new_current.get_semantic_view().formatted(true, true, true),
-        );
+        let msg = format!("Now viewing {}", new_current.formatted(true, true, true),);
         let status = workspace.status(msg, "", "", true)?;
         logger.info(status);
         Ok(())
@@ -106,16 +106,16 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         let current = match repo.get_workspace::<AnyType<Concrete>>(PathBuf::from("."))? {
             WorkspaceKind::Head(w) => w
                 .get_current_view()
-                .get_semantic_view()
+                .get_structure_view()
                 .to_normalized_path(),
             WorkspaceKind::Rev(w) => w
                 .get_current_view()
-                .get_semantic_view()
+                .get_structure_view()
                 .to_normalized_path(),
         };
         let root = repo.root_view();
         let all_branches = root
-            .iter_children_req()
+            .iter_children_req(repo)
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)
             .map(|p| p.to_normalized_path());
         let result = match maybe_editing.unwrap().get_id().as_str() {

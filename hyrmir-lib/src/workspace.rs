@@ -1,11 +1,11 @@
 use crate::model::*;
 use crate::repository::Repository;
-use crate::vcs::{VCS, VCSError, VersionId};
+use crate::vcs::{VCS, VCSError};
 use std::path::PathBuf;
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug)]
-pub enum GetWorkSpaceError<V: VersionId, VE: VCSError> {
+pub enum GetWorkSpaceError<V: VCS, VE: VCSError> {
     #[error(transparent)]
     View(#[from] SemanticViewError<V>),
     #[error("There is no workspace attached at this path.")]
@@ -14,27 +14,37 @@ pub enum GetWorkSpaceError<V: VersionId, VE: VCSError> {
     VCS(#[from] VE),
 }
 
-pub enum WorkspaceKind<'a, S: IsConcrete, V: VCS> {
-    Head(Workspace<'a, S, Head, V>),
-    Rev(Workspace<'a, S, Rev, V>),
+pub enum WorkspaceKind<'a, S, V>
+where
+    S: IsConcrete,
+    V: VCS,
+{
+    Head(Workspace<'a, S, Head, Shared, V>),
+    Rev(Workspace<'a, S, Rev, Shared, V>),
 }
 
-impl<'a, S: IsConcrete, V: VCS> WorkspaceKind<'a, S, V> {
+impl<'a, S, V> WorkspaceKind<'a, S, V>
+where
+    S: IsConcrete,
+    V: VCS,
+{
     pub fn get(
         path: PathBuf,
         repository: &'a Repository<V>,
-    ) -> Result<WorkspaceKind<'a, S, V>, GetWorkSpaceError<V::VersionId, V::VCSError>> {
+    ) -> Result<WorkspaceKind<'a, S, V>, GetWorkSpaceError<V, V::VCSError>> {
         if let Some(current) = repository.get_vcs().get_current_path(&path)? {
-            let current_semantic_view = repository.get_view(current.get_path())?;
+            let current_semantic_view = repository
+                .root_view()
+                .move_to(current.get_path(), repository)?;
             match current.get_revision() {
                 NormalizedRevision::Head => {
                     let current_view = current_semantic_view.to_head_rev();
-                    let new = Workspace::<S, Head, V> { current_view, path };
+                    let new = Workspace::<S, Head, Shared, V> { current_view, path };
                     Ok(WorkspaceKind::Head(new))
                 }
                 NormalizedRevision::Revision(revision) => {
                     let current_view = current_semantic_view.to_rev(revision).unwrap();
-                    let new = Workspace::<S, Rev, V> { current_view, path };
+                    let new = Workspace::<S, Rev, Shared, V> { current_view, path };
                     Ok(WorkspaceKind::Rev(new))
                 }
             }
@@ -45,40 +55,34 @@ impl<'a, S: IsConcrete, V: VCS> WorkspaceKind<'a, S, V> {
 }
 
 #[derive(Debug)]
-pub struct Workspace<'a, S: IsConcrete, R: RevPointer, V: VCS> {
-    current_view: RevisionView<'a, S, Shared, V>,
+pub struct Workspace<'a, S, R, M, V>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    M: AccessMode,
+    V: VCS,
+{
+    current_view: RevisionView<'a, S, R, M, V>,
     path: PathBuf,
 }
 
-/// Base implementation
-impl<'a, S, R, V> Workspace<'a, S, Shared, V>
+impl<'a, S, R, M, V> Workspace<'a, S, R, M, V>
 where
     S: IsConcrete,
     R: RevPointer,
+    M: AccessMode,
     V: VCS,
 {
-    pub fn new() {
-        todo!()
-    }
-}
-
-/// VCS commands
-impl<'a, S, R, V> Workspace<'a, S, Shared, V>
-where
-    S: IsConcrete,
-    R: RevPointer,
-    V: VCS,
-{
-    pub fn get_current_view(&self) -> &RevisionView<'a, S, Shared, V> {
+    pub fn get_current_view(&self) -> &RevisionView<'a, S, R, M, V> {
         &self.current_view
+    }
+
+    pub fn mut_get_current_view(&mut self) -> &mut RevisionView<'a, S, R, M, V> {
+        &mut self.current_view
     }
 
     pub fn get_vcs(&self) -> &V {
         &self.get_current_view().get_structure_view().get_vcs()
-    }
-
-    pub fn mut_get_current_view(&mut self) -> &mut RevisionView<'a, S, Shared, V> {
-        &mut self.current_view
     }
 
     pub fn status(
@@ -97,13 +101,18 @@ where
         Ok(status)
     }
 
-    pub fn switch_to<T: IsConcrete, P: RevPointer>(
+    pub fn switch_to<T, P>(
         self,
-        view: RevisionView<'a, T, P, V>,
-    ) -> Result<Workspace<'a, T, P, V>, V::VCSError> {
-        let semantic = view.get_structure_view();
-        let id = semantic.get_id();
-        self.get_vcs().switch_to_branch(id, semantic, &self.path)?;
+        view: RevisionView<'a, T, P, M, V>,
+    ) -> Result<Workspace<'a, T, P, M, V>, V::VCSError>
+    where
+        T: IsConcrete,
+        P: RevPointer,
+        M: AccessMode,
+    {
+        let structure = view.get_structure_view();
+        let id = structure.get_vcs_id();
+        self.get_vcs().switch_to_branch(id, structure, &self.path)?;
         let new = Workspace {
             current_view: view,
             path: self.path,
