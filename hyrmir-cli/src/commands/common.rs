@@ -114,7 +114,7 @@ impl<V: VCS> CommandInterface<V> for AddPathCommand<V> {
                 .get_semantic_view()
                 .to_normalized_path(),
         };
-        let root = repo.get_virtual_root_view();
+        let root = repo.root_view();
         let all_branches = root
             .iter_children_req()
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)

@@ -1,21 +1,27 @@
 use crate::model::*;
 use crate::repository::Repository;
 use crate::vcs::VCS;
+use indextree::{Arena, Node, NodeId};
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
-use std::rc::Rc;
 use thiserror::Error;
+
+/*
+    ##############
+        Errors
+    ##############
+*/
 
 #[derive(Error, Clone, Debug)]
 pub struct PathDoesNotExistError<V: VCS> {
-    path: DynamicView<V>,
+    path: FrozenView<V>,
 }
 
 impl<V: VCS> PathDoesNotExistError<V> {
-    pub fn new(path: DynamicView<V>) -> Self {
+    pub fn new(path: FrozenView<V>) -> Self {
         Self { path }
     }
 }
@@ -36,11 +42,11 @@ impl<V: VCS> Display for PathDoesNotExistError<V> {
 pub struct InvalidTypeError<V: VCS> {
     types_possible: Vec<NodeType>,
     type_found: NodeType,
-    path: DynamicView<V>,
+    path: FrozenView<V>,
 }
 
 impl<V: VCS> InvalidTypeError<V> {
-    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType, path: DynamicView<V>) -> Self {
+    pub fn new(types_possible: Vec<NodeType>, type_found: NodeType, path: FrozenView<V>) -> Self {
         Self {
             types_possible,
             type_found,
@@ -56,7 +62,7 @@ impl<V: VCS> InvalidTypeError<V> {
         &self.type_found
     }
 
-    pub fn path(&self) -> &DynamicView<V> {
+    pub fn path(&self) -> &FrozenView<V> {
         &self.path
     }
 }
@@ -72,7 +78,7 @@ impl<V: VCS> Display for InvalidTypeError<V> {
         f.write_str(
             format!(
                 "Path '{}' has invalid type\n\
-            Found type {} but expected one of the following:\n  {expected}",
+                Found type {} but expected one of the following:\n  {expected}",
                 self.path.formatted(false, false, true),
                 self.type_found.get_formatted_name(),
             )
@@ -89,43 +95,11 @@ pub enum SemanticViewError<V: VCS> {
     InvalidType(#[from] InvalidTypeError<V>),
 }
 
-pub trait AccessMode: Debug {
-    type V: VCS;
-
-    fn get_repo(&self) -> &Repository<Self::V>;
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct R<'a, V: VCS> {
-    repo: &'a Repository<V>
-}
-
-impl<'a, V: VCS> AccessMode for R<'a, V> {
-    type V = V;
-
-    fn get_repo(&self) -> &'a Repository<Self::V> {
-        self.repo
-    }
-}
-
-#[derive(Debug)]
-pub struct RW<'a, V: VCS> {
-    repo: &'a mut Repository<V>
-}
-
-impl<'a, V: VCS> AccessMode for RW<'a, V> {
-    type V = V;
-
-    fn get_repo(&self) -> &Repository<Self::V> {
-        self.repo
-    }
-}
-
-impl<'a, V: VCS> RW<'a, V> {
-    pub fn get_repo_mut(&mut self) -> &mut Repository<V> {
-        self.repo
-    }
-}
+/*
+    #######################
+        Main Definition
+    #######################
+*/
 
 /// Semantic view onto the path model.
 ///
@@ -134,134 +108,200 @@ impl<'a, V: VCS> RW<'a, V> {
 /// - the type of node it points to ([SymbolicNodeType] parameter),
 /// - the VCS implementation ([VCS] parameter).
 #[derive(Debug)]
-pub struct StructureView<S, M>
+pub struct StructureView<'a, S, M, V>
 where
     S: SymbolicNodeType,
     M: AccessMode,
+    V: VCS,
 {
-    path: Vec<Rc<RefCell<NodeData<M::V>>>>,
-    mode: M,
-    _sym_marker: PhantomData<S>,
+    id: NodeId,
+    repo: &'a Repository<V>,
+    _mode_marker: PhantomData<M>,
+    _type_marker: PhantomData<S>,
 }
 
-/// Construction and transformation
-impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
-    pub(crate) fn new(
-        path: Vec<Rc<RefCell<NodeData<M::V>>>>,
-        mode: M,
-    ) -> Result<Self, SemanticViewError<M::V>> {
-        let new = Self {
-            path,
-            mode,
-            _sym_marker: PhantomData,
-        };
-        let new = new
-            .check_path_not_existent()?
-            .check_sym_type_compatibility()?;
-        Ok(new)
+impl<'a, S, M, V> StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
+    fn get_repo(&self) -> &Repository<V> {
+        self.repo
     }
 
-    pub fn try_convert_to<To: SymbolicNodeType>(
-        self,
-    ) -> Result<StructureView<To, M>, InvalidTypeError<M::V>> {
-        let new = StructureView {
-            path: self.path,
-            mode: self.mode,
-            _sym_marker: PhantomData,
-        };
-        let new = new.check_sym_type_compatibility()?;
-        Ok(new)
+    fn get_arena(&self) -> &Arena<RefCell<NodeData<V>>> {
+        self.get_repo().get_arena()
     }
 
-    pub fn convert_to_any_type(self) -> StructureView<AnyType<AnyC>, M> {
-        self.try_convert_to().unwrap()
+    fn iter_path(&self) -> impl Iterator<Item=NodeId> {
+        self.get_node_id().ancestors(self.get_arena())
     }
 
-    pub fn to_dynamic_view(&self) -> DynamicView<M::V> {
-        DynamicView::new(self.path.clone(), RevisionPointer::Head)
+    fn get_id_path(&self) -> Vec<NodeId> {
+        let mut v = self.iter_path().collect::<Vec<NodeId>>();
+        v.reverse();
+        v
     }
 
-    fn check_path_not_existent(self) -> Result<Self, PathDoesNotExistError<M::V>> {
+    fn get_node_path(&self) -> Vec<&Node<RefCell<NodeData<V>>>> {
+        self
+            .get_id_path()
+            .iter()
+            .map(|id| self.get_arena().get(*id).unwrap())
+            .collect()
+    }
+
+    fn get_root_id(&self) -> NodeId {
+        self.repo.get_root_id()
+    }
+
+    fn get_root_node(&self) -> &Node<RefCell<NodeData<V>>> {
+        self.repo.get_root_node()
+    }
+
+    fn path_to_static(&self) -> Vec<StaticNode> {
+        let mut path = self.iter_path().collect_vec();
+        path.reverse();
+        path
+            .iter()
+            .map(|id| {
+                let node = self.repo.get_node(*id).unwrap().get().borrow();
+                StaticNode::new(node.get_name().clone(), node.get_type().clone())
+            })
+            .collect()
+    }
+
+    fn check_path_not_existent(&self) -> Result<(), PathDoesNotExistError<V>> {
         if &self.get_real_type() == &NodeType::NonExistent {
-            let path = DynamicView::new(self.path.clone(), RevisionPointer::Head);
+            let path = FrozenView::new(self.path_to_static(), RevisionPointer::None);
             Err(PathDoesNotExistError::new(path))
         } else {
-            Ok(self)
+            Ok(())
         }
     }
 
-    fn check_sym_type_compatibility(self) -> Result<Self, InvalidTypeError<M::V>> {
+    fn check_sym_type_compatibility(&self) -> Result<(), InvalidTypeError<V>> {
         if !S::compatible().contains(&self.get_real_type()) {
             let real_type = self.get_real_type();
             Err(InvalidTypeError::new(
                 S::compatible(),
                 real_type,
-                self.to_dynamic_view(),
+                self.to_frozen_view(RevisionPointer::None),
             ))
         } else {
-            Ok(self)
+            Ok(())
         }
     }
-}
 
-/// Getters and setters
-impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
-    fn get_repo(&self) -> &Repository<M::V> {
-        self.mode.get_repo()
+    fn assert_lock(&self) {
+        let mut node = self.get_node().get().borrow_mut();
+        if node.is_structure_locked() {
+            drop(node);
+            panic!(
+                "Cannot create structure view for for '{}': node is locked",
+                self.to_normalized_path(),
+            )
+        }
+        if M::lock() {
+            if node.structure_views_referenced() > 0 {
+                let referenced = node.structure_views_referenced();
+                drop(node);
+                panic!(
+                    "Cannot lock node for structure view '{}': there are {referenced} other structure views referencing it",
+                    self.to_normalized_path(),
+                )
+            }
+            node.lock_structure();
+        }
+        node.reference_structure_view();
     }
 
-    fn get_root(&self) -> &Rc<RefCell<NodeData<M::V>>> {
-        self.path.first().unwrap()
+    pub(crate) fn new(
+        id: NodeId,
+        repo: &'a Repository<V>,
+    ) -> Result<Self, SemanticViewError<V>> {
+        let new = Self {
+            id,
+            repo,
+            _mode_marker: PhantomData,
+            _type_marker: PhantomData,
+        };
+        new.check_path_not_existent()?;
+        new.check_sym_type_compatibility()?;
+        new.assert_lock();
+        Ok(new)
     }
 
-    pub fn get_vcs(&self) -> &M::V {
+    pub(crate) fn get_node(&self) -> &Node<RefCell<NodeData<V>>> {
+        self.repo.get_node(self.get_node_id()).unwrap()
+    }
+
+    pub fn get_node_id(&self) -> NodeId {
+        self.id
+    }
+
+    pub fn get_real_type(&self) -> NodeType {
+        self.get_node().get().borrow().get_type().clone()
+    }
+
+    pub fn get_vcs(&self) -> &V {
         self.get_repo().get_vcs()
     }
 
-    pub fn has_children(&self) -> bool {
-        self.get_node().borrow().has_children()
+    pub fn try_convert_to<To: SymbolicNodeType>(
+        self,
+    ) -> Result<StructureView<'a, To, M, V>, InvalidTypeError<V>> {
+        let new = StructureView {
+            id: self.id,
+            repo: self.repo,
+            _mode_marker: PhantomData,
+            _type_marker: PhantomData,
+        };
+        new.check_sym_type_compatibility()?;
+        Ok(new)
     }
-}
 
-impl<'a, S: SymbolicNodeType, V: VCS> StructureView<S, RW<'a, V>> {
-    fn get_repo_mut(&mut self) -> &mut Repository<V> {
-        self.mode.get_repo_mut()
+    pub fn convert_to_any_type(self) -> StructureView<'a, AnyType<AnyC>, M, V> {
+        self.try_convert_to().unwrap()
     }
-}
 
-/// Iterators
-impl<'a, S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
-    pub fn iter_children(&self) -> impl Iterator<Item = StructureView<AnyType<AnyC>, M>> {
-        self.get_node()
-            .borrow()
-            .get_children()
-            .into_iter()
-            .map(|node| {
-                let mut path = self.path.clone();
-                path.push(node);
-                StructureView::new(path, self.mode).unwrap()
+    pub fn to_frozen_view(&self, revision: RevisionPointer<V>) -> FrozenView<V> {
+        FrozenView::new(self.path_to_static(), revision)
+    }
+
+    pub fn iter_children(
+        &self,
+        repo: &'a Repository<V>,
+    ) -> impl Iterator<Item = StructureView<'a, AnyType<AnyC>, Shared, V>> {
+        let id = self.get_node_id();
+        id
+            .children(self.get_repo().get_arena())
+            .map(|child| {
+                StructureView::new(child, repo).unwrap()
             })
-            .sorted()
     }
 
-    pub fn iter_children_req(&self) -> impl Iterator<Item = StructureView<AnyType<AnyC>, M>> {
-        self
-            .iter_children()
-            .flat_map(|v| {
-                v.iter_children_req().collect::<Vec<_>>()
+    pub fn iter_children_req(
+        &self,
+        repo: &'a Repository<V>,
+    ) -> impl Iterator<Item = StructureView<AnyType<AnyC>, Shared, V>> {
+        let id = self.get_node_id();
+        id
+            .descendants(self.get_repo().get_arena())
+            .map(|child| {
+                StructureView::new(child, repo).unwrap()
             })
     }
-}
 
-/// Path pointer movement
-impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
-    /// Moves path to a specific index of the node vector.
+    /// Moves path to a specific index on the node vector.
     pub fn move_to_index<To: SymbolicNodeType>(
         self,
         index: usize,
-    ) -> Result<StructureView<To, M>, SemanticViewError<M::V>> {
-        let path = self.path[0..index + 1].to_vec();
-        Ok(StructureView::<To, M>::new(path, self.mode)?)
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
+        let path = self.get_id_path();
+        Ok(StructureView::<To, M, V>::new(path[index], repo)?)
     }
 
     /// Move path to another node.
@@ -277,92 +317,244 @@ impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
     pub fn move_to<To: SymbolicNodeType>(
         self,
         path: &impl ToNormalizedPath,
-    ) -> Result<StructureView<To, M>, SemanticViewError<M::V>> {
-        let path = path.to_normalized_path();
-        let mut new_node_vec = vec![self.get_root().clone()];
-        for p in path.iter_segments(1, path.len()) {
-            let current = new_node_vec.last().unwrap();
-            let node = if let Some(node) = current.borrow().get_child(p) {
-                node
-            } else {
-                Rc::new(RefCell::new(NodeData::new(
-                    p.clone(),
-                    NodeType::NonExistent,
-                    None,
-                )))
-            };
-            new_node_vec.push(node);
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
+        fn make_error_node(name: String) -> StaticNode {
+            StaticNode::new(
+                name,
+                NodeType::NonExistent,
+            )
         }
-        StructureView::new(new_node_vec, self.mode)
+
+        // set path to absolute from root
+        let path = self.to_normalized_path() + path.to_normalized_path();
+        let root = self.get_root_id();
+        let mut current = Some(root);
+        let mut id_vec: Vec<NodeId> = vec![root];
+        let mut error_nodes: Vec<StaticNode> = vec![];
+        // iter path
+        for p in path.iter_segments(1, path.len()) {
+            match current {
+                Some(id) => {
+                    let borrowed = repo.get_node(id).unwrap().get().borrow();
+                    match borrowed.get_child(p) {
+                        Some(child) => {
+                            id_vec.push(*child);
+                            current = Some(*child);
+                        }
+                        None => {
+                            error_nodes.push(make_error_node(p.clone()));
+                            current = None;
+                        }
+                    }
+                }
+                None => {
+                    error_nodes.push(make_error_node(p.clone()));
+                }
+            }
+        }
+        if let Some(current) = current {
+            StructureView::new(current, repo)
+        } else {
+            let mut nodes = id_vec
+                .iter()
+                .map(|id| {
+                    let node = self.repo.get_node(*id).unwrap().get().borrow();
+                    StaticNode::new(
+                        node.get_name().clone(),
+                        node.get_type().clone(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            nodes.extend(error_nodes);
+            Err(PathDoesNotExistError::new(FrozenView::new(nodes, RevisionPointer::None)).into())
+        }
     }
 
     fn move_to_guaranteed_type<To: SymbolicNodeType>(
         self,
         path: &impl ToNormalizedPath,
-    ) -> Result<StructureView<To, M>, PathDoesNotExistError<M::V>> {
-        match self.move_to::<To>(path) {
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, To, M, V>, PathDoesNotExistError<V>> {
+        match self.move_to::<To>(path, repo) {
             Ok(v) => Ok(v),
             Err(SemanticViewError::PathDoesNotExist(e)) => Err(e),
             _ => unreachable!(),
         }
     }
-}
 
-/// Display and pretty printing
-impl<S: SymbolicNodeType, M: AccessMode> StructureView<S, M> {
-    // pub fn display_tree(&self, show_tags: bool) -> String {
-    //     self.get_node().borrow().display_tree(show_tags)
-    // }
-
-    pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
-        self.to_dynamic_view()
-            .formatted(show_type, show_version, colored)
+    pub fn formatted(&self, show_type: bool, colored: bool) -> String {
+        self.to_frozen_view(RevisionPointer::None)
+            .formatted(show_type, false, colored)
     }
 }
 
-impl<S: SymbolicNodeType, M: AccessMode> NodeHolder<M::V> for StructureView<S, M> {
-    fn get_node(&self) -> &Rc<RefCell<NodeData<M::V>>> {
-        &self.path.last().unwrap()
+impl<'a, S, V> StructureView<'a, S, Shared, V>
+where
+    S: SymbolicNodeType,
+    V: VCS,
+{
+    pub fn clone(&self, repo: &'a Repository<V>) -> Self {
+        Self::new(self.id, repo).unwrap()
     }
 }
 
-impl<'a, T: SymbolicNodeType, M: AccessMode> ToNormalizedPath for StructureView<T, M> {
+/*
+    #######################################
+        Important trait implementations
+    #######################################
+*/
+
+impl<'a, S, M, V> ToNormalizedPath for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
     fn to_normalized_path(&self) -> NormalizedPath {
-        self.path.to_normalized_path()
+        self.get_node_path().to_normalized_path()
     }
 }
 
-impl<S: SymbolicNodeType, M: AccessMode> PartialEq for StructureView<S, M> {
+impl<'a, S, M, V> PartialEq for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
     fn eq(&self, other: &Self) -> bool {
         self.to_normalized_path() == other.to_normalized_path()
     }
 }
 
-impl<S: SymbolicNodeType, M: AccessMode> Eq for StructureView<S, M> {}
+impl<'a, S, M, V> Eq for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{}
 
-impl<S: SymbolicNodeType, M: AccessMode> PartialOrd for StructureView<S, M> {
+impl<'a, S, M, V> PartialOrd for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.to_normalized_path().partial_cmp(&other.to_normalized_path())
     }
 }
 
-impl<S: SymbolicNodeType, M: AccessMode> Ord for StructureView<S, M> {
+impl<'a, S, M, V> Ord for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(&other).unwrap()
     }
 }
 
-/// Reachability for virtual root
-impl<M: AccessMode> StructureView<VirtualRoot, M> {
-    pub fn move_to_area<C: NodeClassification>(
-        self,
-        area: &impl ToNormalizedPath,
-    ) -> Result<StructureView<Area<C>, M>, SemanticViewError<M::V>> {
-        self.move_to(area)
+impl<'a, S, M, V> Drop for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
+    fn drop(&mut self) {
+        let mut node = self.get_node().get().borrow_mut();
+        if M::lock() {
+            node.unlock_structure()
+        }
+        node.dereference_structure_view()
     }
 }
 
-impl<C: NodeClassification, M: AccessMode> StructureView<Area<C>, M> {
+/*
+    ############################
+    # Specific Implementations #
+    ############################
+*/
+
+impl<'a, S, M, V> StructureView<'a, S, M, V>
+where
+    S: IsConcrete,
+    M: AccessMode,
+    V: VCS,
+{
+    pub fn get_vcs_id(&self) -> usize {
+        self.get_node().get().borrow().get_branch_info().unwrap().get_id()
+    }
+}
+
+impl<'a, S, V> StructureView<'a, S, Shared, V>
+where
+    S: IsConcrete,
+    V: VCS,
+{
+    pub fn lock(self) -> StructureView<'a, S, Locked, V> {
+        let id = self.id;
+        let repo = self.repo;
+        drop(self);
+        StructureView::new(id, repo).unwrap()
+    }
+    
+    pub fn to_head_rev(self) -> RevisionView<'a, S, Head, M, V> {
+        RevisionView::<'a, S, Head, V>::new(self)
+    }
+
+    pub fn to_rev(
+        self,
+        revision: impl Into<String>,
+    ) -> Result<RevisionView<'a, S, Rev, M, V>, RevisionError<V, V::VCSError>> {
+        RevisionView::<'a, S, Rev, V>::new(self, revision)
+    }
+}
+
+impl<'a, S, V> StructureView<'a, S, Locked, V>
+where
+    S: IsConcrete,
+    V: VCS,
+{
+    pub fn unlock(self) -> StructureView<'a, S, Shared, V> {
+        let id = self.id;
+        let repo = self.repo;
+        drop(self);
+        StructureView::new(id, repo).unwrap()
+    }
+}
+
+impl<'a, T, M, V> StructureView<'a, T, M, V>
+where
+    T: UnderArea,
+    M: AccessMode,
+    V: VCS,
+{
+    pub fn move_to_area<C: NodeClassification>(
+        self,
+        repo: &'a Repository<V>,
+    ) -> StructureView<'a, Area<C>, M, V> {
+        self.move_to_index(1, repo).unwrap()
+    }
+}
+
+impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
+    pub fn move_to_area<C: NodeClassification>(
+        self,
+        area: &impl ToNormalizedPath,
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, Area<C>, M, V>, SemanticViewError<V>> {
+        self.move_to(area, repo)
+    }
+}
+
+impl<'a, C, M, V> StructureView<'a, Area<C>, M, V>
+where
+    C: NodeClassification,
+    M: AccessMode,
+    V: VCS,
+{
     pub fn get_path_to_feature_root(&self) -> NormalizedPath {
         self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
     }
@@ -373,74 +565,34 @@ impl<C: NodeClassification, M: AccessMode> StructureView<Area<C>, M> {
 
     pub fn move_to_feature_root(
         self,
-    ) -> Result<StructureView<FeatureRoot, M>, PathDoesNotExistError<M::V>> {
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, FeatureRoot, M, V>, PathDoesNotExistError<V>> {
         let path = self.get_path_to_feature_root().to_normalized_path();
-        self.move_to_guaranteed_type(&path)
+        self.move_to_guaranteed_type(&path, repo)
     }
 
     pub fn move_to_product_root(
         self,
-    ) -> Result<StructureView<ProductRoot, M>, PathDoesNotExistError<M::V>> {
+        repo: &'a Repository<V>,
+    ) -> Result<StructureView<'a, ProductRoot, M, V>, PathDoesNotExistError<V>> {
         let path = self.get_path_to_feature_root().to_normalized_path();
-        self.move_to_guaranteed_type(&path)
+        self.move_to_guaranteed_type(&path, repo)
     }
 }
 
-impl<S: IsConcrete, M: AccessMode> StructureView<S, M> {
-    pub fn get_id(&self) -> usize {
-        self.get_node().borrow().get_branch_info().unwrap().get_id()
-    }
+/*
+    ##########################
+    # Filter implementations #
+    ##########################
+*/
 
-    pub fn assert_revision(
-        &self,
-        revision: impl Into<String>,
-    ) -> Result<<M::V as VCS>::VersionId, RevisionError<M::V, <M::V as VCS>::VCSError>> {
-        let rev = revision.into();
-        let vcs = self.get_vcs();
-        if vcs
-            .revision_exists_on_path(&self.to_normalized_path(), &rev)?
-        {
-            let revision = vcs.get_revision(&rev)?.unwrap();
-            self.get_node()
-                .borrow_mut()
-                .mut_get_branch_info()
-                .unwrap()
-                .add_known_version(revision.clone());
-            Ok(revision)
-        } else {
-            Err(self.to_dynamic_view().into())
-        }
-    }
-
-    pub fn to_head_rev(self) -> RevisionView<'a, S, Head, V> {
-        RevisionView::<'a, S, Head, V>::new(self)
-    }
-
-    pub fn to_rev(
-        self,
-        revision: impl Into<String>,
-    ) -> Result<RevisionView<'a, S, Rev, V>, RevisionError<V::VCS, V::VCSError>>
-    {
-        RevisionView::<'a, S, Rev, V>::new(self, revision)
-    }
-}
-
-impl<T: UnderArea, M: AccessMode> StructureView<T, M> {
-    pub fn move_to_area<C: NodeClassification>(
-        self,
-    ) -> StructureView<Area<C>, M> {
-        self.move_to_index(1).unwrap()
-    }
-}
-
-pub struct FilterByType<T: SymbolicNodeType> {
-    _marker: PhantomData<T>,
-}
+pub struct FilterByType<T: SymbolicNodeType>(PhantomData<T>);
 
 impl<T: SymbolicNodeType> FilterByType<T> {
-    pub fn filter<S, V>(view: StructureView<S, V>) -> Option<StructureView<T, V>>
+    pub fn filter<S, M, V>(view: StructureView<S, M, V>) -> Option<StructureView<T, M, V>>
     where
         S: SymbolicNodeType,
+        M: AccessMode,
         V: VCS
     {
         match view.try_convert_to::<T>() {

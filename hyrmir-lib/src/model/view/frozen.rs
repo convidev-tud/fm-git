@@ -1,32 +1,58 @@
 use crate::model::*;
 use crate::vcs::{VersionId, VCS};
 use colored::Colorize;
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::rc::Rc;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum RevisionPointer<V: VCS> {
-    Head,
+    None,
+    Head(V::VersionId),
     Revision(V::VersionId),
+    Invalid(String),
 }
 
-/// A dynamic view onto the model without static guarantees.
 #[derive(Clone, Debug)]
-pub struct DynamicView<V: VCS> {
-    path: Vec<Rc<RefCell<NodeData<V>>>>,
+pub struct StaticNode {
+    name: String,
+    node_type: NodeType,
+}
+
+impl StaticNode {
+    pub fn new(name: String, node_type: NodeType) -> Self {
+        Self { name, node_type }
+    }
+    
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+}
+
+impl ToNormalizedPath for Vec<StaticNode> {
+    fn to_normalized_path(&self) -> NormalizedPath {
+        let mut path = NormalizedPath::new();
+        for node in self {
+            path.push(node.name.clone());
+        };
+        path
+    }
+}
+
+/// A static, decoupled view onto the model, meant for long-term storage.
+/// Does not react to changes in the source tree.
+#[derive(Clone, Debug)]
+pub struct FrozenView<V: VCS> {
+    path: Vec<StaticNode>,
     version: RevisionPointer<V>,
 }
 
-impl<V: VCS> DynamicView<V> {
-    pub(crate) fn new(path: Vec<Rc<RefCell<NodeData<V>>>>, version: RevisionPointer<V>) -> Self {
+impl<V: VCS> FrozenView<V> {
+    pub(crate) fn new(
+        path: Vec<StaticNode>,
+        version: RevisionPointer<V>,
+    ) -> Self {
         Self { path, version }
-    }
-    
-    pub(crate) fn get_path(&self) -> &Vec<Rc<RefCell<NodeData<V>>>> {
-        &self.path
     }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
@@ -41,7 +67,7 @@ impl<V: VCS> DynamicView<V> {
         if show_version {
             if let Some(branch_info) = self.get_node().borrow().get_branch_info() {
                 let version = match &self.version {
-                    RevisionPointer::Head => {
+                    RevisionPointer::None => {
                         let head = branch_info.get_head();
                         format!("({})", head.get_printable_id()).yellow()
                     }
@@ -63,17 +89,11 @@ impl<V: VCS> DynamicView<V> {
     }
 }
 
-impl<V: VCS> NodeHolder<V> for DynamicView<V> {
-    fn get_node(&self) -> &Rc<RefCell<NodeData<V>>> {
-        &self.path.last().unwrap()
-    }
-}
-
-impl<V: VCS> Normalize for DynamicView<V> {
+impl<V: VCS> Normalize for FrozenView<V> {
     fn normalize(&self) -> Normalized {
         let path = self.path.to_normalized_path();
         let revision = match &self.version {
-            RevisionPointer::Head => NormalizedRevision::Head,
+            RevisionPointer::None => NormalizedRevision::Head,
             RevisionPointer::Revision(version) => {
                 NormalizedRevision::Revision(version.get_full_id())
             }
@@ -82,33 +102,33 @@ impl<V: VCS> Normalize for DynamicView<V> {
     }
 }
 
-impl<V: VCS> Eq for DynamicView<V> {}
+impl<V: VCS> Eq for FrozenView<V> {}
 
-impl<V: VCS> Hash for DynamicView<V> {
+impl<V: VCS> Hash for FrozenView<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.normalize().hash(state);
     }
 }
 
-impl<V: VCS> PartialEq for DynamicView<V> {
-    fn eq(&self, other: &DynamicView<V>) -> bool {
+impl<V: VCS> PartialEq for FrozenView<V> {
+    fn eq(&self, other: &FrozenView<V>) -> bool {
         self.normalize() == other.normalize()
     }
 }
 
-impl<V: VCS> Display for DynamicView<V> {
+impl<V: VCS> Display for FrozenView<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.normalize().to_string().as_str())
     }
 }
 
-impl<V: VCS> PartialOrd for DynamicView<V> {
+impl<V: VCS> PartialOrd for FrozenView<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.normalize().partial_cmp(&other.normalize())
     }
 }
 
-impl<V: VCS> Ord for DynamicView<V> {
+impl<V: VCS> Ord for FrozenView<V> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(&other).unwrap()
     }

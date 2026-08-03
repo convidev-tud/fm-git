@@ -1,4 +1,3 @@
-use crate::model::*;
 use crate::vcs::{VersionId, VCS};
 use colored::{ColoredString, Colorize};
 use std::collections::HashMap;
@@ -197,7 +196,10 @@ pub struct NodeData<V: VCS> {
     node_type: NodeType,
     branch_info: Option<BranchInfo<V>>,
     children: HashMap<String, NodeId>,
-    lock: bool,
+    structure_lock: bool,
+    revision_lock: bool,
+    structure_views_referenced: usize,
+    revision_views_referenced: usize,
 }
 
 impl<V: VCS> NodeData<V> {
@@ -211,8 +213,15 @@ impl<V: VCS> NodeData<V> {
             node_type,
             branch_info,
             children: HashMap::new(),
-            lock: false,
+            structure_lock: false,
+            revision_lock: false,
+            structure_views_referenced: 0,
+            revision_views_referenced: 0,
         }
+    }
+
+    pub(crate) fn update_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
     }
 
     pub(crate) fn update_type(&mut self, node_type: NodeType) {
@@ -237,19 +246,53 @@ impl<V: VCS> NodeData<V> {
     ) {
         self.children.remove(name);
     }
-    
 
-    pub(crate) fn try_lock(&mut self) -> Result<(), NodeLockError> {
-        if !self.lock {
-            self.lock = true;
-            Ok(())
-        } else {
-            Err(NodeLockError)
-        }
+    pub(crate) fn is_structure_locked(&self) -> bool {
+        self.structure_lock
     }
 
-    pub(crate) fn unlock(&mut self) {
-        self.lock = false;
+    pub(crate) fn lock_structure(&mut self) {
+        self.structure_lock = true;
+    }
+
+    pub(crate) fn unlock_structure(&mut self) {
+        self.structure_lock = false;
+    }
+
+    pub(crate) fn is_revision_locked(&self) -> bool {
+        self.revision_lock
+    }
+
+    pub(crate) fn lock_revision(&mut self) {
+        self.revision_lock = true;
+    }
+
+    pub(crate) fn unlock_revision(&mut self) {
+        self.revision_lock = false;
+    }
+
+    pub(crate) fn structure_views_referenced(&self) -> usize {
+        self.structure_views_referenced
+    }
+
+    pub(crate) fn revision_views_referenced(&self) -> usize {
+        self.revision_views_referenced
+    }
+
+    pub(crate) fn reference_structure_view(&mut self) {
+        self.structure_views_referenced += 1
+    }
+
+    pub(crate) fn reference_revision_view(&mut self) {
+        self.revision_views_referenced += 1
+    }
+
+    pub(crate) fn dereference_structure_view(&mut self) {
+        self.structure_views_referenced -= 1
+    }
+
+    pub(crate) fn dereference_revision_view(&mut self) {
+        self.revision_views_referenced -= 1
     }
 
     fn decide_child_type(

@@ -1,6 +1,6 @@
 use crate::completion::CompletionHelper;
 use crate::{CommandContext, CommandDefinition, CommandInterface, CommandLogger};
-use clap::{Arg, Command};
+use clap::{Arg, Command, ValueHint};
 use colored::Colorize;
 use hyrmir_lib::model::*;
 use hyrmir_lib::repository::RepositoryLoader;
@@ -113,7 +113,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
                 .get_semantic_view()
                 .to_normalized_path(),
         };
-        let root = repo.get_virtual_root_view();
+        let root = repo.root_view();
         let all_branches = root
             .iter_children_req()
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)

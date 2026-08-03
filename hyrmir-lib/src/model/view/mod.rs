@@ -1,30 +1,49 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 mod revision;
 mod structure;
-mod dynamic;
+mod frozen;
 
-use crate::model::*;
-use crate::vcs::{VersionId, VCS};
-pub use dynamic::*;
+use std::cell::RefCell;
+use std::fmt::Debug;
+use indextree::Node;
+pub use frozen::*;
 pub use revision::*;
 pub use structure::*;
+use crate::model::{NodeData, NormalizedPath, ToNormalizedPath};
+use crate::vcs::VCS;
+/*
+    ####################
+        Access Modes
+    ####################
+*/
 
-impl<V: VCS> ToNormalizedPath for Vec<Rc<RefCell<NodeData<V>>>> {
-    fn to_normalized_path(&self) -> NormalizedPath {
-        let mut path = NormalizedPath::new();
-        for p in self.iter() {
-            path.push(p.borrow().get_name());
-        }
-        path
+pub trait AccessMode: Debug {
+    fn lock() -> bool;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Shared;
+
+impl AccessMode for Shared {
+    fn lock() -> bool {
+        true
     }
 }
 
-pub trait NodeHolder<V: VCS> {
-    fn get_node(&self) -> &Rc<RefCell<NodeData<V>>>;
+#[derive(Debug)]
+pub struct Locked;
 
-    fn get_real_type(&self) -> NodeType {
-        self.get_node().borrow().get_type().clone()
+impl AccessMode for Locked {
+    fn lock() -> bool {
+        false
+    }
+}
+
+impl<V: VCS> ToNormalizedPath for Vec<&Node<RefCell<NodeData<V>>>> {
+    fn to_normalized_path(&self) -> NormalizedPath {
+        let mut path = NormalizedPath::new();
+        for p in self.iter() {
+            path.push(p.get().borrow().get_name());
+        }
+        path
     }
 }

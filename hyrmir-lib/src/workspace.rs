@@ -46,12 +46,12 @@ impl<'a, S: IsConcrete, V: VCS> WorkspaceKind<'a, S, V> {
 
 #[derive(Debug)]
 pub struct Workspace<'a, S: IsConcrete, R: RevPointer, V: VCS> {
-    current_view: RevisionView<'a, S, R, V>,
+    current_view: RevisionView<'a, S, Shared, V>,
     path: PathBuf,
 }
 
 /// Base implementation
-impl<'a, S, R, V> Workspace<'a, S, R, V>
+impl<'a, S, R, V> Workspace<'a, S, Shared, V>
 where
     S: IsConcrete,
     R: RevPointer,
@@ -63,21 +63,21 @@ where
 }
 
 /// VCS commands
-impl<'a, S, R, V> Workspace<'a, S, R, V>
+impl<'a, S, R, V> Workspace<'a, S, Shared, V>
 where
     S: IsConcrete,
     R: RevPointer,
     V: VCS,
 {
-    pub fn get_current_view(&self) -> &RevisionView<'a, S, R, V> {
+    pub fn get_current_view(&self) -> &RevisionView<'a, S, Shared, V> {
         &self.current_view
     }
 
     pub fn get_vcs(&self) -> &V {
-        &self.get_current_view().get_semantic_view().get_vcs()
+        &self.get_current_view().get_structure_view().get_vcs()
     }
 
-    pub fn mut_get_current_view(&mut self) -> &mut RevisionView<'a, S, R, V> {
+    pub fn mut_get_current_view(&mut self) -> &mut RevisionView<'a, S, Shared, V> {
         &mut self.current_view
     }
 
@@ -101,7 +101,7 @@ where
         self,
         view: RevisionView<'a, T, P, V>,
     ) -> Result<Workspace<'a, T, P, V>, V::VCSError> {
-        let semantic = view.get_semantic_view();
+        let semantic = view.get_structure_view();
         let id = semantic.get_id();
         self.get_vcs().switch_to_branch(id, semantic, &self.path)?;
         let new = Workspace {
