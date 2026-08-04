@@ -130,12 +130,12 @@ where
         self.get_repo().get_arena()
     }
 
-    fn iter_path(&self) -> impl Iterator<Item = NodeId> {
+    fn iter_path_towards_root(&self) -> impl Iterator<Item = NodeId> {
         self.get_node_id().ancestors(self.get_arena())
     }
 
     fn get_id_path(&self) -> Vec<NodeId> {
-        let mut v = self.iter_path().collect::<Vec<NodeId>>();
+        let mut v = self.iter_path_towards_root().collect::<Vec<NodeId>>();
         v.reverse();
         v
     }
@@ -156,7 +156,7 @@ where
     }
 
     fn path_to_frozen(&self) -> Vec<FrozenNode> {
-        let mut path = self.iter_path().collect_vec();
+        let mut path = self.iter_path_towards_root().collect_vec();
         path.reverse();
         path.iter()
             .map(|id| {
@@ -305,7 +305,7 @@ where
     /// ```
     pub fn move_to<To: SymbolicNodeType>(
         self,
-        path: &impl ToNormalizedPath,
+        path: impl ToNormalizedPath,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
         fn make_error_node(name: String) -> FrozenNode {
@@ -356,7 +356,7 @@ where
 
     fn move_to_guaranteed_type<To: SymbolicNodeType>(
         self,
-        path: &impl ToNormalizedPath,
+        path: impl ToNormalizedPath,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, PathDoesNotExistError<V>> {
         match self.move_to::<To>(path, repo) {
@@ -392,14 +392,19 @@ where
     ###################################
 */
 
-impl<'a, S, M, V> ToNormalizedPath for StructureView<'a, S, M, V>
+impl<'a, S, M, V> Display for StructureView<'a, S, M, V>
 where
     S: SymbolicNodeType,
     M: AccessMode,
     V: VCS,
 {
-    fn to_normalized_path(&self) -> NormalizedPath {
-        self.get_node_path().to_normalized_path()
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let output = self
+            .get_node_path()
+            .iter()
+            .map(|node| node.get().borrow().get_name().clone())
+            .join("/");
+        f.write_str(&output)
     }
 }
 
@@ -536,7 +541,7 @@ where
 impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
-        area: &impl ToNormalizedPath,
+        area: impl ToNormalizedPath,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, Area<C>, M, V>, SemanticViewError<V>> {
         self.move_to(area, repo)

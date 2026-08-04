@@ -104,9 +104,11 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             .iter_children_req(repo)
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)
             .map(|p| p.to_normalized_path());
-        let strategy = NameSearchPathCompleter::new(current);
         let result = match maybe_editing.unwrap().get_id().as_str() {
-            PATH => completion_helper.complete_normalized_paths(&strategy, all_branches),
+            PATH => {
+                let strategy = DelegatingPathCompleter::new(current);
+                completion_helper.complete_normalized_paths(&strategy, all_branches)
+            },
             _ => vec![],
         };
         Ok(result)

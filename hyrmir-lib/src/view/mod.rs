@@ -38,13 +38,3 @@ impl AccessMode for Locked {
         true
     }
 }
-
-impl<V: VCS> ToNormalizedPath for Vec<&Node<RefCell<NodeData<V>>>> {
-    fn to_normalized_path(&self) -> NormalizedPath {
-        let mut path = NormalizedPath::new();
-        for p in self.iter() {
-            path.push(p.get().borrow().get_name());
-        }
-        path
-    }
-}
