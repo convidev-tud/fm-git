@@ -6,11 +6,8 @@ pub struct DelegatingPathCompleter {
 }
 
 impl DelegatingPathCompleter {
-    pub fn new(reference_path: NormalizedPath) -> Self {
-        if reference_path.is_empty() {
-            panic!("Reference path must not be empty")
-        }
-        Self { reference_path }
+    pub fn new(reference_path: impl ToNormalizedPath) -> Self {
+        Self { reference_path: reference_path.to_normalized_path() }
     }
 }
 

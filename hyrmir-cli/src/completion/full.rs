@@ -49,7 +49,6 @@ impl NormalizedPathCompleter for FullRelativePathCompleter {
         let filtered: Vec<NormalizedPath> = self
             .transform_and_filter_path(&prefix, paths)
             .collect();
-        println!("{:?}", filtered);
         match filtered.len() {
             0 => vec![],
             1 => vec![filtered[0].to_string()],
