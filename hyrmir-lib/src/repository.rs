@@ -16,7 +16,7 @@ pub enum MalformedModelVCSError<VE: VCSError> {
     VCS(#[from] VE),
 }
 
-type ScanError<VE: VCSError> = MalformedModelVCSError<VE>;
+type ScanError<VE> = MalformedModelVCSError<VE>;
 
 pub struct RepositoryLoader<V: VCS> {
     repository: Repository<V>,
@@ -182,5 +182,17 @@ impl<V: VCS> Repository<V> {
         path: PathBuf,
     ) -> Result<Workspace<'_, S, Rev, Shared, V>, GetWorkSpaceError<V, V::VCSError>> {
         Workspace::new(path, self)
+    }
+}
+
+#[cfg(test)]
+pub mod test_utils {
+    use crate::vcs::test_utils::TestVCS;
+    use super::*;
+    
+    pub fn prepare_repo() -> Repository<TestVCS> {
+        let mut repo = Repository::new(TestVCS::new());
+        repo.scan_repository().unwrap();
+        repo
     }
 }

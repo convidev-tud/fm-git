@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use crate::model::*;
 use crate::repository::Repository;
 use crate::vcs::VCS;
@@ -190,6 +191,7 @@ where
 
     fn assert_lock(&self) {
         let mut node = self.get_node().get().borrow_mut();
+        node.reference_structure_view();
         if node.is_structure_locked() {
             drop(node);
             panic!(
@@ -198,8 +200,8 @@ where
             )
         }
         if M::lock() {
-            if node.structure_views_referenced() > 0 {
-                let referenced = node.structure_views_referenced();
+            if node.structure_views_referenced() - 1 > 0 {
+                let referenced = node.structure_views_referenced() - 1;
                 drop(node);
                 panic!(
                     "Cannot lock node for structure view '{}': there are {referenced} other structure views referencing it",
@@ -208,7 +210,6 @@ where
             }
             node.lock_structure();
         }
-        node.reference_structure_view();
     }
 
     pub(crate) fn new(id: NodeId, repo: &'a Repository<V>) -> Result<Self, SemanticViewError<V>> {
@@ -218,9 +219,9 @@ where
             _access_mode: PhantomData,
             _type_marker: PhantomData,
         };
+        new.assert_lock();
         new.check_path_not_existent()?;
         new.check_sym_type_compatibility()?;
-        new.assert_lock();
         Ok(new)
     }
 
@@ -280,6 +281,7 @@ where
     ) -> impl Iterator<Item = StructureView<AnyType<AnyC>, Shared, V>> {
         let id = self.get_node_id();
         id.descendants(self.get_repo().get_arena())
+            .skip(1)
             .map(|child| StructureView::new(child, repo).unwrap())
     }
 
@@ -419,13 +421,24 @@ where
     }
 }
 
+impl<'a, S, M, V, T> PartialEq<T> for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+    T: Borrow<str>
+{
+    fn eq(&self, other: &T) -> bool {
+        self.to_normalized_path() == other.borrow()
+    }
+}
+
 impl<'a, S, M, V> Eq for StructureView<'a, S, M, V>
 where
     S: SymbolicNodeType,
     M: AccessMode,
     V: VCS,
-{
-}
+{}
 
 impl<'a, S, M, V> PartialOrd for StructureView<'a, S, M, V>
 where
@@ -465,11 +478,9 @@ where
     }
 }
 
-/*
-    ############################
-    # Specific Implementations #
-    ############################
-*/
+// ############################
+// # Specific Implementations #
+// ############################
 
 impl<'a, S, M, V> StructureView<'a, S, M, V>
 where
@@ -579,11 +590,9 @@ where
     }
 }
 
-/*
-    ############################
-    # Transformers and Filters #
-    ############################
-*/
+// ############################
+// # Transformers and Filters #
+// ############################
 
 pub struct FilterByType<T: SymbolicNodeType>(PhantomData<T>);
 
@@ -598,5 +607,121 @@ impl<T: SymbolicNodeType> FilterByType<T> {
             Ok(view) => Some(view),
             Err(_) => None,
         }
+    }
+}
+
+
+// #########
+// # Tests #
+// #########
+
+
+#[cfg(test)]
+mod tests {
+    use crate::repository::test_utils::prepare_repo;
+    use super::*;
+
+    #[test]
+    fn test_structure_view_move_without_errors() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let feature = root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo).unwrap();
+        assert_eq!(feature, "/main/feature/foo");
+    }
+
+    #[test]
+    fn test_structure_view_move_wrong_path() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        match root.move_to::<Feature<Concrete>>("/main/nothing", &repo) {
+            Err(error) => {
+                match error {
+                    SemanticViewError::PathDoesNotExist(error) => {
+                        assert_eq!(error.path, "/main/nothing")
+                    }
+                    _ => panic!("Wrong error variant!"),
+                }
+            }
+            Ok(_) => panic!("Should have returned an error"),
+        }
+    }
+
+    #[test]
+    fn test_structure_view_move_wrong_type() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        match root.move_to::<Product<Concrete>>("/main/feature/foo", &repo) {
+            Err(error) => {
+                match error {
+                    SemanticViewError::InvalidType(error) => {
+                        assert_eq!(error.path, "/main/feature/foo")
+                    }
+                    _ => panic!("Wrong error variant!"),
+                }
+            }
+            Ok(_) => panic!("Should have returned an error"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot create structure view for '/main/feature/foo': node is locked")]
+    fn test_structure_view_lock_and_create_second() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let view = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        let _locked = view.lock();
+        root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot lock node for structure view '/main/feature/foo': there are 1 other structure views referencing it")]
+    fn test_structure_view_lock_while_other_exists() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let _view = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        let _view2 = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .lock();
+    }
+
+    #[test]
+    fn test_structure_view_iterate_children() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let children = root
+            .iter_children(&repo)
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            children,
+            vec!["/main"],
+        )
+    }
+
+    #[test]
+    fn test_structure_view_iterate_children_req() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let children = root
+            .iter_children_req(&repo)
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            children,
+            vec![
+                "/main",
+                "/main/feature",
+                "/main/feature/foo",
+                "/main/feature/bar",
+            ]
+        )
     }
 }

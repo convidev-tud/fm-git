@@ -44,11 +44,13 @@ pub struct CommitHash {
     hash: String,
 }
 
-impl RevisionId for CommitHash {
+impl CommitHash {
     fn new(id: impl Into<String>) -> Self {
         Self { hash: id.into() }
     }
+}
 
+impl RevisionId for CommitHash {
     fn get_full_id(&self) -> String {
         self.hash.clone()
     }
@@ -108,18 +110,22 @@ impl GitCLI {
     pub fn in_current_directory() -> Self {
         Self::new(GitPath::CurrentDirectory)
     }
+    
     pub fn in_custom_directory(path: PathBuf) -> Self {
         Self::new(GitPath::CustomDirectory(path))
     }
+    
     pub fn new(path: GitPath) -> Self {
         Self {
             path,
             colored: false,
         }
     }
+    
     pub fn colored(&mut self, colored: bool) {
         self.colored = colored;
     }
+    
     pub fn prepare_command(&self, args: &Vec<&str>) -> Vec<String> {
         let mut arguments: Vec<String> = vec![];
         match self.path {
@@ -136,11 +142,13 @@ impl GitCLI {
         arguments.extend(args.into_iter().map(|arg| arg.to_string()));
         arguments
     }
+    
     pub fn run_attached(&self, args: &Vec<&str>) -> io::Result<Output> {
         let mut base = Command::new("git");
         let arguments = self.prepare_command(args);
         base.args(arguments).output()
     }
+    
     pub fn run_detached(&self, args: &Vec<&str>) -> io::Result<ExitStatus> {
         let mut base = Command::new("git");
         let arguments = self.prepare_command(args);

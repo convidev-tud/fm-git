@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use crate::model::*;
 use crate::vcs::{VCS, RevisionId};
 use colored::{ColoredString, Colorize};
@@ -107,17 +108,23 @@ impl<V: VCS> Normalize for FrozenView<V> {
     }
 }
 
+impl<V: VCS> PartialEq for FrozenView<V> {
+    fn eq(&self, other: &FrozenView<V>) -> bool {
+        Normalize::normalize(self) == Normalize::normalize(other)
+    }
+}
+
+impl<V: VCS, T: Borrow<str>> PartialEq<T> for FrozenView<V> {
+    fn eq(&self, other: &T) -> bool {
+        Normalize::normalize(self).to_string() == other.borrow()
+    }
+}
+
 impl<V: VCS> Eq for FrozenView<V> {}
 
 impl<V: VCS> Hash for FrozenView<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Normalize::normalize(self).hash(state);
-    }
-}
-
-impl<V: VCS> PartialEq for FrozenView<V> {
-    fn eq(&self, other: &FrozenView<V>) -> bool {
-        Normalize::normalize(self) == Normalize::normalize(other)
     }
 }
 
