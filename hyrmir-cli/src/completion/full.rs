@@ -9,9 +9,6 @@ pub struct FullRelativePathCompleter {
 impl FullRelativePathCompleter {
     pub fn new(reference_path: impl ToNormalizedPath) -> Self {
         let reference_path = reference_path.to_normalized_path();
-        if reference_path.is_empty() {
-            panic!("Reference path must not be empty")
-        }
         Self { reference_path }
     }
 
@@ -33,11 +30,15 @@ impl FullRelativePathCompleter {
             if path.len() <= current_index {
                 return None;
             }
-            println!("{:?}", transformed_prefix);
-            println!("{:?}", transformed_prefix.strip_until_n_right(transformed_prefix.len() - 1));
-            let new_path = transformed_prefix.strip_until_n_right(transformed_prefix.len() - 1)
-                + path.strip_n_left(current_index);
-            Some(new_path)
+            let new_path = path.strip_n_left(current_index);
+            if transformed_prefix.len() == 1 {
+                Some(new_path)
+            } else {
+                Some(
+                    transformed_prefix.strip_until_n_right(transformed_prefix.len() - 1)
+                    + new_path
+                )
+            }
         })
     }
 }
@@ -174,11 +175,5 @@ mod tests {
         let mut consecutive = completion.complete("b", paths.into_iter());
         consecutive.sort();
         assert_eq!(consecutive, vec!["bar/baz1", "bar/baz2"]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_relative_path_completion_empty_reference() {
-        FullRelativePathCompleter::new(NormalizedPath::new());
     }
 }

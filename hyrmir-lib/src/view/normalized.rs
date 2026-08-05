@@ -70,7 +70,7 @@ impl NormalizedPath {
     pub fn strip_n(&self, n_left: usize, n_right: usize) -> NormalizedPath {
         let l_removed = self.path[n_left..].to_vec();
         let first = &l_removed[0];
-        let mut r_removed = l_removed[0..n_right].to_vec();
+        let mut r_removed = self.path[n_left..n_right].to_vec();
         if r_removed.is_empty() {
             match first.as_str() {
                 "" => r_removed.push("".to_string()),
@@ -87,6 +87,7 @@ impl NormalizedPath {
     pub fn strip_until_n_right(&self, n: usize) -> NormalizedPath {
         self.strip_n(0, n)
     }
+
     pub fn trim_whitespaces(&self) -> NormalizedPath {
         let mut new_path = self.path.clone();
         match new_path.first() {
