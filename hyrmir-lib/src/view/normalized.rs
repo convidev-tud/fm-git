@@ -2,6 +2,7 @@ use colored::Colorize;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
+use itertools::Itertools;
 use thiserror::Error;
 
 const PATH_SEPARATOR: char = '/';
@@ -333,9 +334,9 @@ impl<T: ToString> ToNormalizedPath for T {
 }
 
 /*
-    ############################
-    # Transformers and Filters #
-    ############################
+    ###########
+    # Utility #
+    ###########
 */
 
 pub fn collect_paths_by_name(paths: impl Iterator<Item=NormalizedPath>) -> HashMap<String, Vec<NormalizedPath>> {
@@ -353,6 +354,51 @@ pub fn collect_paths_by_name(paths: impl Iterator<Item=NormalizedPath>) -> HashM
         }
     };
     names
+}
+
+#[derive(Error, Clone, Debug)]
+pub enum NameSearchError {
+    NoneFound(NormalizedPath),
+    MultipleFound(NormalizedPath, Vec<NormalizedPath>),
+}
+
+impl Display for NameSearchError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let error = match self {
+            Self::NoneFound(path) => format!(
+                "There is no path with the name '{}'",
+                path,
+            ),
+            Self::MultipleFound(path, paths) => format!(
+                "Multiple paths exist with the name '{}':\n  {}",
+                path,
+                paths.iter().map(|p| p.formatted(true)).join("\n  ")
+            ),
+        };
+        f.write_str(error.as_str())
+    }
+}
+
+pub fn get_path_from_name(
+    path: impl ToNormalizedPath,
+    search_space: impl Iterator<Item=NormalizedPath>
+) -> Result<NormalizedPath, NameSearchError> {
+    let path = path.to_normalized_path();
+    match path.first_segment().as_str() {
+        "" | "." | ".." => Ok(path),
+        _ => {
+            let mut name_to_paths = collect_paths_by_name(search_space);
+            if let Some(paths) = name_to_paths.remove(path.last_segment().as_str()) {
+                match paths.len() {
+                    0 => Err(NameSearchError::NoneFound(path)),
+                    1 => Ok(paths[0].clone()),
+                    _ => Err(NameSearchError::MultipleFound(path, paths))
+                }
+            } else {
+                Err(NameSearchError::NoneFound(path))
+            }
+        }
+    }
 }
 
 #[cfg(test)]

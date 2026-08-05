@@ -49,7 +49,16 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         let path = PathBuf::from(".");
         let workspace = repo.get_workspace::<AnyType<Concrete>>(path)?;
         let current = workspace.get_current_view().get_structure_view();
-        let target_path = current.to_normalized_path() + parsed_target.get_path().clone();
+
+        let root = repo.root_view();
+        let found_path = get_path_from_name(
+            parsed_target.get_path(),
+            root
+                .iter_children_req(repo)
+                .filter_map(FilterByType::<AnyType<Concrete>>::filter)
+                .map(|p| p.to_normalized_path())
+        )?;
+        let target_path = current.to_normalized_path() + found_path;
 
         if current.to_normalized_path() == target_path {
             logger.info(format!(
