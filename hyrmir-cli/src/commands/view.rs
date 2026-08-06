@@ -42,7 +42,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             .get_arg_helper()
             .get_argument_value::<String>(PATH)
             .unwrap()
-            .normalize()?;
+            .try_normalize()?;
 
         // repo allocations
         let repo = loader.load_repo()?;

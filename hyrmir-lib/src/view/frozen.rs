@@ -53,7 +53,7 @@ impl<V: VCS> FrozenView<V> {
     }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
-        let path = Normalize::normalize(self).get_path().to_string().blue().to_string();
+        let path = Normalize::try_normalize(self).get_path().to_string().blue().to_string();
         let mut info: Vec<String> = vec![];
 
         if show_type {
@@ -97,7 +97,7 @@ impl<V: VCS> FrozenView<V> {
 }
 
 impl<V: VCS> Normalize for FrozenView<V> {
-    fn normalize(&self) -> Normalized {
+    fn try_normalize(&self) -> Normalized {
         let path = self.to_normalized_path();
         let revision = match &self.version {
             RevisionPointer::None | RevisionPointer::Head(_) => NormalizedRevision::Head,
@@ -110,13 +110,13 @@ impl<V: VCS> Normalize for FrozenView<V> {
 
 impl<V: VCS> PartialEq for FrozenView<V> {
     fn eq(&self, other: &FrozenView<V>) -> bool {
-        Normalize::normalize(self) == Normalize::normalize(other)
+        Normalize::try_normalize(self) == Normalize::try_normalize(other)
     }
 }
 
 impl<V: VCS, T: Borrow<str>> PartialEq<T> for FrozenView<V> {
     fn eq(&self, other: &T) -> bool {
-        Normalize::normalize(self).to_string() == other.borrow()
+        Normalize::try_normalize(self).to_string() == other.borrow()
     }
 }
 
@@ -124,7 +124,7 @@ impl<V: VCS> Eq for FrozenView<V> {}
 
 impl<V: VCS> Hash for FrozenView<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        Normalize::normalize(self).hash(state);
+        Normalize::try_normalize(self).hash(state);
     }
 }
 
@@ -141,7 +141,7 @@ impl<V: VCS> Display for FrozenView<V> {
 
 impl<V: VCS> PartialOrd for FrozenView<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Normalize::normalize(self).partial_cmp(&Normalize::normalize(other))
+        Normalize::try_normalize(self).partial_cmp(&Normalize::try_normalize(other))
     }
 }
 

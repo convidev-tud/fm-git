@@ -314,7 +314,7 @@ where
     /// ```
     pub fn move_to<To: SymbolicNodeType>(
         self,
-        path: impl ToNormalizedPath,
+        path: impl Borrow<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
         fn make_error_node(name: String) -> FrozenNode {
@@ -322,7 +322,7 @@ where
         }
 
         // set path to absolute from root
-        let path = self.to_normalized_path() + path.to_normalized_path();
+        let path = self.to_normalized_path() + path.borrow();
         let root = self.get_root_id();
         let mut current = Some(root);
         let mut id_vec: Vec<NodeId> = vec![root];
@@ -365,7 +365,7 @@ where
 
     fn move_to_guaranteed_type<To: SymbolicNodeType>(
         self,
-        path: impl ToNormalizedPath,
+        path: impl Borrow<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, PathDoesNotExistError<V>> {
         match self.move_to::<To>(path, repo) {
@@ -463,7 +463,7 @@ where
 impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
-        area: impl ToNormalizedPath,
+        area: impl Borrow<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, Area<C>, M, V>, SemanticViewError<V>> {
         self.move_to(area, repo)
@@ -477,18 +477,18 @@ where
     V: VCS,
 {
     pub fn get_path_to_feature_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(FEATURE_ROOT)
+        self.to_normalized_path() + &FEATURE_ROOT.to_normalized_path()
     }
 
     pub fn get_path_to_product_root(&self) -> NormalizedPath {
-        self.to_normalized_path() + NormalizedPath::from(PRODUCT_ROOT)
+        self.to_normalized_path() + &PRODUCT_ROOT.to_normalized_path()
     }
 
     pub fn move_to_feature_root(
         self,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, FeatureRoot, M, V>, PathDoesNotExistError<V>> {
-        let path = self.get_path_to_feature_root().to_normalized_path();
+        let path = self.get_path_to_feature_root();
         self.move_to_guaranteed_type(&path, repo)
     }
 
@@ -496,14 +496,25 @@ where
         self,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, ProductRoot, M, V>, PathDoesNotExistError<V>> {
-        let path = self.get_path_to_feature_root().to_normalized_path();
+        let path = self.get_path_to_product_root();
         self.move_to_guaranteed_type(&path, repo)
     }
 }
 
-// ###################################
+// #########################
 // # Trait Implementations #
-// ###################################
+// #########################
+
+impl<'a, S, M, V> ToNormalizedPath for StructureView<'a, S, M, V>
+where
+    S: SymbolicNodeType,
+    M: AccessMode,
+    V: VCS,
+{
+    fn to_normalized_path(&self) -> NormalizedPath {
+        todo!()
+    }
+}
 
 impl<'a, S, M, V> Display for StructureView<'a, S, M, V>
 where
@@ -512,12 +523,7 @@ where
     V: VCS,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let output = self
-            .get_node_path()
-            .iter()
-            .map(|node| node.get().borrow().get_name().clone())
-            .join("/");
-        f.write_str(&output)
+        f.write_str(&self.to_normalized_path().to_string())
     }
 }
 
