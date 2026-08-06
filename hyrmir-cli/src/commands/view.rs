@@ -84,7 +84,7 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
                 };
             }
         };
-        let workspace = workspace.switch_to(target.to_head_rev())?;
+        let workspace = workspace.switch_to(target.head())?;
         let new_current = workspace.get_current_view();
         let msg = format!("Now viewing {}", new_current.formatted(true, true, true),);
         let status = workspace.status(msg, "", "", true)?;

@@ -100,10 +100,10 @@ where
                 .move_to(current.get_path(), repository)?;
             let current_view = match current.get_revision() {
                 NormalizedRevision::Head => {
-                    current_semantic_view.to_head_rev().convert_to_rev()
+                    current_semantic_view.head().convert_to_rev()
                 }
                 NormalizedRevision::Revision(revision) => {
-                    current_semantic_view.to_rev(revision).unwrap()
+                    current_semantic_view.rev(revision).unwrap()
                 }
             };
             Ok(Workspace::<S, Rev, Shared, V> { current_view, path })

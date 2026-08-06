@@ -296,7 +296,7 @@ impl Display for Normalized {
         let s = match &self.revision {
             NormalizedRevision::Head => self.path.to_string(),
             NormalizedRevision::Revision(revision) => {
-                format!("{}:{revision}", self.path,)
+                format!("{}:{revision}", self.path)
             }
         };
         f.write_str(&s)

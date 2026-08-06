@@ -1,7 +1,12 @@
+use std::borrow::Borrow;
+use std::cell::RefCell;
+use std::cmp::Ordering;
 use crate::model::*;
 use crate::vcs::{VCSError, VCS};
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
+use indextree::Node;
+use itertools::Itertools;
 use thiserror::Error;
 
 /*
@@ -80,11 +85,9 @@ impl RevPointer for Rev {
     }
 }
 
-/*
-    ###################
-    # Main Definition #
-    ###################
-*/
+// ###################
+// # Main Definition #
+// ###################
 
 #[derive(Debug)]
 pub struct RevisionView<'a, S, R, M, V>
@@ -110,16 +113,17 @@ where
     fn assert_lock(&self) {
         let view = self.get_structure_view();
         let mut node = view.get_node().get().borrow_mut();
+        node.reference_revision_view();
         if node.is_revision_locked() {
             drop(node);
             panic!(
-                "Cannot create revision view for for '{}': node is locked",
+                "Cannot create revision view for '{}': node is locked",
                 view.to_normalized_path(),
             )
         }
         if M::lock() {
-            if node.revision_views_referenced() > 0 {
-                let referenced = node.revision_views_referenced();
+            let referenced = node.revision_views_referenced() - 1;
+            if referenced > 0 {
                 drop(node);
                 panic!(
                     "Cannot lock node for revision view '{}': there are {referenced} other revision views referencing it",
@@ -128,7 +132,38 @@ where
             }
             node.lock_revision();
         }
-        node.reference_revision_view();
+    }
+
+    fn private_new(
+        structure_view: StructureView<'a, S, Shared, V>,
+        revision: V::RevisionId,
+    ) -> Self {
+        let new = Self {
+            structure_view,
+            revision,
+            _revision_type: PhantomData,
+            _access_mode: PhantomData,
+        };
+        new.assert_lock();
+        new
+    }
+
+    fn convert<R2, M2>(self) -> RevisionView<'a, S, R2, M2, V>
+    where
+        R2: RevPointer,
+        M2: AccessMode,
+    {
+        let structure_view = self.structure_view.private_clone();
+        let revision = self.revision.clone();
+        drop(self);
+        RevisionView::<'a, S, R2, M2, V>::private_new(
+            structure_view,
+            revision,
+        )
+    }
+
+    pub(crate) fn get_node(&self) -> &Node<RefCell<NodeData<V>>> {
+        self.get_structure_view().get_node()
     }
 
     pub fn assert_revision(
@@ -199,23 +234,11 @@ where
             .unwrap()
             .get_head()
             .clone();
-        let new = Self {
-            structure_view,
-            revision,
-            _revision_type: PhantomData,
-            _access_mode: PhantomData,
-        };
-        new.assert_lock();
-        new
+        Self::private_new(structure_view, revision)
     }
 
     pub fn convert_to_rev(self) -> RevisionView<'a, S, Rev, M, V> {
-        RevisionView::<'a, S, Rev, M, V> {
-            structure_view: self.structure_view.clone_private(),
-            revision: self.revision.clone(),
-            _revision_type: PhantomData,
-            _access_mode: PhantomData,
-        }
+        self.convert()
     }
 }
 
@@ -230,14 +253,101 @@ where
         revision: impl Into<String>,
     ) -> Result<Self, RevisionError<V, V::VCSError>> {
         let revision = Self::assert_revision(&structure_view, revision)?;
-        let new = Self {
-            structure_view,
-            revision,
-            _revision_type: PhantomData,
-            _access_mode: PhantomData,
-        };
-        new.assert_lock();
-        Ok(new)
+        Ok(Self::private_new(structure_view, revision))
+    }
+}
+
+impl<'a, S, R, V> RevisionView<'a, S, R, Shared, V>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    V: VCS,
+{
+    pub fn lock(self) -> RevisionView<'a, S, R, Locked, V> {
+        self.convert()
+    }
+}
+
+impl<'a, S, R, V> RevisionView<'a, S, R, Locked, V>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    V: VCS,
+{
+    pub fn unlock(self) -> RevisionView<'a, S, R, Shared, V> {
+        self.convert()
+    }
+}
+
+// #########################
+// # Trait Implementations #
+// #########################
+
+impl<'a, S, R, M, V> Display for RevisionView<'a, S, R, M, V>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    M: AccessMode,
+    V: VCS,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let output = self.to_frozen_view().to_string();
+        f.write_str(&output)
+    }
+}
+
+impl<'a, S1, S2, M1, M2, V> PartialEq<RevisionView<'a, S2, M2, V>> for RevisionView<'a, S1, M1, V>
+where
+    S1: SymbolicNodeType,
+    S2: SymbolicNodeType,
+    M1: AccessMode,
+    M2: AccessMode,
+    V: VCS,
+{
+    fn eq(&self, other: &RevisionView<'a, S2, M2, V>) -> bool {
+        self.to_normalized_path() == other.to_normalized_path()
+    }
+}
+
+impl<'a, S, M, V, T> PartialEq<T> for RevisionView<'a, S, M, V>
+where
+    S: IsConcrete,
+    M: AccessMode,
+    V: VCS,
+    T: Borrow<str>
+{
+    fn eq(&self, other: &T) -> bool {
+        self.to_normalized_path() == other.borrow()
+    }
+}
+
+impl<'a, S, M, V> Eq for RevisionView<'a, S, M, V>
+where
+    S: IsConcrete,
+    M: AccessMode,
+    V: VCS,
+{}
+
+impl<'a, S, M, V> PartialOrd for RevisionView<'a, S, M, V>
+where
+    S: IsConcrete,
+    M: AccessMode,
+    V: VCS,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.to_normalized_path()
+            .partial_cmp(&other.to_normalized_path())
+    }
+}
+
+impl<'a, S, M, V> Ord for RevisionView<'a, S, M, V>
+where
+    S: IsConcrete,
+    M: AccessMode,
+    V: VCS,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(&other).unwrap()
     }
 }
 
@@ -254,5 +364,101 @@ where
             node.unlock_revision()
         }
         node.dereference_revision_view()
+    }
+}
+
+// #########
+// # Tests #
+// #########
+
+#[cfg(test)]
+mod tests {
+    use crate::repository::test_utils::prepare_repo;
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "Cannot create revision view for '/main/feature/foo': node is locked")]
+    fn test_revision_view_lock_and_create_second() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let _view = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head()
+            .lock();
+        root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head();
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot lock node for revision view '/main/feature/foo': there are 1 other revision views referencing it")]
+    fn test_revision_view_lock_while_other_exists() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let _view1 = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head();
+        let _view2 = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head()
+            .lock();
+    }
+
+    #[test]
+    fn test_revision_view_lock_and_unlock() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let view1 = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head()
+            .lock();
+        assert!(view1.get_node().get().borrow().is_revision_locked());
+        let view1 = view1.unlock();
+        assert!(!view1.get_node().get().borrow().is_revision_locked());
+        let view2 = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap()
+            .head();
+        assert_eq!(view1, view2);
+    }
+
+    #[test]
+    fn test_revision_view_count_increment() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let view1 = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        let view2 = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
+        assert_eq!(view2.get_node().get().borrow().structure_views_referenced(), 2);
+    }
+
+    #[test]
+    fn test_revision_view_count_decrement() {
+        let repo = prepare_repo();
+        let root = repo.root_view();
+        let view1 = root
+            .clone(&repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        let view2 = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .unwrap();
+        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
+        drop(view2);
+        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
     }
 }
