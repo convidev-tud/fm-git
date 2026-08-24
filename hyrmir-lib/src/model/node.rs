@@ -1,4 +1,4 @@
-use crate::vcs::{VCS, RevisionId};
+use crate::vcs::{RevisionId, VCS};
 use colored::{ColoredString, Colorize};
 use indextree::NodeId;
 use std::collections::HashMap;

@@ -1,8 +1,8 @@
 use crate::arg::ArgHelper;
-use crate::completion::NormalizedPathCompleter;
+use crate::completion::NormalizedCompleter;
 use clap::parser::ValueSource;
 use clap::{Arg, ArgAction, ArgMatches, Command};
-use hyrmir_lib::model::NormalizedPath;
+use hyrmir_lib::model::{Normalize, NormalizeError, Normalized};
 use std::ops::Range;
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ impl<'a> CompletionHelper<'a> {
             arg_matches: matches.clone(),
         }
     }
-    
+
     pub fn get_last(&self) -> Option<String> {
         Some(self.cli_content.last()?.to_string())
     }
@@ -110,7 +110,7 @@ impl<'a> CompletionHelper<'a> {
             },
         }
     }
-    
+
     /// Returns if the passed target is the currently one edited on the console.
     ///
     /// Examples:
@@ -122,7 +122,7 @@ impl<'a> CompletionHelper<'a> {
     pub fn currently_editing(&self) -> Option<&Arg> {
         Some(self.currently_editing_with_range()?.1)
     }
-    
+
     pub fn get_appendix_of(&self, name: &str) -> Vec<String> {
         let helper = ArgHelper::new(self.arg_matches.clone());
         if !helper.has_arg(name) {
@@ -130,7 +130,7 @@ impl<'a> CompletionHelper<'a> {
         }
         helper.get_argument_values(name).unwrap()
     }
-    
+
     pub fn get_appendix_of_currently_edited(&self) -> Vec<String> {
         let maybe_currently_editing = self.currently_editing_with_range();
         if maybe_currently_editing.is_none() {
@@ -139,17 +139,17 @@ impl<'a> CompletionHelper<'a> {
         let currently_editing = maybe_currently_editing.unwrap().1;
         self.get_appendix_of(currently_editing.get_id().as_str())
     }
-    
+
     pub fn complete_normalized_paths(
         &self,
-        completer: &impl NormalizedPathCompleter,
-        paths: impl Iterator<Item = NormalizedPath>,
-    ) -> Vec<String> {
+        completer: &impl NormalizedCompleter,
+        paths: impl Iterator<Item = Normalized>,
+    ) -> Result<Vec<String>, NormalizeError> {
         let maybe_last = self.get_last();
         if maybe_last.is_none() {
-            return vec![];
+            return Ok(vec![]);
         }
-        completer.complete(NormalizedPath::from(maybe_last.unwrap()), paths)
+        Ok(completer.complete(maybe_last.unwrap().try_normalize()?, paths))
     }
 }
 

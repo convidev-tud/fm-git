@@ -1,5 +1,5 @@
 use hyrmir_lib::model::*;
-use hyrmir_lib::vcs::{PathInfo, VCS, VCSError, RevisionId};
+use hyrmir_lib::vcs::{PathInfo, RevisionId, VCS, VCSError};
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::PathBuf;
@@ -110,22 +110,22 @@ impl GitCLI {
     pub fn in_current_directory() -> Self {
         Self::new(GitPath::CurrentDirectory)
     }
-    
+
     pub fn in_custom_directory(path: PathBuf) -> Self {
         Self::new(GitPath::CustomDirectory(path))
     }
-    
+
     pub fn new(path: GitPath) -> Self {
         Self {
             path,
             colored: false,
         }
     }
-    
+
     pub fn colored(&mut self, colored: bool) {
         self.colored = colored;
     }
-    
+
     pub fn prepare_command(&self, args: &Vec<&str>) -> Vec<String> {
         let mut arguments: Vec<String> = vec![];
         match self.path {
@@ -142,13 +142,13 @@ impl GitCLI {
         arguments.extend(args.into_iter().map(|arg| arg.to_string()));
         arguments
     }
-    
+
     pub fn run_attached(&self, args: &Vec<&str>) -> io::Result<Output> {
         let mut base = Command::new("git");
         let arguments = self.prepare_command(args);
         base.args(arguments).output()
     }
-    
+
     pub fn run_detached(&self, args: &Vec<&str>) -> io::Result<ExitStatus> {
         let mut base = Command::new("git");
         let arguments = self.prepare_command(args);
@@ -185,7 +185,7 @@ impl VCS for Git {
             let (path, _) = self.split_branch(&path_string);
             Ok(Some(Normalized::new(
                 NormalizedPath::from_git_branch(path).as_absolute(),
-                NormalizedRevision::Head,
+                NormalizedRevision::None,
             )))
         } else {
             Ok(None)

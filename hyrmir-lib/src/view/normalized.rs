@@ -1,9 +1,9 @@
-use std::borrow::Borrow;
+use crate::view::ColorFormat;
 use colored::Colorize;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
-use itertools::Itertools;
 use thiserror::Error;
 
 const PATH_SEPARATOR: char = '/';
@@ -30,11 +30,11 @@ impl Display for NormalizeError {
     }
 }
 
-// ##########
+// ####################
 // # Main Definitions #
-// ##########
+// ####################
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Normalized {
     path: NormalizedPath,
     revision: NormalizedRevision,
@@ -57,7 +57,7 @@ impl Normalized {
         let revision = if split.len() == 2 {
             NormalizedRevision::Revision(split[1].to_string())
         } else {
-            NormalizedRevision::Head
+            NormalizedRevision::None
         };
         Ok(Normalized::new(path, revision))
     }
@@ -81,16 +81,34 @@ impl<T: AsRef<str>> From<T> for Normalized {
     }
 }
 
-impl Borrow<NormalizedPath> for Normalized {
-    fn borrow(&self) -> &NormalizedPath {
+impl From<NormalizedPath> for Normalized {
+    fn from(value: NormalizedPath) -> Self {
+        Self::new(value, NormalizedRevision::None)
+    }
+}
+
+impl AsRef<NormalizedPath> for Normalized {
+    fn as_ref(&self) -> &NormalizedPath {
         self.get_path()
+    }
+}
+
+impl AsRef<Normalized> for Normalized {
+    fn as_ref(&self) -> &Normalized {
+        self
+    }
+}
+
+impl<T: AsRef<str>> PartialEq<T> for Normalized {
+    fn eq(&self, other: &T) -> bool {
+        self.to_string() == other.as_ref()
     }
 }
 
 impl Display for Normalized {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let s = match &self.revision {
-            NormalizedRevision::Head => self.path.to_string(),
+            NormalizedRevision::None => self.path.to_string(),
             NormalizedRevision::Revision(revision) => {
                 format!("{}:{revision}", self.path)
             }
@@ -99,22 +117,49 @@ impl Display for Normalized {
     }
 }
 
+impl ColorFormat for Normalized {
+    fn formatted(&self, colored: bool) -> String {
+        let path = self.get_path().formatted(colored);
+        let result = match &self.revision {
+            NormalizedRevision::None => path,
+            NormalizedRevision::Revision(revision) => {
+                format!(
+                    "{path}{}{}",
+                    REVISION_SEPARATOR.to_string().yellow(),
+                    revision.yellow()
+                )
+            }
+        };
+        result
+    }
+}
+
+impl Add<&Normalized> for Normalized {
+    type Output = Normalized;
+
+    fn add(self, rhs: &Normalized) -> Self::Output {
+        let new_path = self.get_path().clone() + rhs.get_path();
+        let revision = rhs.get_revision().clone();
+        Normalized::new(new_path, revision)
+    }
+}
+
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum NormalizedRevision {
-    Head,
+    None,
     Revision(String),
 }
 
 impl Display for NormalizedRevision {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Head => f.write_str(""),
+            Self::None => f.write_str(""),
             Self::Revision(revision) => f.write_str(revision),
         }
     }
 }
 
-#[derive(Clone, Debug, Hash, Eq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub struct NormalizedPath {
     path: Vec<String>,
 }
@@ -130,7 +175,7 @@ impl NormalizedPath {
         new
     }
 
-    pub fn from_iter(path: impl Iterator<Item=String>) -> Self {
+    pub fn from_iter(path: impl Iterator<Item = String>) -> Self {
         let mut new = Self::new_empty();
         for p in path {
             new.path.push(p);
@@ -222,12 +267,13 @@ impl NormalizedPath {
         Some(NormalizedPath::new(self.path.get(index)?.clone()))
     }
 
-    pub fn starts_with(&self, prefix: impl ToNormalizedPath) -> bool {
-        self.to_string().starts_with(&prefix.to_normalized_path().to_string())
+    pub fn starts_with(&self, prefix: impl AsRef<NormalizedPath>) -> bool {
+        self.to_string()
+            .starts_with(prefix.as_ref().to_string().as_str())
     }
 
-    pub fn last_is(&self, suffix: impl ToNormalizedPath) -> bool {
-        self.last_segment() == suffix.to_normalized_path().last_segment()
+    pub fn last_is(&self, suffix: impl AsRef<NormalizedPath>) -> bool {
+        self.last_segment() == suffix.as_ref().last_segment()
     }
 
     pub fn len(&self) -> usize {
@@ -253,15 +299,6 @@ impl NormalizedPath {
     pub fn is_absolute(&self) -> bool {
         self.path.len() > 0 && self.first_segment() == &"".to_string()
     }
-
-    pub fn formatted(&self, colored: bool) -> String {
-        let base = if colored {
-            self.to_string().blue().to_string()
-        } else {
-            self.to_string()
-        };
-        base
-    }
 }
 
 impl<T: AsRef<str>> From<T> for NormalizedPath {
@@ -270,19 +307,32 @@ impl<T: AsRef<str>> From<T> for NormalizedPath {
     }
 }
 
-impl<T: ToString> PartialEq<T> for NormalizedPath {
-    fn eq(&self, other: &T) -> bool {
-        self.to_string() == *other.to_string()
+impl AsRef<NormalizedPath> for NormalizedPath {
+    fn as_ref(&self) -> &NormalizedPath {
+        self
     }
+}
 
-    fn ne(&self, other: &T) -> bool {
-        self.to_string() != *other.to_string()
+impl<T: AsRef<str>> PartialEq<T> for NormalizedPath {
+    fn eq(&self, other: &T) -> bool {
+        self.to_string() == other.as_ref()
     }
 }
 
 impl Display for NormalizedPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.path.join("/").as_str())
+    }
+}
+
+impl ColorFormat for NormalizedPath {
+    fn formatted(&self, colored: bool) -> String {
+        let base = if colored {
+            self.to_string().blue().to_string()
+        } else {
+            self.to_string()
+        };
+        base
     }
 }
 
@@ -347,16 +397,47 @@ impl<T: AsRef<str>> Normalize for T {
     }
 }
 
+impl Normalize for Normalized {
+    fn try_normalize(&self) -> Result<Normalized, NormalizeError> {
+        Ok(self.clone())
+    }
+}
+
 pub trait ToNormalizedPath {
     fn to_normalized_path(&self) -> NormalizedPath;
 }
 
 impl<T: Normalize> ToNormalizedPath for T {
     fn to_normalized_path(&self) -> NormalizedPath {
-        self
-            .normalize()
-            .extract()
-            .0
+        self.normalize().extract().0
+    }
+}
+
+pub trait GetPathName {
+    fn get_path_name(&self) -> String;
+}
+
+impl<T: GetPathName> GetPathName for &T {
+    fn get_path_name(&self) -> String {
+        (*self).get_path_name()
+    }
+}
+
+impl GetPathName for NormalizedPath {
+    fn get_path_name(&self) -> String {
+        self.last_segment().to_string()
+    }
+}
+
+impl GetPathName for Normalized {
+    fn get_path_name(&self) -> String {
+        let path_name = self.get_path().get_path_name();
+        match self.get_revision() {
+            NormalizedRevision::None => path_name,
+            NormalizedRevision::Revision(revision) => {
+                format!("{}{}{}", path_name, REVISION_SEPARATOR, revision)
+            }
+        }
     }
 }
 
@@ -364,39 +445,40 @@ impl<T: Normalize> ToNormalizedPath for T {
 // # Utility #
 // ###########
 
-pub fn collect_paths_by_name(paths: impl Iterator<Item=NormalizedPath>) -> HashMap<String, Vec<NormalizedPath>> {
+pub fn collect_by_name<T: GetPathName + Eq>(
+    paths: impl Iterator<Item = T>,
+) -> HashMap<String, Vec<T>> {
     let mut names = HashMap::new();
     for path in paths {
-        let name = path.last_segment();
-        if !names.contains_key(name) {
+        let name = path.get_path_name();
+        if !names.contains_key(&name) {
             names.insert(name.to_string(), vec![path]);
         } else {
-            let paths_vec = names.get_mut(name).unwrap();
+            let paths_vec = names.get_mut(&name).unwrap();
             // removes duplicates
             if !paths_vec.contains(&path) {
                 paths_vec.push(path);
             }
         }
-    };
+    }
     names
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum NameSearchError {
-    NoneFound(NormalizedPath),
-    MultipleFound(NormalizedPath, Vec<NormalizedPath>),
+pub enum NameSearchError<T: ColorFormat> {
+    NoneFound(T),
+    MultipleFound(T, Vec<T>),
 }
 
-impl Display for NameSearchError {
+impl<T: ColorFormat> Display for NameSearchError<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let error = match self {
-            Self::NoneFound(path) => format!(
-                "There is no path with the name '{}'",
-                path,
-            ),
+            Self::NoneFound(path) => {
+                format!("There is no path with the name '{}'", path.formatted(true),)
+            }
             Self::MultipleFound(path, paths) => format!(
                 "Multiple paths exist with the name '{}':\n  {}",
-                path,
+                path.formatted(true),
                 paths.iter().map(|p| p.formatted(true)).join("\n  ")
             ),
         };
@@ -404,20 +486,19 @@ impl Display for NameSearchError {
     }
 }
 
-pub fn get_path_from_name(
-    path: impl ToNormalizedPath,
-    search_space: impl Iterator<Item=NormalizedPath>
-) -> Result<NormalizedPath, NameSearchError> {
-    let path = path.to_normalized_path();
-    match path.first_segment().as_str() {
+pub fn get_path_from_name<T: GetPathName + ColorFormat + Eq + Clone>(
+    path: T,
+    search_space: impl Iterator<Item = T>,
+) -> Result<T, NameSearchError<T>> {
+    match path.get_path_name().as_str() {
         "" | "." | ".." => Ok(path),
         _ => {
-            let mut name_to_paths = collect_paths_by_name(search_space);
-            if let Some(paths) = name_to_paths.remove(path.last_segment().as_str()) {
+            let mut name_to_paths = collect_by_name(search_space);
+            if let Some(paths) = name_to_paths.remove(path.get_path_name().as_str()) {
                 match paths.len() {
                     0 => Err(NameSearchError::NoneFound(path)),
                     1 => Ok(paths[0].clone()),
-                    _ => Err(NameSearchError::MultipleFound(path, paths))
+                    _ => Err(NameSearchError::MultipleFound(path, paths)),
                 }
             } else {
                 Err(NameSearchError::NoneFound(path))
@@ -435,91 +516,128 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_normalized_path_from_qualified() {
-        assert_eq!(NormalizedPath::new("foo/bar").path, vec!["foo", "bar"]);
-        assert_eq!(
-            NormalizedPath::new("/foo/bar").path,
-            vec!["", "foo", "bar"]
-        );
-        assert_eq!(NormalizedPath::new("/foo/bar").to_string(), "/foo/bar");
-        assert_eq!(NormalizedPath::new("foo/").path, vec!["foo", ""]);
-        assert_eq!(NormalizedPath::new("/").path, vec!["", ""]);
+    fn test_normalize_relative() {
+        assert_eq!("foo/bar".normalize().get_path().path, vec!["foo", "bar"]);
     }
 
     #[test]
-    fn test_normalized_path_add_empty() {
-        let l = NormalizedPath::new();
-        let r = NormalizedPath::new("foo/bar");
-        assert_eq!(l + &r, NormalizedPath::new("/foo/bar"));
+    fn test_normalize_absolute() {
+        assert_eq!("/foo/bar".normalize().get_path().path, vec!["/foo", "bar"]);
+    }
 
-        let l = NormalizedPath::new();
-        let r = NormalizedPath::new("/foo/bar");
-        assert_eq!(l + r, NormalizedPath::new("/foo/bar"));
+    #[test]
+    fn test_normalize_relative_dir() {
+        assert_eq!("foo/".normalize().get_path().path, vec!["foo", ""]);
+    }
+
+    #[test]
+    fn test_normalize_root() {
+        assert_eq!("/".normalize().get_path().path, vec![""]);
+    }
+
+    #[test]
+    fn test_normalize_revision() {
+        let normalized = "foo/bar:1.0".normalize();
+        assert_eq!(normalized.get_path().path, vec!["foo", "bar"]);
+        assert_eq!(
+            normalized.get_revision(),
+            &NormalizedRevision::Revision("1.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_normalized_path_add() {
+        let l = NormalizedPath::new("foo");
+        let r = NormalizedPath::new("bar/baz");
+        assert_eq!(l + &r, NormalizedPath::new("foo/bar/baz"));
+    }
+
+    #[test]
+    fn test_normalized_path_add_to_absolute() {
+        let l = NormalizedPath::new("");
+        let r = NormalizedPath::new("bar/baz");
+        assert_eq!((l + &r).path, vec!["", "bar", "baz"]);
+    }
+
+    #[test]
+    fn test_normalized_path_add_root() {
+        let l = NormalizedPath::new("bar/baz");
+        let r = NormalizedPath::new("");
+        assert_eq!((l + &r).path, vec![""]);
     }
 
     #[test]
     fn test_normalized_path_add_absolute() {
-        let l = NormalizedPath::new("foo");
-        let r = NormalizedPath::new("bar/baz");
-        assert_eq!(l + r, NormalizedPath::new("foo/bar/baz"));
-
-        let l = NormalizedPath::new("");
-        let r = NormalizedPath::new("bar/baz");
-        assert_eq!((l + r).path, vec!["", "bar", "baz"]);
-
-        let l = NormalizedPath::new("foo/");
-        let r = NormalizedPath::new("bar/baz");
-        assert_eq!(l + r, NormalizedPath::new("foo/bar/baz"));
+        let l = NormalizedPath::new("bar/baz");
+        let r = NormalizedPath::new("/foo");
+        assert_eq!((l + &r).path, vec!["", "foo"]);
     }
 
     #[test]
-    fn test_normalized_path_add_relative() {
+    fn test_normalized_path_add_to_dir() {
+        let l = NormalizedPath::new("foo/");
+        let r = NormalizedPath::new("bar/baz");
+        assert_eq!(l + &r, NormalizedPath::new("foo/bar/baz"));
+    }
+
+    #[test]
+    fn test_normalized_path_add_on_up() {
         let l = NormalizedPath::new("foo");
         let r = NormalizedPath::new("..");
-        assert_eq!(l + r, ".");
+        assert_eq!(l + &r, ".");
+    }
 
+    #[test]
+    fn test_normalized_path_add_in_current_dir() {
         let l = NormalizedPath::new("foo");
         let r = NormalizedPath::new("./bar");
-        assert_eq!(l + r, "foo/bar");
+        assert_eq!(l + &r, "foo/bar");
+    }
 
+    #[test]
+    fn test_normalized_path_add_current_dir() {
         let l = NormalizedPath::new("foo");
         let r = NormalizedPath::new("./");
-        assert_eq!(l + r, "foo/");
+        assert_eq!(l + &r, "foo/");
+    }
 
+    #[test]
+    fn test_normalized_path_add_sibling_replace() {
         let l = NormalizedPath::new("foo");
         let r = NormalizedPath::new("../bar");
-        assert_eq!(l + r, "./bar");
+        assert_eq!(l + &r, "./bar");
+    }
 
-        let l = NormalizedPath::new("foo/bar");
-        let r = NormalizedPath::new("../baz");
-        assert_eq!(l + r, "foo/baz");
-
+    #[test]
+    fn test_normalized_path_add_sibling_replace_multiple_levels() {
         let l = NormalizedPath::new("foo/bar");
         let r = NormalizedPath::new("../../baz");
-        assert_eq!(l + r, "./baz");
+        assert_eq!(l + &r, "./baz");
 
         let l = NormalizedPath::new("foo/bar");
         let r = NormalizedPath::new("../../../../../../baz");
-        assert_eq!(l + r, "./baz");
-
-        let l = NormalizedPath::new("foo/bar");
-        let r = NormalizedPath::new("baz/../baz/../baz/../baz");
-        assert_eq!(l + r, "foo/bar/baz");
-
-        let l = NormalizedPath::new("foo/bar");
-        let r = NormalizedPath::new("../baz/../baz/../baz");
-        assert_eq!(l + r, "foo/baz");
+        assert_eq!(l + &r, "./baz");
     }
 
     #[test]
-    fn test_normalized_path_add_whitespaces() {
-        let l = NormalizedPath::new("foo");
-        let r = NormalizedPath::new("");
-        assert_eq!(l + r, NormalizedPath::new("foo/"));
+    fn test_normalized_path_add_sibling_common_root() {
+        let l = NormalizedPath::new("foo/bar");
+        let r = NormalizedPath::new("../baz");
+        assert_eq!(l + &r, "foo/baz");
+    }
 
-        let l = NormalizedPath::new("foo");
-        let r = NormalizedPath::new("/bar/baz");
-        assert_eq!(l + r, NormalizedPath::new("/bar/baz"));
+    #[test]
+    fn test_normalized_path_add_mixed_relative1() {
+        let l = NormalizedPath::new("foo/bar");
+        let r = NormalizedPath::new("baz/../baz/../baz/../baz");
+        assert_eq!(l + &r, "foo/bar/baz");
+    }
+
+    #[test]
+    fn test_normalized_path_add_mixed_relative2() {
+        let l = NormalizedPath::new("foo/bar");
+        let r = NormalizedPath::new("../baz/../baz/../baz");
+        assert_eq!(l + &r, "foo/baz");
     }
 
     #[test]
@@ -534,5 +652,40 @@ mod tests {
         let absolute = path.as_absolute();
         assert!(absolute.is_absolute());
         assert_eq!(absolute, "/foo/bar");
+    }
+
+    #[test]
+    fn test_normalized_add() {
+        let l = "foo/bar:1.0".normalize();
+        let r = "baz:2.0".normalize();
+        assert_eq!(l + &r, "foo/bar/baz:2.0");
+    }
+
+    #[test]
+    fn test_collect_normalized_paths_by_name() {
+        let paths = vec![
+            "foo".to_normalized_path(),
+            "foo/bar".to_normalized_path(),
+            "bar/baz".to_normalized_path(),
+        ];
+        let collected = collect_by_name(paths.iter());
+        let foo = collected.get("foo").unwrap();
+        let bar = collected.get("bar").unwrap();
+        let baz = collected.get("baz").unwrap();
+        assert!(foo.len() == 1 && bar.len() == 1 && baz.len() == 1);
+        assert!(foo.contains(&&"foo".to_normalized_path()));
+        assert!(bar.contains(&&"foo/bar".to_normalized_path()));
+        assert!(baz.contains(&&"bar/baz".to_normalized_path()));
+    }
+
+    #[test]
+    fn test_collect_normalized_by_name() {
+        let paths = vec!["foo".normalize(), "foo:1.0".normalize()];
+        let collected = collect_by_name(paths.iter());
+        let foo = collected.get("foo").unwrap();
+        let foo_1 = collected.get("foo:1.0").unwrap();
+        assert!(foo.len() == 1 && foo_1.len() == 1);
+        assert!(foo.contains(&&"foo".normalize()));
+        assert!(foo_1.contains(&&"foo:1.0".normalize()));
     }
 }

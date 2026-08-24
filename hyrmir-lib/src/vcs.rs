@@ -18,7 +18,11 @@ pub struct PathInfo<V: RevisionId> {
 
 impl<V: RevisionId> PathInfo<V> {
     pub fn new(id: usize, path: impl Into<NormalizedPath>, version: V) -> Self {
-        Self { id, path: path.into(), version }
+        Self {
+            id,
+            path: path.into(),
+            version,
+        }
     }
 
     pub fn get_id(&self) -> usize {
@@ -99,26 +103,26 @@ pub trait VCS: Debug {
 
 #[cfg(test)]
 pub mod test_utils {
-    use thiserror::Error;
     use super::*;
-    
+    use thiserror::Error;
+
     #[derive(Error, Debug)]
     #[error("Test Error")]
     pub struct TestVCSError;
-    
+
     impl VCSError for TestVCSError {}
-    
+
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct TestRevisionId {
         id: usize,
     }
-    
+
     impl TestRevisionId {
         pub fn new(id: usize) -> Self {
-            Self {id}
+            Self { id }
         }
     }
-    
+
     impl RevisionId for TestRevisionId {
         fn get_full_id(&self) -> String {
             todo!()
@@ -128,23 +132,21 @@ pub mod test_utils {
             todo!()
         }
     }
-    
+
     #[derive(Debug)]
     pub struct TestVCS {
         pub paths: Vec<String>,
     }
-    
+
     impl TestVCS {
         pub fn new() -> Self {
-            let paths = vec![
-                "/main",
-                "/main/feature/foo",
-                "/main/feature/bar",
-            ];
-            Self {paths: paths.into_iter().map(String::from).collect()}
+            let paths = vec!["/main", "/main/feature/foo", "/main/feature/bar"];
+            Self {
+                paths: paths.into_iter().map(String::from).collect(),
+            }
         }
     }
-    
+
     impl VCS for TestVCS {
         type VCSError = TestVCSError;
         type RevisionId = TestRevisionId;
@@ -156,28 +158,50 @@ pub mod test_utils {
         fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError> {
             let mut vec = vec![];
             for i in 0..self.paths.len() {
-                vec.push(PathInfo::new(i, self.paths[i].clone(), TestRevisionId::new(i)))
+                vec.push(PathInfo::new(
+                    i,
+                    self.paths[i].clone(),
+                    TestRevisionId::new(i),
+                ))
             }
             Ok(vec)
         }
 
-        fn get_revision(&self, version: impl Into<String>) -> Result<Option<Self::RevisionId>, Self::VCSError> {
+        fn get_revision(
+            &self,
+            version: impl Into<String>,
+        ) -> Result<Option<Self::RevisionId>, Self::VCSError> {
             todo!()
         }
 
-        fn revision_exists_on_path(&self, path: &NormalizedPath, version: impl Into<String>) -> Result<bool, Self::VCSError> {
+        fn revision_exists_on_path(
+            &self,
+            path: &NormalizedPath,
+            version: impl Into<String>,
+        ) -> Result<bool, Self::VCSError> {
             todo!()
         }
 
-        fn iter_versions(&self, path: &NormalizedPath) -> impl Iterator<Item=Result<Self::RevisionId, Self::VCSError>> {
+        fn iter_versions(
+            &self,
+            path: &NormalizedPath,
+        ) -> impl Iterator<Item = Result<Self::RevisionId, Self::VCSError>> {
             vec![].into_iter()
         }
 
-        fn get_status_without_current_branch(&self, colored: bool) -> Result<String, Self::VCSError> {
+        fn get_status_without_current_branch(
+            &self,
+            colored: bool,
+        ) -> Result<String, Self::VCSError> {
             todo!()
         }
 
-        fn switch_to_branch(&self, id: usize, path: &impl ToNormalizedPath, dir: &PathBuf) -> Result<String, Self::VCSError> {
+        fn switch_to_branch(
+            &self,
+            id: usize,
+            path: &impl ToNormalizedPath,
+            dir: &PathBuf,
+        ) -> Result<String, Self::VCSError> {
             todo!()
         }
     }

@@ -1,6 +1,5 @@
-use std::borrow::Borrow;
 use crate::model::*;
-use crate::vcs::{VCS, RevisionId};
+use crate::vcs::{RevisionId, VCS};
 use colored::{ColoredString, Colorize};
 use itertools::Itertools;
 use std::cmp::Ordering;
@@ -15,7 +14,7 @@ pub enum RevisionPointer<V: VCS> {
     Invalid(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FrozenNode {
     name: String,
     node_type: NodeType,
@@ -53,7 +52,7 @@ impl<V: VCS> FrozenView<V> {
     }
 
     pub fn formatted(&self, show_type: bool, show_version: bool, colored: bool) -> String {
-        let path = Normalize::try_normalize(self).get_path().to_string().blue().to_string();
+        let path = self.normalize().get_path().to_string().blue().to_string();
         let mut info: Vec<String> = vec![];
 
         if show_type {
@@ -97,26 +96,20 @@ impl<V: VCS> FrozenView<V> {
 }
 
 impl<V: VCS> Normalize for FrozenView<V> {
-    fn try_normalize(&self) -> Normalized {
-        let path = self.to_normalized_path();
+    fn try_normalize(&self) -> Result<Normalized, NormalizeError> {
+        let path = NormalizedPath::from_iter(self.path.iter().map(|n| n.get_name().to_string()));
         let revision = match &self.version {
-            RevisionPointer::None | RevisionPointer::Head(_) => NormalizedRevision::Head,
+            RevisionPointer::None | RevisionPointer::Head(_) => NormalizedRevision::None,
             RevisionPointer::Revision(rev) => NormalizedRevision::Revision(rev.get_full_id()),
             RevisionPointer::Invalid(invalid) => NormalizedRevision::Revision(invalid.clone()),
         };
-        Normalized::new(path, revision)
+        Ok(Normalized::new(path, revision))
     }
 }
 
-impl<V: VCS> PartialEq for FrozenView<V> {
-    fn eq(&self, other: &FrozenView<V>) -> bool {
-        Normalize::try_normalize(self) == Normalize::try_normalize(other)
-    }
-}
-
-impl<V: VCS, T: Borrow<str>> PartialEq<T> for FrozenView<V> {
+impl<V: VCS, T: Normalize> PartialEq<T> for FrozenView<V> {
     fn eq(&self, other: &T) -> bool {
-        Normalize::try_normalize(self).to_string() == other.borrow()
+        self.normalize() == other.normalize()
     }
 }
 
@@ -124,24 +117,20 @@ impl<V: VCS> Eq for FrozenView<V> {}
 
 impl<V: VCS> Hash for FrozenView<V> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        Normalize::try_normalize(self).hash(state);
+        self.normalize().hash(state);
     }
 }
 
 impl<V: VCS> Display for FrozenView<V> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let output = self
-            .path
-            .iter()
-            .map(|node| node.get_name().clone())
-            .join("/");
+        let output = self.normalize().to_string();
         f.write_str(&output)
     }
 }
 
 impl<V: VCS> PartialOrd for FrozenView<V> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Normalize::try_normalize(self).partial_cmp(&Normalize::try_normalize(other))
+        self.normalize().partial_cmp(&other.normalize())
     }
 }
 

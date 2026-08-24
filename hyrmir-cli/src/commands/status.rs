@@ -13,9 +13,7 @@ pub struct StatusCommand<V: VCS + 'static>(PhantomData<V>);
 
 impl<V: VCS> StatusCommand<V> {
     pub fn new() -> Self {
-        Self {
-            0: PhantomData,
-        }
+        Self { 0: PhantomData }
     }
 }
 

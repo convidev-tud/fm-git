@@ -19,5 +19,5 @@ pub mod importer;
 pub mod model;
 pub mod repository;
 pub mod vcs;
-pub mod workspace;
 pub mod view;
+pub mod workspace;

@@ -52,13 +52,12 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
 
         let root = repo.root_view();
         let found_path = get_path_from_name(
-            parsed_target.get_path(),
-            root
-                .iter_children_req(repo)
+            parsed_target.get_path().clone(),
+            root.iter_children_req(repo)
                 .filter_map(FilterByType::<AnyType<Concrete>>::filter)
-                .map(|p| p.to_normalized_path())
+                .map(|p| p.to_normalized_path()),
         )?;
-        let target_path = current.to_normalized_path() + found_path;
+        let target_path = current.to_normalized_path() + &found_path;
 
         if current.to_normalized_path() == target_path {
             logger.info(format!(
@@ -106,18 +105,17 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
         let current = repo
             .get_workspace::<AnyType<Concrete>>(PathBuf::from("."))?
             .get_current_view()
-            .get_structure_view()
-            .to_normalized_path();
+            .normalize();
         let root = repo.root_view();
         let all_branches = root
             .iter_children_req(repo)
             .filter_map(FilterByType::<AnyType<Concrete>>::filter)
-            .map(|p| p.to_normalized_path());
+            .map(|p| p.to_normalized_path().into());
         let result = match maybe_editing.unwrap().get_id().as_str() {
             PATH => {
-                let strategy = DelegatingPathCompleter::new(current);
-                completion_helper.complete_normalized_paths(&strategy, all_branches)
-            },
+                let strategy = SwitchingPathCompleter::new(current);
+                completion_helper.complete_normalized_paths(&strategy, all_branches)?
+            }
             _ => vec![],
         };
         Ok(result)

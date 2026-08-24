@@ -1,7 +1,7 @@
 mod frozen;
+pub mod normalized;
 mod revision;
 mod structure;
-pub mod normalized;
 
 use crate::model::{NodeData, NormalizedPath, ToNormalizedPath};
 use crate::vcs::VCS;
@@ -11,11 +11,10 @@ pub use revision::*;
 use std::cell::RefCell;
 use std::fmt::Debug;
 pub use structure::*;
-/*
-    ####################
-        Access Modes
-    ####################
-*/
+
+// ################
+// # Access Modes #
+// ################
 
 pub trait AccessMode: Debug {
     fn lock() -> bool;
@@ -36,5 +35,19 @@ pub struct Locked;
 impl AccessMode for Locked {
     fn lock() -> bool {
         true
+    }
+}
+
+// ####################
+// # Formatting Trait #
+// ####################
+
+pub trait ColorFormat {
+    fn formatted(&self, colored: bool) -> String;
+}
+
+impl<T: ColorFormat> ColorFormat for &T {
+    fn formatted(&self, colored: bool) -> String {
+        (*self).formatted(colored)
     }
 }

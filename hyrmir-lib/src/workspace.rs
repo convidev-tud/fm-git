@@ -99,9 +99,7 @@ where
                 .root_view()
                 .move_to(current.get_path(), repository)?;
             let current_view = match current.get_revision() {
-                NormalizedRevision::Head => {
-                    current_semantic_view.head().convert_to_rev()
-                }
+                NormalizedRevision::None => current_semantic_view.head().convert_to_rev(),
                 NormalizedRevision::Revision(revision) => {
                     current_semantic_view.rev(revision).unwrap()
                 }

@@ -1,29 +1,35 @@
+use crate::completion::NormalizedCompleter;
+use hyrmir_lib::model::{Normalize, Normalized, NormalizedRevision};
 use std::collections::HashSet;
-use crate::completion::NormalizedPathCompleter;
-use hyrmir_lib::model::{NormalizedPath, ToNormalizedPath};
 
 pub struct FullRelativePathCompleter {
-    reference_path: NormalizedPath,
+    reference: Normalized,
 }
 
 impl FullRelativePathCompleter {
-    pub fn new(reference_path: impl ToNormalizedPath) -> Self {
-        let reference_path = reference_path.to_normalized_path();
-        Self { reference_path }
+    pub fn new(reference: Normalized) -> Self {
+        Self { reference }
     }
 
     fn transform_and_filter_path(
         &self,
-        prefix: &NormalizedPath,
-        paths: impl Iterator<Item=NormalizedPath>
-    ) -> impl Iterator<Item=NormalizedPath> {
-        let transformed_prefix = match prefix.last_segment().as_str() {
-            "." | ".." => prefix.as_dir(),
-            _ => prefix.clone(),
-        };
-        let current_position = self.reference_path.clone() + transformed_prefix.clone();
+        prefix: &Normalized,
+        paths: impl Iterator<Item = Normalized>,
+    ) -> impl Iterator<Item = Normalized> {
+        let prefix_path = prefix.get_path();
+        let current_position = self.reference.get_path().clone() + &prefix_path;
         let current_index = current_position.len() - 1;
-        paths.filter_map(move |path| {
+        paths.filter_map(move |normalized| {
+            match (prefix.get_revision(), normalized.get_revision()) {
+                (NormalizedRevision::Revision(rev1), NormalizedRevision::Revision(rev2)) => {
+                    if !rev2.starts_with(rev1) {
+                        return None;
+                    }
+                }
+                (NormalizedRevision::Revision(_), NormalizedRevision::None) => return None,
+                _ => {}
+            }
+            let path = normalized.get_path();
             if !path.starts_with(&current_position) {
                 return None;
             }
@@ -31,39 +37,50 @@ impl FullRelativePathCompleter {
                 return None;
             }
             let new_path = path.strip_n_left(current_index);
-            if transformed_prefix.len() == 1 {
-                Some(new_path)
+            if prefix_path.len() == 1 {
+                Some(Normalized::new(new_path, normalized.get_revision().clone()))
             } else {
-                Some(
-                    transformed_prefix.strip_until_n_right(transformed_prefix.len() - 1)
-                    + new_path
-                )
+                let new_path = prefix_path.strip_until_n_right(prefix_path.len() - 1) + &new_path;
+                Some(Normalized::new(new_path, normalized.get_revision().clone()))
             }
         })
     }
 }
 
-impl NormalizedPathCompleter for FullRelativePathCompleter {
-    fn complete(&self, prefix: impl ToNormalizedPath, paths: impl Iterator<Item=NormalizedPath>) -> Vec<String> {
-        let prefix = prefix.to_normalized_path();
-        let filtered: Vec<NormalizedPath> = self
-            .transform_and_filter_path(&prefix, paths)
+impl NormalizedCompleter for FullRelativePathCompleter {
+    fn complete(
+        &self,
+        prefix: impl AsRef<Normalized>,
+        paths: impl Iterator<Item = Normalized>,
+    ) -> Vec<String> {
+        let prefix = prefix.as_ref();
+        let prefix_path = prefix.get_path();
+        let transformed_prefix = match prefix_path.last_segment().as_str() {
+            "." | ".." => prefix_path.as_dir(),
+            _ => prefix_path.clone(),
+        };
+        let filtered: Vec<Normalized> = self
+            .transform_and_filter_path(
+                &Normalized::new(transformed_prefix.clone(), prefix.get_revision().clone()),
+                paths,
+            )
             .collect();
         match filtered.len() {
             0 => vec![],
             1 => vec![filtered[0].to_string()],
             _ => {
-                let current_index = prefix.len();
+                let current_index = transformed_prefix.len();
                 let all = filtered
                     .iter()
-                    .map(|path| {
+                    .map(|normalized| {
+                        let path = normalized.get_path();
                         let to_index = path.strip_until_n_right(current_index);
                         let to_return = if path.len() == current_index {
                             to_index
                         } else {
                             to_index.as_dir()
                         };
-                        to_return.to_string()
+                        Normalized::new(to_return, normalized.get_revision().clone()).to_string()
                     })
                     .collect::<HashSet<_>>()
                     .into_iter()
@@ -80,99 +97,190 @@ impl NormalizedPathCompleter for FullRelativePathCompleter {
 
 #[cfg(test)]
 mod tests {
-    use crate::completion::test_utils::setup_qualified_paths;
     use super::*;
+    use crate::completion::test_utils::setup_normalized;
 
     #[test]
-    fn test_relative_path_completion_from_virtual_root() {
-        let paths = setup_qualified_paths();
-        let completion = FullRelativePathCompleter::new("");
-
-        let mut direct = completion.complete("", paths.clone().into_iter());
-        direct.sort();
-        assert_eq!(direct, vec!["bar", "foo", "foo/",]);
-
-        let mut prefixed1 =
-            completion.complete("/f", paths.clone().into_iter());
-        prefixed1.sort();
-        assert_eq!(prefixed1, vec!["/foo", "/foo/"]);
-
-        let mut prefixed2 =
-            completion.complete("/", paths.clone().into_iter());
-        prefixed2.sort();
-        assert_eq!(prefixed2, vec!["/bar", "/foo", "/foo/"]);
+    fn test_full_path_completion_direct_from_root() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("".normalize(), paths.into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["bar", "foo", "foo/", "foo:1.0", "foo:2.0"]);
     }
 
     #[test]
-    fn test_relative_path_completion_relative_identifier_current_path() {
-        let paths = setup_qualified_paths();
-        let completion = FullRelativePathCompleter::new("/foo");
-
-        let mut direct = completion.complete(".", paths.clone().into_iter());
-        direct.sort();
-        assert_eq!(
-            direct,
-            vec!["./abc", "./abc/def", "./bar/baz1", "./bar/baz2"]
-        );
-
-        let mut direct_with_slash =
-            completion.complete("./", paths.clone().into_iter());
-        direct_with_slash.sort();
-        assert_eq!(direct_with_slash, vec!["./abc", "./abc/", "./bar/"]);
-
-        let mut prefixed =
-            completion.complete("./a", paths.clone().into_iter());
-        prefixed.sort();
-        assert_eq!(prefixed, vec!["./abc", "./abc/"]);
-
-        let mut consecutive = completion.complete("./b", paths.into_iter());
-        consecutive.sort();
-        assert_eq!(consecutive, vec!["./bar/baz1", "./bar/baz2"]);
+    fn test_full_path_completion_direct_root_prefix_1() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("/f".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["/foo", "/foo/", "/foo:1.0", "/foo:2.0"]);
     }
 
     #[test]
-    fn test_relative_path_completion_relative_identifier_previous_path() {
-        let paths = setup_qualified_paths();
-        let completion = FullRelativePathCompleter::new("/foo");
-
-        let mut direct =
-            completion.complete("../", paths.clone().into_iter());
-        direct.sort();
-        assert_eq!(direct, vec!["../bar", "../foo", "../foo/"]);
-
-        let mut consecutive =
-            completion.complete("../foo/", paths.clone().into_iter());
-        consecutive.sort();
+    fn test_full_path_completion_direct_root_prefix_2() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("/".normalize(), paths.clone().into_iter());
+        completion.sort();
         assert_eq!(
-            consecutive,
-            vec!["../foo/abc", "../foo/abc/", "../foo/bar/"]
-        );
-
-        let mut previous_of_previous =
-            completion.complete("abc/../../", paths.into_iter());
-        previous_of_previous.sort();
-        assert_eq!(
-            previous_of_previous,
-            vec!["abc/../../bar", "abc/../../foo", "abc/../../foo/"]
+            completion,
+            vec!["/bar", "/foo", "/foo/", "/foo:1.0", "/foo:2.0"]
         );
     }
 
     #[test]
-    fn test_relative_path_completion_current_path() {
-        let paths = setup_qualified_paths();
-        let completion = FullRelativePathCompleter::new("/foo");
+    fn test_full_path_completion_current_path() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["abc", "abc/", "bar/"]);
+    }
 
-        let mut direct = completion.complete("", paths.clone().into_iter());
-        direct.sort();
-        assert_eq!(direct, vec!["abc", "abc/", "bar/"]);
+    #[test]
+    fn test_full_path_completion_current_path_prefix() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("a".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["abc", "abc/"]);
+    }
 
-        let mut prefixed =
-            completion.complete("a", paths.clone().into_iter());
-        prefixed.sort();
-        assert_eq!(prefixed, vec!["abc", "abc/"]);
+    #[test]
+    fn test_full_path_completion_current_path_prefix_forward() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("b".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["bar/baz1", "bar/baz2"]);
+    }
 
-        let mut consecutive = completion.complete("b", paths.into_iter());
-        consecutive.sort();
-        assert_eq!(consecutive, vec!["bar/baz1", "bar/baz2"]);
+    #[test]
+    fn test_full_path_completion_relative_current() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete(".".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["./abc", "./abc/", "./bar/"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_current_slash() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("./".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["./abc", "./abc/", "./bar/"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_current_slash_and_prefix() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("./a".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["./abc", "./abc/"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_current_slash_and_prefix_forward() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("./b".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["./bar/baz1", "./bar/baz2"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_previous() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("..".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(
+            completion,
+            vec!["../bar", "../foo", "../foo/", "../foo:1.0", "../foo:2.0"]
+        );
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_previous_slash() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("../".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(
+            completion,
+            vec!["../bar", "../foo", "../foo/", "../foo:1.0", "../foo:2.0"]
+        );
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_previous_slash_prefix() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("../foo".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(
+            completion,
+            vec!["../foo", "../foo/", "../foo:1.0", "../foo:2.0"]
+        );
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_previous_slash_prefix_trailing_slash() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion = completer.complete("../foo/".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["../foo/abc", "../foo/abc/", "../foo/bar/"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_relative_previous_mixed() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("/foo".normalize());
+        let mut completion =
+            completer.complete("abc/../../".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(
+            completion,
+            vec![
+                "abc/../../bar",
+                "abc/../../foo",
+                "abc/../../foo/",
+                "abc/../../foo:1.0",
+                "abc/../../foo:2.0"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_full_path_completion_direct_full_revision() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("foo:1.0".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["foo:1.0"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_direct_completion_partial_revision() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("foo:1".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["foo:1.0"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_direct_completion_empty_string_revision() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("foo:".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["foo:1.0", "foo:2.0"]);
     }
 }

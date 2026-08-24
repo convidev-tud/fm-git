@@ -1,12 +1,9 @@
-use std::borrow::Borrow;
-use std::cell::RefCell;
-use std::cmp::Ordering;
 use crate::model::*;
-use crate::vcs::{VCSError, VCS};
+use crate::vcs::{RevisionId, VCS, VCSError};
+use indextree::Node;
+use std::cell::RefCell;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
-use indextree::Node;
-use itertools::Itertools;
 use thiserror::Error;
 
 /*
@@ -89,7 +86,7 @@ impl RevPointer for Rev {
 // # Main Definition #
 // ###################
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialOrd, Ord)]
 pub struct RevisionView<'a, S, R, M, V>
 where
     S: IsConcrete,
@@ -156,10 +153,7 @@ where
         let structure_view = self.structure_view.private_clone();
         let revision = self.revision.clone();
         drop(self);
-        RevisionView::<'a, S, R2, M2, V>::private_new(
-            structure_view,
-            revision,
-        )
+        RevisionView::<'a, S, R2, M2, V>::private_new(structure_view, revision)
     }
 
     pub(crate) fn get_node(&self) -> &Node<RefCell<NodeData<V>>> {
@@ -195,15 +189,8 @@ where
         let revision_pointer = if R::is_head() {
             RevisionPointer::Head(revision.clone())
         } else {
-            let node = self
-                .get_structure_view()
-                .get_node()
-                .get()
-                .borrow();
-            let head = node
-                .get_branch_info()
-                .unwrap()
-                .get_head();
+            let node = self.get_structure_view().get_node().get().borrow();
+            let head = node.get_branch_info().unwrap().get_head();
             if revision == head {
                 RevisionPointer::Head(revision.clone())
             } else {
@@ -283,6 +270,23 @@ where
 // # Trait Implementations #
 // #########################
 
+impl<'a, S, R, M, V> Normalize for RevisionView<'a, S, R, M, V>
+where
+    S: IsConcrete,
+    R: RevPointer,
+    M: AccessMode,
+    V: VCS,
+{
+    fn try_normalize(&self) -> Result<Normalized, NormalizeError> {
+        let path = self.get_structure_view().to_normalized_path();
+        let revision = match R::is_head() {
+            true => NormalizedRevision::None,
+            false => NormalizedRevision::Revision(self.revision.get_full_id()),
+        };
+        Ok(Normalized::new(path, revision))
+    }
+}
+
 impl<'a, S, R, M, V> Display for RevisionView<'a, S, R, M, V>
 where
     S: IsConcrete,
@@ -296,58 +300,16 @@ where
     }
 }
 
-impl<'a, S1, S2, M1, M2, V> PartialEq<RevisionView<'a, S2, M2, V>> for RevisionView<'a, S1, M1, V>
-where
-    S1: SymbolicNodeType,
-    S2: SymbolicNodeType,
-    M1: AccessMode,
-    M2: AccessMode,
-    V: VCS,
-{
-    fn eq(&self, other: &RevisionView<'a, S2, M2, V>) -> bool {
-        self.to_normalized_path() == other.to_normalized_path()
-    }
-}
-
-impl<'a, S, M, V, T> PartialEq<T> for RevisionView<'a, S, M, V>
+impl<'a, S, R, M, V, T> PartialEq<T> for RevisionView<'a, S, R, M, V>
 where
     S: IsConcrete,
+    R: RevPointer,
     M: AccessMode,
     V: VCS,
-    T: Borrow<str>
+    T: Normalize,
 {
     fn eq(&self, other: &T) -> bool {
-        self.to_normalized_path() == other.borrow()
-    }
-}
-
-impl<'a, S, M, V> Eq for RevisionView<'a, S, M, V>
-where
-    S: IsConcrete,
-    M: AccessMode,
-    V: VCS,
-{}
-
-impl<'a, S, M, V> PartialOrd for RevisionView<'a, S, M, V>
-where
-    S: IsConcrete,
-    M: AccessMode,
-    V: VCS,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.to_normalized_path()
-            .partial_cmp(&other.to_normalized_path())
-    }
-}
-
-impl<'a, S, M, V> Ord for RevisionView<'a, S, M, V>
-where
-    S: IsConcrete,
-    M: AccessMode,
-    V: VCS,
-{
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(&other).unwrap()
+        self.normalize() == other.normalize()
     }
 }
 
@@ -373,37 +335,41 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::repository::test_utils::prepare_repo;
     use super::*;
+    use crate::repository::test_utils::prepare_repo;
 
     #[test]
-    #[should_panic(expected = "Cannot create revision view for '/main/feature/foo': node is locked")]
+    #[should_panic(
+        expected = "Cannot create revision view for '/main/feature/foo': node is locked"
+    )]
     fn test_revision_view_lock_and_create_second() {
         let repo = prepare_repo();
         let root = repo.root_view();
         let _view = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head()
             .lock();
-        root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+        root.move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head();
     }
 
     #[test]
-    #[should_panic(expected = "Cannot lock node for revision view '/main/feature/foo': there are 1 other revision views referencing it")]
+    #[should_panic(
+        expected = "Cannot lock node for revision view '/main/feature/foo': there are 1 other revision views referencing it"
+    )]
     fn test_revision_view_lock_while_other_exists() {
         let repo = prepare_repo();
         let root = repo.root_view();
         let _view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head();
         let _view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head()
             .lock();
@@ -415,7 +381,7 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head()
             .lock();
@@ -423,7 +389,7 @@ mod tests {
         let view1 = view1.unlock();
         assert!(!view1.get_node().get().borrow().is_revision_locked());
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .head();
         assert_eq!(view1, view2);
@@ -435,14 +401,23 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
-        assert_eq!(view2.get_node().get().borrow().structure_views_referenced(), 2);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
+        assert_eq!(
+            view2.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
     }
 
     #[test]
@@ -451,14 +426,23 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
         drop(view2);
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
     }
 }

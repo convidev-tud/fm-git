@@ -1,34 +1,36 @@
-mod helper;
-mod full;
-mod search;
 mod delegation;
+mod full;
+mod helper;
+mod search;
 
-pub use helper::*;
-pub use full::*;
-pub use search::*;
 pub use delegation::*;
-use hyrmir_lib::model::{NormalizedPath, ToNormalizedPath};
+pub use full::*;
+pub use helper::*;
+use hyrmir_lib::model::Normalized;
+pub use search::*;
 
-pub trait NormalizedPathCompleter {
+pub trait NormalizedCompleter {
     fn complete(
         &self,
-        prefix: impl ToNormalizedPath,
-        paths: impl Iterator<Item = NormalizedPath>,
+        prefix: impl AsRef<Normalized>,
+        paths: impl Iterator<Item = Normalized>,
     ) -> Vec<String>;
 }
 
 #[cfg(test)]
 pub mod test_utils {
-    use hyrmir_lib::model::NormalizedPath;
+    use hyrmir_lib::model::{Normalize, Normalized};
 
-    pub fn setup_qualified_paths() -> Vec<NormalizedPath> {
+    pub fn setup_normalized() -> Vec<Normalized> {
         vec![
-            NormalizedPath::from("/foo"),
-            NormalizedPath::from("/foo/bar/baz1"),
-            NormalizedPath::from("/foo/bar/baz2"),
-            NormalizedPath::from("/foo/abc/def"),
-            NormalizedPath::from("/foo/abc"),
-            NormalizedPath::from("/bar"),
+            "/foo".normalize(),
+            "/foo:1.0".normalize(),
+            "/foo:2.0".normalize(),
+            "/foo/bar/baz1".normalize(),
+            "/foo/bar/baz2".normalize(),
+            "/foo/abc/def".normalize(),
+            "/foo/abc".normalize(),
+            "/bar".normalize(),
         ]
     }
 }

@@ -2,10 +2,10 @@ use crate::model::*;
 use crate::vcs::*;
 use crate::workspace::*;
 use indextree::{Arena, Node, NodeId};
+use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use itertools::Itertools;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -187,9 +187,9 @@ impl<V: VCS> Repository<V> {
 
 #[cfg(test)]
 pub mod test_utils {
-    use crate::vcs::test_utils::TestVCS;
     use super::*;
-    
+    use crate::vcs::test_utils::TestVCS;
+
     pub fn prepare_repo() -> Repository<TestVCS> {
         let mut repo = Repository::new(TestVCS::new());
         repo.scan_repository().unwrap();

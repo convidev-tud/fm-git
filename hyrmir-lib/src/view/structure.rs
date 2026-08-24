@@ -1,9 +1,9 @@
-use std::borrow::Borrow;
 use crate::model::*;
 use crate::repository::Repository;
 use crate::vcs::VCS;
 use indextree::{Arena, Node, NodeId};
 use itertools::Itertools;
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
@@ -201,7 +201,7 @@ where
         }
         if M::lock() {
             let referenced = node.structure_views_referenced() - 1;
-            if referenced  > 0 {
+            if referenced > 0 {
                 drop(node);
                 panic!(
                     "Cannot lock node for structure view '{}': there are {referenced} other structure views referencing it",
@@ -314,7 +314,7 @@ where
     /// ```
     pub fn move_to<To: SymbolicNodeType>(
         self,
-        path: impl Borrow<NormalizedPath>,
+        path: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
         fn make_error_node(name: String) -> FrozenNode {
@@ -322,7 +322,7 @@ where
         }
 
         // set path to absolute from root
-        let path = self.to_normalized_path() + path.borrow();
+        let path = self.to_normalized_path() + path.as_ref();
         let root = self.get_root_id();
         let mut current = Some(root);
         let mut id_vec: Vec<NodeId> = vec![root];
@@ -365,7 +365,7 @@ where
 
     fn move_to_guaranteed_type<To: SymbolicNodeType>(
         self,
-        path: impl Borrow<NormalizedPath>,
+        path: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, To, M, V>, PathDoesNotExistError<V>> {
         match self.move_to::<To>(path, repo) {
@@ -389,7 +389,7 @@ where
     pub(crate) fn private_clone(&self) -> Self {
         Self::new(self.id, self.repo).unwrap()
     }
-    
+
     pub fn clone(&self, repo: &'a Repository<V>) -> Self {
         Self::new(self.id, repo).unwrap()
     }
@@ -463,7 +463,7 @@ where
 impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
     pub fn move_to_area<C: NodeClassification>(
         self,
-        area: impl Borrow<NormalizedPath>,
+        area: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
     ) -> Result<StructureView<'a, Area<C>, M, V>, SemanticViewError<V>> {
         self.move_to(area, repo)
@@ -512,7 +512,11 @@ where
     V: VCS,
 {
     fn to_normalized_path(&self) -> NormalizedPath {
-        todo!()
+        NormalizedPath::from_iter(
+            self.get_node_path()
+                .iter()
+                .map(|n| n.get().borrow().get_name().clone()),
+        )
     }
 }
 
@@ -527,28 +531,15 @@ where
     }
 }
 
-impl<'a, S1, S2, M1, M2, V> PartialEq<StructureView<'a, S2, M2, V>> for StructureView<'a, S1, M1, V>
-where
-    S1: SymbolicNodeType,
-    S2: SymbolicNodeType,
-    M1: AccessMode,
-    M2: AccessMode,
-    V: VCS,
-{
-    fn eq(&self, other: &StructureView<'a, S2, M2, V>) -> bool {
-        self.to_normalized_path() == other.to_normalized_path()
-    }
-}
-
 impl<'a, S, M, V, T> PartialEq<T> for StructureView<'a, S, M, V>
 where
     S: SymbolicNodeType,
     M: AccessMode,
     V: VCS,
-    T: Borrow<str>
+    T: ToNormalizedPath,
 {
     fn eq(&self, other: &T) -> bool {
-        self.to_normalized_path() == other.borrow()
+        self.to_normalized_path() == other.to_normalized_path()
     }
 }
 
@@ -557,7 +548,8 @@ where
     S: SymbolicNodeType,
     M: AccessMode,
     V: VCS,
-{}
+{
+}
 
 impl<'a, S, M, V> PartialOrd for StructureView<'a, S, M, V>
 where
@@ -623,14 +615,16 @@ impl<T: SymbolicNodeType> FilterByType<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::repository::test_utils::prepare_repo;
     use super::*;
+    use crate::repository::test_utils::prepare_repo;
 
     #[test]
     fn test_structure_view_move_without_errors() {
         let repo = prepare_repo();
         let root = repo.root_view();
-        let feature = root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo).unwrap();
+        let feature = root
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
+            .unwrap();
         assert_eq!(feature, "/main/feature/foo");
     }
 
@@ -638,15 +632,13 @@ mod tests {
     fn test_structure_view_move_wrong_path() {
         let repo = prepare_repo();
         let root = repo.root_view();
-        match root.move_to::<Feature<Concrete>>("/main/nothing", &repo) {
-            Err(error) => {
-                match error {
-                    SemanticViewError::PathDoesNotExist(error) => {
-                        assert_eq!(error.path, "/main/nothing")
-                    }
-                    _ => panic!("Wrong error variant!"),
+        match root.move_to::<Feature<Concrete>>("/main/nothing".normalize(), &repo) {
+            Err(error) => match error {
+                SemanticViewError::PathDoesNotExist(error) => {
+                    assert_eq!(error.path, "/main/nothing")
                 }
-            }
+                _ => panic!("Wrong error variant!"),
+            },
             Ok(_) => panic!("Should have returned an error"),
         }
     }
@@ -655,44 +647,46 @@ mod tests {
     fn test_structure_view_move_wrong_type() {
         let repo = prepare_repo();
         let root = repo.root_view();
-        match root.move_to::<Product<Concrete>>("/main/feature/foo", &repo) {
-            Err(error) => {
-                match error {
-                    SemanticViewError::InvalidType(error) => {
-                        assert_eq!(error.path, "/main/feature/foo")
-                    }
-                    _ => panic!("Wrong error variant!"),
+        match root.move_to::<Product<Concrete>>("/main/feature/foo".normalize(), &repo) {
+            Err(error) => match error {
+                SemanticViewError::InvalidType(error) => {
+                    assert_eq!(error.path, "/main/feature/foo")
                 }
-            }
+                _ => panic!("Wrong error variant!"),
+            },
             Ok(_) => panic!("Should have returned an error"),
         }
     }
 
     #[test]
-    #[should_panic(expected = "Cannot create structure view for '/main/feature/foo': node is locked")]
+    #[should_panic(
+        expected = "Cannot create structure view for '/main/feature/foo': node is locked"
+    )]
     fn test_structure_view_lock_and_create_second() {
         let repo = prepare_repo();
         let root = repo.root_view();
         let view = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
         let _locked = view.lock();
-        root.move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+        root.move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "Cannot lock node for structure view '/main/feature/foo': there are 1 other structure views referencing it")]
+    #[should_panic(
+        expected = "Cannot lock node for structure view '/main/feature/foo': there are 1 other structure views referencing it"
+    )]
     fn test_structure_view_lock_while_other_exists() {
         let repo = prepare_repo();
         let root = repo.root_view();
         let _view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
         let _view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .lock();
     }
@@ -703,14 +697,14 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .lock();
         assert!(view1.get_node().get().borrow().is_structure_locked());
         let view1 = view1.unlock();
         assert!(!view1.get_node().get().borrow().is_structure_locked());
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
         assert_eq!(view1, view2);
     }
@@ -721,14 +715,23 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
-        assert_eq!(view2.get_node().get().borrow().structure_views_referenced(), 2);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
+        assert_eq!(
+            view2.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
     }
 
     #[test]
@@ -737,15 +740,24 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 2);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            2
+        );
         drop(view2);
-        assert_eq!(view1.get_node().get().borrow().structure_views_referenced(), 1);
+        assert_eq!(
+            view1.get_node().get().borrow().structure_views_referenced(),
+            1
+        );
     }
 
     #[test]
@@ -754,13 +766,13 @@ mod tests {
         let root = repo.root_view();
         let view1 = root
             .clone(&repo)
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap()
             .lock();
         assert!(view1.get_node().get().borrow().is_structure_locked());
         drop(view1);
         let view2 = root
-            .move_to::<Feature<Concrete>>("/main/feature/foo", &repo)
+            .move_to::<Feature<Concrete>>("/main/feature/foo".normalize(), &repo)
             .unwrap();
         assert!(!view2.get_node().get().borrow().is_structure_locked());
     }
@@ -773,10 +785,7 @@ mod tests {
             .iter_children(&repo)
             .map(|p| p.to_string())
             .collect::<Vec<_>>();
-        assert_eq!(
-            children,
-            vec!["/main"],
-        )
+        assert_eq!(children, vec!["/main"],)
     }
 
     #[test]
