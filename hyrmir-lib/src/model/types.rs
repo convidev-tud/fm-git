@@ -52,8 +52,8 @@ pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     }
 }
 
-/// Defines a type as child of an area.
-pub trait UnderArea: SymbolicNodeType {}
+/// Defines a type as child of a channel.
+pub trait UnderChannel: SymbolicNodeType {}
 
 /// Marker for the virtual root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -67,13 +67,13 @@ impl SymbolicNodeType for VirtualRoot {
     }
 }
 
-/// Marker for an area node.
+/// Marker for a channel node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Area<C: NodeClassification> {
+pub struct Channel<C: NodeClassification> {
     _phantom: PhantomData<C>,
 }
 
-impl<C: NodeClassification> SymbolicNodeType for Area<C> {
+impl<C: NodeClassification> SymbolicNodeType for Channel<C> {
     type Classification = C;
 
     fn compatible() -> Vec<NodeType> {
@@ -93,7 +93,7 @@ impl SymbolicNodeType for FeatureRoot {
     }
 }
 
-impl UnderArea for FeatureRoot {}
+impl UnderChannel for FeatureRoot {}
 
 /// Marker of a feature node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -113,7 +113,7 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
     }
 }
 
-impl<C: NodeClassification> UnderArea for Feature<C> {}
+impl<C: NodeClassification> UnderChannel for Feature<C> {}
 
 /// Marker for the product root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -127,7 +127,7 @@ impl SymbolicNodeType for ProductRoot {
     }
 }
 
-impl UnderArea for ProductRoot {}
+impl UnderChannel for ProductRoot {}
 
 /// Marker of a product node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -147,7 +147,7 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
     }
 }
 
-impl<C: NodeClassification> UnderArea for Product<C> {}
+impl<C: NodeClassification> UnderChannel for Product<C> {}
 
 /// Placeholder if the exact node type is unknown or does not matter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -162,14 +162,14 @@ impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
         match Self::Classification::requires_artifact() {
             Some(true) => {
                 vec![
-                    NodeType::Area(true),
+                    NodeType::Channel(true),
                     NodeType::Feature(true),
                     NodeType::Product(true),
                 ]
             }
             Some(false) => {
                 vec![
-                    NodeType::Area(false),
+                    NodeType::Channel(false),
                     NodeType::Feature(false),
                     NodeType::Product(false),
                     NodeType::VirtualRoot,
@@ -179,10 +179,10 @@ impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
             }
             None => {
                 vec![
-                    NodeType::Area(true),
+                    NodeType::Channel(true),
                     NodeType::Feature(true),
                     NodeType::Product(true),
-                    NodeType::Area(false),
+                    NodeType::Channel(false),
                     NodeType::Feature(false),
                     NodeType::Product(false),
                     NodeType::VirtualRoot,

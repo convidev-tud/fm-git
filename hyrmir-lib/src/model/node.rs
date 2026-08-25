@@ -58,7 +58,7 @@ impl VirtualRootMetadata {
 pub enum NodeType {
     // Valid types
     VirtualRoot,
-    Area(bool),
+    Channel(bool),
     FeatureRoot,
     ProductRoot,
     Feature(bool),
@@ -76,8 +76,8 @@ impl NodeType {
         concrete: bool,
     ) -> Result<NodeType, MalformedModelError> {
         match self {
-            Self::VirtualRoot => Ok(Self::Area(concrete)),
-            Self::Area(_) => match name {
+            Self::VirtualRoot => Ok(Self::Channel(concrete)),
+            Self::Channel(_) => match name {
                 FEATURE_ROOT => Ok(Self::FeatureRoot),
                 PRODUCT_ROOT => Ok(Self::ProductRoot),
                 _ => Err(MalformedModelError::new("Expected 'feature' or 'product'")),
@@ -91,14 +91,14 @@ impl NodeType {
 
     pub fn accepts_explicit_version(&self) -> bool {
         match self {
-            Self::Area(true) | Self::Feature(true) | Self::Product(true) => true,
+            Self::Channel(true) | Self::Feature(true) | Self::Product(true) => true,
             _ => false,
         }
     }
 
     pub fn format_node_display(&self, name: ColoredString) -> ColoredString {
         match self {
-            Self::Area(_) => name.yellow(),
+            Self::Channel(_) => name.yellow(),
             Self::FeatureRoot => name.bright_purple(),
             Self::Feature(_) => name.purple(),
             Self::ProductRoot => name.truecolor(231, 100, 18),
@@ -110,7 +110,7 @@ impl NodeType {
     pub fn get_type_name(&self) -> String {
         let name: &str = match self {
             Self::VirtualRoot => "virtual root",
-            Self::Area(_) => "area",
+            Self::Channel(_) => "channel",
             Self::FeatureRoot => "feature root",
             Self::ProductRoot => "product root",
             Self::Feature(_) => "feature",
@@ -123,7 +123,7 @@ impl NodeType {
     pub fn get_short_type_name(&self) -> String {
         let name: &str = match self {
             Self::VirtualRoot => "vr",
-            Self::Area(_) => "a",
+            Self::Channel(_) => "c",
             Self::FeatureRoot => "fr",
             Self::ProductRoot => "pr",
             Self::Feature(_) => "f",

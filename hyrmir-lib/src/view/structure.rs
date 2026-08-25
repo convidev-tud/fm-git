@@ -448,29 +448,29 @@ where
 
 impl<'a, T, M, V> StructureView<'a, T, M, V>
 where
-    T: UnderArea,
+    T: UnderChannel,
     M: AccessMode,
     V: VCS,
 {
-    pub fn move_to_area<C: NodeClassification>(
+    pub fn move_to_parent_channel<C: NodeClassification>(
         self,
         repo: &'a Repository<V>,
-    ) -> StructureView<'a, Area<C>, M, V> {
+    ) -> StructureView<'a, Channel<C>, M, V> {
         self.move_to_index(1, repo).unwrap()
     }
 }
 
 impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
-    pub fn move_to_area<C: NodeClassification>(
+    pub fn move_to_channel<C: NodeClassification>(
         self,
-        area: impl AsRef<NormalizedPath>,
+        channel: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
-    ) -> Result<StructureView<'a, Area<C>, M, V>, SemanticViewError<V>> {
-        self.move_to(area, repo)
+    ) -> Result<StructureView<'a, Channel<C>, M, V>, SemanticViewError<V>> {
+        self.move_to(channel, repo)
     }
 }
 
-impl<'a, C, M, V> StructureView<'a, Area<C>, M, V>
+impl<'a, C, M, V> StructureView<'a, Channel<C>, M, V>
 where
     C: NodeClassification,
     M: AccessMode,
