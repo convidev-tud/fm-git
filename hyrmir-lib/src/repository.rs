@@ -173,14 +173,14 @@ impl<V: VCS> Repository<V> {
         &self.vcs
     }
 
-    pub fn root_view(&self) -> StructureView<VirtualRoot, Shared, V> {
-        StructureView::<VirtualRoot, Shared, V>::new(self.root_id, &self).unwrap()
+    pub fn root_view(&self) -> StructureView<VirtualRoot, Read, V> {
+        StructureView::<VirtualRoot, Read, V>::new(self.root_id, &self).unwrap()
     }
 
     pub fn get_workspace<S: IsConcrete>(
         &'_ self,
         path: PathBuf,
-    ) -> Result<Workspace<'_, S, Rev, Shared, V>, GetWorkSpaceError<V, V::VCSError>> {
+    ) -> Result<Workspace<'_, S, Rev, Read, V>, GetWorkSpaceError<V, V::VCSError>> {
         Workspace::new(path, self)
     }
 }

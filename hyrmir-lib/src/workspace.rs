@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Error, Clone, Debug)]
 pub enum GetWorkSpaceError<V: VCS, VE: VCSError> {
     #[error(transparent)]
-    View(#[from] SemanticViewError<V>),
+    View(#[from] StructureViewError<V>),
     #[error("There is no workspace attached at this path.")]
     NoWorkspace,
     #[error(transparent)]
@@ -85,7 +85,7 @@ where
     }
 }
 
-impl<'a, S, V> Workspace<'a, S, Rev, Shared, V>
+impl<'a, S, V> Workspace<'a, S, Rev, Read, V>
 where
     S: IsConcrete,
     V: VCS,
@@ -104,7 +104,7 @@ where
                     current_semantic_view.rev(revision).unwrap()
                 }
             };
-            Ok(Workspace::<S, Rev, Shared, V> { current_view, path })
+            Ok(Workspace::<S, Rev, Read, V> { current_view, path })
         } else {
             Err(GetWorkSpaceError::NoWorkspace)
         }

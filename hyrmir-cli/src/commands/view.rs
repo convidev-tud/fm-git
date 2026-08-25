@@ -74,8 +74,8 @@ impl<V: VCS> CommandInterface<V> for ViewCommand<V> {
             Ok(path) => path,
             Err(error) => {
                 return match error {
-                    SemanticViewError::PathDoesNotExist(path) => Err(path.into()),
-                    SemanticViewError::InvalidType(_) => Err(format!(
+                    StructureViewError::PathDoesNotExist(path) => Err(path.into()),
+                    StructureViewError::InvalidType(_) => Err(format!(
                         "Cannot view {}: target does not have an associated artifact",
                         target_path.to_string().blue()
                     )

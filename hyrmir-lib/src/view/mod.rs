@@ -9,7 +9,8 @@ pub use frozen::*;
 use indextree::Node;
 pub use revision::*;
 use std::cell::RefCell;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
+use thiserror::Error;
 pub use structure::*;
 
 // ################
@@ -21,18 +22,18 @@ pub trait AccessMode: Debug {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Shared;
+pub struct Read;
 
-impl AccessMode for Shared {
+impl AccessMode for Read {
     fn lock() -> bool {
         false
     }
 }
 
 #[derive(Debug)]
-pub struct Locked;
+pub struct ReadWrite;
 
-impl AccessMode for Locked {
+impl AccessMode for ReadWrite {
     fn lock() -> bool {
         true
     }

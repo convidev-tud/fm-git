@@ -10,11 +10,9 @@ use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use thiserror::Error;
 
-/*
-    ##########
-    # Errors #
-    ##########
-*/
+// ##########
+// # Errors #
+// ##########
 
 #[derive(Error, Clone, Debug)]
 pub struct PathDoesNotExistError<V: VCS> {
@@ -89,7 +87,7 @@ impl<V: VCS> Display for InvalidTypeError<V> {
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum SemanticViewError<V: VCS> {
+pub enum StructureViewError<V: VCS> {
     #[error(transparent)]
     PathDoesNotExist(#[from] PathDoesNotExistError<V>),
     #[error(transparent)]
@@ -219,7 +217,7 @@ where
         StructureView::new(id, repo).unwrap()
     }
 
-    pub(crate) fn new(id: NodeId, repo: &'a Repository<V>) -> Result<Self, SemanticViewError<V>> {
+    pub(crate) fn new(id: NodeId, repo: &'a Repository<V>) -> Result<Self, StructureViewError<V>> {
         let new = Self {
             id,
             repo,
@@ -276,7 +274,7 @@ where
     pub fn iter_children(
         &self,
         repo: &'a Repository<V>,
-    ) -> impl Iterator<Item = StructureView<'a, AnyType<AnyC>, Shared, V>> {
+    ) -> impl Iterator<Item = StructureView<'a, AnyType<AnyC>, Read, V>> {
         let id = self.get_node_id();
         id.children(self.get_repo().get_arena())
             .map(|child| StructureView::new(child, repo).unwrap())
@@ -285,7 +283,7 @@ where
     pub fn iter_children_req(
         &self,
         repo: &'a Repository<V>,
-    ) -> impl Iterator<Item = StructureView<AnyType<AnyC>, Shared, V>> {
+    ) -> impl Iterator<Item = StructureView<AnyType<AnyC>, Read, V>> {
         let id = self.get_node_id();
         id.descendants(self.get_repo().get_arena())
             .skip(1)
@@ -297,7 +295,7 @@ where
         self,
         index: usize,
         repo: &'a Repository<V>,
-    ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
+    ) -> Result<StructureView<'a, To, M, V>, StructureViewError<V>> {
         let path = self.get_id_path();
         Ok(StructureView::<To, M, V>::new(path[index], repo)?)
     }
@@ -316,7 +314,7 @@ where
         self,
         path: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
-    ) -> Result<StructureView<'a, To, M, V>, SemanticViewError<V>> {
+    ) -> Result<StructureView<'a, To, M, V>, StructureViewError<V>> {
         fn make_error_node(name: String) -> FrozenNode {
             FrozenNode::new(name, NodeType::NonExistent)
         }
@@ -370,7 +368,7 @@ where
     ) -> Result<StructureView<'a, To, M, V>, PathDoesNotExistError<V>> {
         match self.move_to::<To>(path, repo) {
             Ok(v) => Ok(v),
-            Err(SemanticViewError::PathDoesNotExist(e)) => Err(e),
+            Err(StructureViewError::PathDoesNotExist(e)) => Err(e),
             _ => unreachable!(),
         }
     }
@@ -381,7 +379,7 @@ where
     }
 }
 
-impl<'a, S, V> StructureView<'a, S, Shared, V>
+impl<'a, S, V> StructureView<'a, S, Read, V>
 where
     S: SymbolicNodeType,
     V: VCS,
@@ -415,33 +413,33 @@ where
     }
 }
 
-impl<'a, S, V> StructureView<'a, S, Shared, V>
+impl<'a, S, V> StructureView<'a, S, Read, V>
 where
     S: IsConcrete,
     V: VCS,
 {
-    pub fn lock(self) -> StructureView<'a, S, Locked, V> {
+    pub fn lock(self) -> StructureView<'a, S, ReadWrite, V> {
         self.convert_access()
     }
 
-    pub fn head(self) -> RevisionView<'a, S, Head, Shared, V> {
-        RevisionView::<'a, S, Head, Shared, V>::new(self)
+    pub fn head(self) -> RevisionView<'a, S, Head, Read, V> {
+        RevisionView::<'a, S, Head, Read, V>::new(self)
     }
 
     pub fn rev(
         self,
         revision: impl Into<String>,
-    ) -> Result<RevisionView<'a, S, Rev, Shared, V>, RevisionError<V, V::VCSError>> {
-        RevisionView::<'a, S, Rev, Shared, V>::new(self, revision)
+    ) -> Result<RevisionView<'a, S, Rev, Read, V>, RevisionError<V, V::VCSError>> {
+        RevisionView::<'a, S, Rev, Read, V>::new(self, revision)
     }
 }
 
-impl<'a, S, V> StructureView<'a, S, Locked, V>
+impl<'a, S, V> StructureView<'a, S, ReadWrite, V>
 where
     S: IsConcrete,
     V: VCS,
 {
-    pub fn unlock(self) -> StructureView<'a, S, Shared, V> {
+    pub fn unlock(self) -> StructureView<'a, S, Read, V> {
         self.convert_access()
     }
 }
@@ -465,7 +463,7 @@ impl<'a, M: AccessMode, V: VCS> StructureView<'a, VirtualRoot, M, V> {
         self,
         channel: impl AsRef<NormalizedPath>,
         repo: &'a Repository<V>,
-    ) -> Result<StructureView<'a, Channel<C>, M, V>, SemanticViewError<V>> {
+    ) -> Result<StructureView<'a, Channel<C>, M, V>, StructureViewError<V>> {
         self.move_to(channel, repo)
     }
 }
@@ -634,7 +632,7 @@ mod tests {
         let root = repo.root_view();
         match root.move_to::<Feature<Concrete>>("/main/nothing".normalize(), &repo) {
             Err(error) => match error {
-                SemanticViewError::PathDoesNotExist(error) => {
+                StructureViewError::PathDoesNotExist(error) => {
                     assert_eq!(error.path, "/main/nothing")
                 }
                 _ => panic!("Wrong error variant!"),
@@ -649,7 +647,7 @@ mod tests {
         let root = repo.root_view();
         match root.move_to::<Product<Concrete>>("/main/feature/foo".normalize(), &repo) {
             Err(error) => match error {
-                SemanticViewError::InvalidType(error) => {
+                StructureViewError::InvalidType(error) => {
                     assert_eq!(error.path, "/main/feature/foo")
                 }
                 _ => panic!("Wrong error variant!"),

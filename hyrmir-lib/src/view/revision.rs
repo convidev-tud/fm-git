@@ -94,7 +94,7 @@ where
     M: AccessMode,
     V: VCS,
 {
-    structure_view: StructureView<'a, S, Shared, V>,
+    structure_view: StructureView<'a, S, Read, V>,
     revision: V::RevisionId,
     _revision_type: PhantomData<R>,
     _access_mode: PhantomData<M>,
@@ -132,7 +132,7 @@ where
     }
 
     fn private_new(
-        structure_view: StructureView<'a, S, Shared, V>,
+        structure_view: StructureView<'a, S, Read, V>,
         revision: V::RevisionId,
     ) -> Self {
         let new = Self {
@@ -161,7 +161,7 @@ where
     }
 
     pub fn assert_revision(
-        structure_view: &StructureView<S, Shared, V>,
+        structure_view: &StructureView<S, Read, V>,
         revision: impl Into<String>,
     ) -> Result<V::RevisionId, RevisionError<V, V::VCSError>> {
         let rev = revision.into();
@@ -176,7 +176,7 @@ where
         }
     }
 
-    pub fn get_structure_view(&self) -> &StructureView<'a, S, Shared, V> {
+    pub fn get_structure_view(&self) -> &StructureView<'a, S, Read, V> {
         &self.structure_view
     }
 
@@ -212,7 +212,7 @@ where
     M: AccessMode,
     V: VCS,
 {
-    pub(crate) fn new(structure_view: StructureView<'a, S, Shared, V>) -> Self {
+    pub(crate) fn new(structure_view: StructureView<'a, S, Read, V>) -> Self {
         let revision = structure_view
             .get_node()
             .get()
@@ -236,7 +236,7 @@ where
     V: VCS,
 {
     pub(crate) fn new(
-        structure_view: StructureView<'a, S, Shared, V>,
+        structure_view: StructureView<'a, S, Read, V>,
         revision: impl Into<String>,
     ) -> Result<Self, RevisionError<V, V::VCSError>> {
         let revision = Self::assert_revision(&structure_view, revision)?;
@@ -244,24 +244,24 @@ where
     }
 }
 
-impl<'a, S, R, V> RevisionView<'a, S, R, Shared, V>
+impl<'a, S, R, V> RevisionView<'a, S, R, Read, V>
 where
     S: IsConcrete,
     R: RevPointer,
     V: VCS,
 {
-    pub fn lock(self) -> RevisionView<'a, S, R, Locked, V> {
+    pub fn lock(self) -> RevisionView<'a, S, R, ReadWrite, V> {
         self.convert()
     }
 }
 
-impl<'a, S, R, V> RevisionView<'a, S, R, Locked, V>
+impl<'a, S, R, V> RevisionView<'a, S, R, ReadWrite, V>
 where
     S: IsConcrete,
     R: RevPointer,
     V: VCS,
 {
-    pub fn unlock(self) -> RevisionView<'a, S, R, Shared, V> {
+    pub fn unlock(self) -> RevisionView<'a, S, R, Read, V> {
         self.convert()
     }
 }
