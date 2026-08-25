@@ -110,7 +110,16 @@ mod tests {
     }
 
     #[test]
-    fn test_full_path_completion_direct_root_prefix_1() {
+    fn test_full_path_completion_direct_root_prefix() {
+        let paths = setup_normalized();
+        let completer = FullRelativePathCompleter::new("".normalize());
+        let mut completion = completer.complete("f".normalize(), paths.clone().into_iter());
+        completion.sort();
+        assert_eq!(completion, vec!["foo", "foo/", "foo:1.0", "foo:2.0"]);
+    }
+
+    #[test]
+    fn test_full_path_completion_direct_root_prefix_slash_1() {
         let paths = setup_normalized();
         let completer = FullRelativePathCompleter::new("".normalize());
         let mut completion = completer.complete("/f".normalize(), paths.clone().into_iter());
@@ -119,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn test_full_path_completion_direct_root_prefix_2() {
+    fn test_full_path_completion_direct_root_prefix_slash_2() {
         let paths = setup_normalized();
         let completer = FullRelativePathCompleter::new("".normalize());
         let mut completion = completer.complete("/".normalize(), paths.clone().into_iter());

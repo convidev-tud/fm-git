@@ -522,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_normalize_absolute() {
-        assert_eq!("/foo/bar".normalize().get_path().path, vec!["/foo", "bar"]);
+        assert_eq!("/foo/bar".normalize().get_path().path, vec!["", "foo", "bar"]);
     }
 
     #[test]
@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_normalize_root() {
-        assert_eq!("/".normalize().get_path().path, vec![""]);
+        assert_eq!("/".normalize().get_path().path, vec!["", ""]);
     }
 
     #[test]
@@ -560,10 +560,17 @@ mod tests {
     }
 
     #[test]
-    fn test_normalized_path_add_root() {
+    fn test_normalized_path_add_empty_string() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("");
-        assert_eq!((l + &r).path, vec![""]);
+        assert_eq!((l + &r).path, vec!["bar", "baz", ""]);
+    }
+
+    #[test]
+    fn test_normalized_path_add_slash() {
+        let l = NormalizedPath::new("bar/baz");
+        let r = NormalizedPath::new("/");
+        assert_eq!((l + &r).path, vec!["", ""]);
     }
 
     #[test]
