@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use thiserror::Error;
-
+use uuid::Uuid;
 // ##########
 // # Errors #
 // ##########
@@ -403,7 +403,7 @@ where
     M: AccessMode,
     V: VCS,
 {
-    pub fn get_vcs_id(&self) -> usize {
+    pub fn get_vcs_id(&self) -> Uuid {
         self.get_node()
             .get()
             .borrow()
@@ -496,6 +496,34 @@ where
     ) -> Result<StructureView<'a, ProductRoot, M, V>, PathDoesNotExistError<V>> {
         let path = self.get_path_to_product_root();
         self.move_to_guaranteed_type(&path, repo)
+    }
+}
+
+impl<'a, S, V> StructureView<'a, S, ReadWrite, V>
+where
+    S: CanBecomeConcrete,
+    V: VCS,
+{
+    pub fn create_branch<T, R, M>(
+        self,
+        revision_view: &RevisionView<T, R, M, V>,
+    ) -> StructureView<'a, S::Target, ReadWrite, V>
+    where
+        T: CanCreate<S::Target>,
+        R: RevPointer,
+        M: AccessMode,
+    {
+        self.get_vcs()
+    }
+}
+
+impl<'a, S, V> StructureView<'a, S, ReadWrite, V>
+where
+    S: CanBecomeAbstract,
+    V: VCS,
+{
+    pub fn delete_branch(self) -> StructureView<'a, S::Target, ReadWrite, V> {
+        todo!()
     }
 }
 

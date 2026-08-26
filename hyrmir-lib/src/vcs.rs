@@ -2,6 +2,7 @@ use crate::model::*;
 use std::error::Error;
 use std::fmt::Debug;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 pub trait VCSError: Error {}
 
@@ -11,13 +12,13 @@ pub trait RevisionId: Debug + Clone + PartialEq + Eq {
 }
 
 pub struct PathInfo<V: RevisionId> {
-    id: usize,
+    id: Uuid,
     path: NormalizedPath,
     version: V,
 }
 
 impl<V: RevisionId> PathInfo<V> {
-    pub fn new(id: usize, path: impl Into<NormalizedPath>, version: V) -> Self {
+    pub fn new(id: Uuid, path: impl Into<NormalizedPath>, version: V) -> Self {
         Self {
             id,
             path: path.into(),
@@ -25,7 +26,7 @@ impl<V: RevisionId> PathInfo<V> {
         }
     }
 
-    pub fn get_id(&self) -> usize {
+    pub fn get_id(&self) -> Uuid {
         self.id
     }
 
@@ -43,7 +44,7 @@ pub trait VCS: Debug {
 
     type RevisionId: RevisionId;
 
-    fn get_current_path(&self, path: &PathBuf) -> Result<Option<Normalized>, Self::VCSError>;
+    fn get_current_path(&self) -> Result<Option<Normalized>, Self::VCSError>;
 
     fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError>;
 
@@ -93,12 +94,14 @@ pub trait VCS: Debug {
         ))
     }
 
-    fn switch_to_branch(
-        &self,
-        id: usize,
-        path: &impl ToNormalizedPath,
-        dir: &PathBuf,
-    ) -> Result<String, Self::VCSError>;
+    fn switch_to_branch(&self, id: Uuid, path: &impl ToNormalizedPath) -> Result<String, Self::VCSError>;
+
+    fn create_branch(&self, uuid: Uuid, path: impl AsRef<NormalizedPath>) -> Result<String, Self::VCSError>;
+    
+    fn rename_branch(&self, uuid: Uuid, new_path: impl AsRef<NormalizedPath>) -> Result<String, Self::VCSError>;
+    
+    fn delete_branch(
+        &self, uuid: Uuid) -> Result<String, Self::VCSError>;
 }
 
 #[cfg(test)]

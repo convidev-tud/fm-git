@@ -1,10 +1,11 @@
-use crate::vcs::{RevisionId, VCS};
+use crate::vcs::VCS;
 use colored::{ColoredString, Colorize};
 use indextree::NodeId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use thiserror::Error;
+use uuid::Uuid;
 
 pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
@@ -146,16 +147,16 @@ impl NodeType {
 
 #[derive(Debug)]
 pub struct BranchInfo<V: VCS> {
-    id: usize,
+    id: Uuid,
     head: V::RevisionId,
 }
 
 impl<V: VCS> BranchInfo<V> {
-    pub fn new(id: usize, head: V::RevisionId) -> Self {
+    pub fn new(id: Uuid, head: V::RevisionId) -> Self {
         Self { id, head }
     }
 
-    pub fn get_id(&self) -> usize {
+    pub fn get_id(&self) -> Uuid {
         self.id
     }
 

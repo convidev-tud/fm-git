@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum MalformedModelVCSError<VE: VCSError> {
@@ -39,7 +40,7 @@ impl<V: VCS> RepositoryLoader<V> {
 pub struct Repository<V: VCS> {
     arena: Arena<RefCell<NodeData<V>>>,
     root_id: NodeId,
-    vcs_id_to_node_id: HashMap<usize, NodeId>,
+    vcs_id_to_node_id: HashMap<Uuid, NodeId>,
     vcs: V,
 }
 

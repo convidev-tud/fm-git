@@ -1,3 +1,5 @@
+//! Type definitions
+
 use crate::model::*;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -52,6 +54,31 @@ pub trait SymbolicNodeType: Clone + Debug + Eq + PartialEq + Hash {
     }
 }
 
+/// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
+///
+/// Is automatically implemented if the type uses [Concrete] as parameter.
+pub trait IsConcrete: SymbolicNodeType {}
+impl<T: SymbolicNodeType<Classification = Concrete>> IsConcrete for T {}
+
+/// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
+///
+/// Is automatically implemented if [Abstract] is used as parameter.
+pub trait IsAbstract: SymbolicNodeType {}
+impl<T: SymbolicNodeType<Classification = Abstract>> IsAbstract for T {}
+
+/// Denotes that an [Abstract] [SymbolicNodeType] may get a branch and become [Concrete] in this process.
+pub trait CanBecomeConcrete: IsAbstract {
+    type Target: IsConcrete;
+}
+
+/// Denotes that a branch may become abstract.
+pub trait CanBecomeAbstract: IsConcrete {
+    type Target: IsAbstract;
+}
+
+/// Defines that a type can create another type.
+pub trait CanCreate<T: IsConcrete>: IsConcrete {}
+
 /// Defines a type as child of a channel.
 pub trait UnderChannel: SymbolicNodeType {}
 
@@ -77,9 +104,15 @@ impl<C: NodeClassification> SymbolicNodeType for Channel<C> {
     type Classification = C;
 
     fn compatible() -> Vec<NodeType> {
-        todo!()
+        match Self::Classification::requires_artifact() {
+            Some(true) => vec![NodeType::Channel(true)],
+            Some(false) => vec![NodeType::Channel(false)],
+            None => vec![NodeType::Channel(true), NodeType::Channel(false)],
+        }
     }
 }
+
+impl CanBecomeConcrete for Channel<Abstract> { type Target = Channel<Concrete>; }
 
 /// Marker for the feature root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -89,7 +122,7 @@ impl SymbolicNodeType for FeatureRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
-        todo!()
+        vec![NodeType::FeatureRoot]
     }
 }
 
@@ -115,6 +148,8 @@ impl<C: NodeClassification> SymbolicNodeType for Feature<C> {
 
 impl<C: NodeClassification> UnderChannel for Feature<C> {}
 
+impl CanBecomeConcrete for Feature<Abstract> { type Target = Feature<Concrete>; }
+
 /// Marker for the product root node.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ProductRoot;
@@ -123,7 +158,7 @@ impl SymbolicNodeType for ProductRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
-        todo!()
+        vec![NodeType::ProductRoot]
     }
 }
 
@@ -148,6 +183,8 @@ impl<C: NodeClassification> SymbolicNodeType for Product<C> {
 }
 
 impl<C: NodeClassification> UnderChannel for Product<C> {}
+
+impl CanBecomeConcrete for Product<Abstract> { type Target = Product<Concrete>; }
 
 /// Placeholder if the exact node type is unknown or does not matter.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -193,15 +230,3 @@ impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
         }
     }
 }
-
-/// Denotes that a [SymbolicNodeType] is concrete (with associated artifact).
-///
-/// Is automatically implemented if the type uses [Concrete] as parameter.
-pub trait IsConcrete: SymbolicNodeType {}
-impl<T: SymbolicNodeType<Classification = Concrete>> IsConcrete for T {}
-
-/// Denotes that a [SymbolicNodeType] is abstract (without associated artifact).
-///
-/// Is automatically implemented if [Abstract] is used as parameter.
-pub trait IsAbstract {}
-impl<T: SymbolicNodeType<Classification = Abstract>> IsAbstract for T {}
