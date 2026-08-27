@@ -407,7 +407,7 @@ where
         self.get_node()
             .get()
             .borrow()
-            .get_branch_info()
+            .get_head()
             .unwrap()
             .get_id()
     }

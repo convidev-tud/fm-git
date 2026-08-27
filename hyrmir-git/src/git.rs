@@ -1,5 +1,5 @@
 use hyrmir_lib::model::*;
-use hyrmir_lib::vcs::{PathInfo, RevisionId, VCS, VCSError};
+use hyrmir_lib::vcs::{BranchInfo, RevisionId, VCS, VCSError};
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::path::PathBuf;
@@ -177,7 +177,7 @@ impl VCS for Git {
     type VCSError = GitError;
     type RevisionId = CommitHash;
 
-    fn get_current_path(&self, _: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
+    fn get_current_branch(&self, _: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
         let command = vec!["branch", "--show-current"];
         let out = self.git_cli.run_attached(&command)?;
         let path_string = output_to_result(out, &command)?;
@@ -192,10 +192,10 @@ impl VCS for Git {
         }
     }
 
-    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError> {
+    fn get_local_branches(&self) -> Result<Vec<BranchInfo<Self::RevisionId>>, Self::VCSError> {
         let branch_command = vec!["branch", "--format=%(refname:short) %(objectname)"];
         let branch_output = self.git_cli.run_attached(&branch_command)?;
-        let all_branches: Vec<PathInfo<Self::RevisionId>> = String::from_utf8(branch_output.stdout)
+        let all_branches: Vec<BranchInfo<Self::RevisionId>> = String::from_utf8(branch_output.stdout)
             .unwrap()
             .trim()
             .split("\n")
@@ -204,7 +204,7 @@ impl VCS for Git {
                 let path_segment = split[0].to_string();
                 let hash = split[1].to_string();
                 let (path, id) = self.split_branch(&path_segment);
-                PathInfo::new(
+                BranchInfo::new(
                     id.parse().unwrap(),
                     NormalizedPath::from_git_branch(path).as_absolute(),
                     CommitHash::new(hash),
@@ -221,7 +221,7 @@ impl VCS for Git {
         todo!()
     }
 
-    fn revision_exists_on_path(
+    fn revision_exists_on_branch(
         &self,
         path: &NormalizedPath,
         version: impl Into<String>,

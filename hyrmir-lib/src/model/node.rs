@@ -144,32 +144,12 @@ impl NodeType {
             .to_string()
     }
 }
-
-#[derive(Debug)]
-pub struct BranchInfo<V: VCS> {
-    id: Uuid,
-    head: V::RevisionId,
-}
-
-impl<V: VCS> BranchInfo<V> {
-    pub fn new(id: Uuid, head: V::RevisionId) -> Self {
-        Self { id, head }
-    }
-
-    pub fn get_id(&self) -> Uuid {
-        self.id
-    }
-
-    pub fn get_head(&self) -> &V::RevisionId {
-        &self.head
-    }
-}
-
 #[derive(Debug)]
 pub struct NodeData<V: VCS> {
     name: String,
+    uuid: Uuid,
     node_type: NodeType,
-    branch_info: Option<BranchInfo<V>>,
+    head: Option<V::RevisionId>,
     children: HashMap<String, NodeId>,
     structure_lock: bool,
     revision_lock: bool,
@@ -180,19 +160,33 @@ pub struct NodeData<V: VCS> {
 impl<V: VCS> NodeData<V> {
     pub fn new(
         name: impl Into<String>,
+        uuid: Uuid,
         node_type: NodeType,
-        branch_info: Option<BranchInfo<V>>,
+        head: Option<V::RevisionId>,
     ) -> Self {
         Self {
             name: name.into(),
+            uuid,
             node_type,
-            branch_info,
+            head,
             children: HashMap::new(),
             structure_lock: false,
             revision_lock: false,
             structure_views_referenced: 0,
             revision_views_referenced: 0,
         }
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    pub(crate) fn get_child(&self, name: &str) -> Option<&NodeId> {
+        self.children.get(name)
+    }
+
+    pub fn get_head(&self) -> Option<&V::RevisionId> {
+        self.head.as_ref()
     }
 
     pub(crate) fn update_name(&mut self, name: impl Into<String>) {
@@ -203,12 +197,28 @@ impl<V: VCS> NodeData<V> {
         self.node_type = node_type;
     }
 
-    pub(crate) fn update_branch_info(&mut self, branch_info: Option<BranchInfo<V>>) {
-        self.branch_info = branch_info;
+    pub(crate) fn update_head(&mut self, head: Option<V::RevisionId>) {
+        self.head = head;
     }
 
     pub(crate) fn add_child(&mut self, id: NodeId, name: impl Into<String>) {
         self.children.insert(name.into(), id);
+    }
+
+    fn decide_child_type(
+        &self,
+        name: &str,
+        head: &Option<V::RevisionId>,
+    ) -> Result<NodeType, MalformedModelError> {
+        let concrete = match head {
+            Some(_) => true,
+            None => false,
+        };
+        self.node_type.decide_next_type(name, concrete)
+    }
+
+    pub fn get_type(&self) -> &NodeType {
+        &self.node_type
     }
 
     pub(crate) fn remove_child(&mut self, name: &str) {
@@ -261,37 +271,5 @@ impl<V: VCS> NodeData<V> {
 
     pub(crate) fn dereference_revision_view(&mut self) {
         self.revision_views_referenced -= 1
-    }
-
-    fn decide_child_type(
-        &self,
-        name: &str,
-        branch_info: &Option<BranchInfo<V>>,
-    ) -> Result<NodeType, MalformedModelError> {
-        let concrete = match branch_info {
-            Some(_) => true,
-            None => false,
-        };
-        self.node_type.decide_next_type(name, concrete)
-    }
-
-    pub fn get_name(&self) -> &String {
-        &self.name
-    }
-
-    pub(crate) fn get_child(&self, name: &str) -> Option<&NodeId> {
-        self.children.get(name)
-    }
-
-    pub fn get_branch_info(&self) -> Option<&BranchInfo<V>> {
-        self.branch_info.as_ref()
-    }
-
-    pub fn mut_get_branch_info(&mut self) -> Option<&mut BranchInfo<V>> {
-        self.branch_info.as_mut()
-    }
-
-    pub fn get_type(&self) -> &NodeType {
-        &self.node_type
     }
 }

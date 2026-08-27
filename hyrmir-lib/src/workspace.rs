@@ -94,7 +94,7 @@ where
         path: PathBuf,
         repository: &'a Repository<V>,
     ) -> Result<Self, GetWorkSpaceError<V, V::VCSError>> {
-        if let Some(current) = repository.get_vcs().get_current_path(&path)? {
+        if let Some(current) = repository.get_vcs().get_current_branch(&path)? {
             let current_semantic_view = repository
                 .root_view()
                 .move_to(current.get_path(), repository)?;

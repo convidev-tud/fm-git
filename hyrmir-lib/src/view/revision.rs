@@ -166,7 +166,7 @@ where
     ) -> Result<V::RevisionId, RevisionError<V, V::VCSError>> {
         let rev = revision.into();
         let vcs = structure_view.get_vcs();
-        if vcs.revision_exists_on_path(&structure_view.to_normalized_path(), &rev)? {
+        if vcs.revision_exists_on_branch(&structure_view.to_normalized_path(), &rev)? {
             let revision = vcs.get_revision(&rev)?.unwrap();
             Ok(revision)
         } else {
@@ -190,7 +190,7 @@ where
             RevisionPointer::Head(revision.clone())
         } else {
             let node = self.get_structure_view().get_node().get().borrow();
-            let head = node.get_branch_info().unwrap().get_head();
+            let head = node.get_head().unwrap();
             if revision == head {
                 RevisionPointer::Head(revision.clone())
             } else {
@@ -217,9 +217,8 @@ where
             .get_node()
             .get()
             .borrow()
-            .get_branch_info()
-            .unwrap()
             .get_head()
+            .unwrap()
             .clone();
         Self::private_new(structure_view, revision)
     }

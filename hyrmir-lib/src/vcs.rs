@@ -1,8 +1,7 @@
 use crate::model::*;
 use std::error::Error;
 use std::fmt::Debug;
-use std::path::PathBuf;
-use uuid::Uuid;
+use std::path::Path;
 
 pub trait VCSError: Error {}
 
@@ -11,31 +10,25 @@ pub trait RevisionId: Debug + Clone + PartialEq + Eq {
     fn get_printable_id(&self) -> String;
 }
 
-pub struct PathInfo<V: RevisionId> {
-    id: Uuid,
-    path: NormalizedPath,
-    version: V,
+pub struct BranchInfo<V: RevisionId> {
+    branch: String,
+    head: V,
 }
 
-impl<V: RevisionId> PathInfo<V> {
-    pub fn new(id: Uuid, path: impl Into<NormalizedPath>, version: V) -> Self {
+impl<V: RevisionId> BranchInfo<V> {
+    pub fn new(branch: impl Into<String>, head: V) -> Self {
         Self {
-            id,
-            path: path.into(),
-            version,
+            branch: branch.into(),
+            head,
         }
     }
 
-    pub fn get_id(&self) -> Uuid {
-        self.id
-    }
-
-    pub fn get_path(&self) -> &NormalizedPath {
-        &self.path
+    pub fn get_branch(&self) -> &String {
+        &self.branch
     }
 
     pub fn get_head(&self) -> &V {
-        &self.version
+        &self.head
     }
 }
 
@@ -44,25 +37,26 @@ pub trait VCS: Debug {
 
     type RevisionId: RevisionId;
 
-    fn get_current_path(&self) -> Result<Option<Normalized>, Self::VCSError>;
+    fn get_local_branches(&self) -> Result<Vec<BranchInfo<Self::RevisionId>>, Self::VCSError>;
 
-    fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError>;
+    fn get_current_branch(&self) -> Result<Option<String>, Self::VCSError>;
+
+    fn revision_exists_on_branch(
+        &self,
+        branch: impl AsRef<str>,
+        revision: impl AsRef<str>,
+    ) -> Result<bool, Self::VCSError>;
 
     fn get_revision(
         &self,
-        version: impl Into<String>,
+        revision: impl AsRef<str>,
     ) -> Result<Option<Self::RevisionId>, Self::VCSError>;
 
-    fn revision_exists_on_path(
+    fn read_file_from_revision(
         &self,
-        path: &NormalizedPath,
-        version: impl Into<String>,
-    ) -> Result<bool, Self::VCSError>;
-
-    fn iter_versions(
-        &self,
-        path: &NormalizedPath,
-    ) -> impl Iterator<Item = Result<Self::RevisionId, Self::VCSError>>;
+        file: impl AsRef<Path>,
+        revision: impl AsRef<str>,
+    ) -> Result<String, Self::VCSError>;
 
     fn get_status_without_current_branch(&self, colored: bool) -> Result<String, Self::VCSError>;
 
@@ -94,14 +88,13 @@ pub trait VCS: Debug {
         ))
     }
 
-    fn switch_to_branch(&self, id: Uuid, path: &impl ToNormalizedPath) -> Result<String, Self::VCSError>;
+    fn switch_to_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError>;
 
-    fn create_branch(&self, uuid: Uuid, path: impl AsRef<NormalizedPath>) -> Result<String, Self::VCSError>;
+    fn create_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError>;
     
-    fn rename_branch(&self, uuid: Uuid, new_path: impl AsRef<NormalizedPath>) -> Result<String, Self::VCSError>;
+    fn rename_branch(&self, old: impl AsRef<str>, new: impl AsRef<str>) -> Result<String, Self::VCSError>;
     
-    fn delete_branch(
-        &self, uuid: Uuid) -> Result<String, Self::VCSError>;
+    fn delete_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError>;
 }
 
 #[cfg(test)]
@@ -154,15 +147,14 @@ pub mod test_utils {
         type VCSError = TestVCSError;
         type RevisionId = TestRevisionId;
 
-        fn get_current_path(&self, path: &PathBuf) -> Result<Option<Normalized>, Self::VCSError> {
+        fn get_current_branch(&self) -> Result<Option<String>, Self::VCSError> {
             todo!()
         }
 
-        fn get_local_paths(&self) -> Result<Vec<PathInfo<Self::RevisionId>>, Self::VCSError> {
+        fn get_local_branches(&self) -> Result<Vec<BranchInfo<Self::RevisionId>>, Self::VCSError> {
             let mut vec = vec![];
             for i in 0..self.paths.len() {
-                vec.push(PathInfo::new(
-                    i,
+                vec.push(BranchInfo::new(
                     self.paths[i].clone(),
                     TestRevisionId::new(i),
                 ))
@@ -172,24 +164,17 @@ pub mod test_utils {
 
         fn get_revision(
             &self,
-            version: impl Into<String>,
+            version: impl AsRef<str>,
         ) -> Result<Option<Self::RevisionId>, Self::VCSError> {
             todo!()
         }
 
-        fn revision_exists_on_path(
+        fn revision_exists_on_branch(
             &self,
-            path: &NormalizedPath,
+            branch: impl AsRef<str>,
             version: impl Into<String>,
         ) -> Result<bool, Self::VCSError> {
             todo!()
-        }
-
-        fn iter_versions(
-            &self,
-            path: &NormalizedPath,
-        ) -> impl Iterator<Item = Result<Self::RevisionId, Self::VCSError>> {
-            vec![].into_iter()
         }
 
         fn get_status_without_current_branch(
@@ -199,12 +184,19 @@ pub mod test_utils {
             todo!()
         }
 
-        fn switch_to_branch(
-            &self,
-            id: usize,
-            path: &impl ToNormalizedPath,
-            dir: &PathBuf,
-        ) -> Result<String, Self::VCSError> {
+        fn switch_to_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError> {
+            todo!()
+        }
+
+        fn create_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError> {
+            todo!()
+        }
+
+        fn rename_branch(&self, old: impl AsRef<str>, new: impl AsRef<str>) -> Result<String, Self::VCSError> {
+            todo!()
+        }
+
+        fn delete_branch(&self, branch: impl AsRef<str>) -> Result<String, Self::VCSError> {
             todo!()
         }
     }

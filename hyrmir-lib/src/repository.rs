@@ -2,7 +2,6 @@ use crate::model::*;
 use crate::vcs::*;
 use crate::workspace::*;
 use indextree::{Arena, Node, NodeId};
-use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -84,7 +83,7 @@ impl<V: VCS> Repository<V> {
         parent.add_child(id, &new_name);
         node.update_name(new_name);
         node.update_type(new_type);
-        node.update_branch_info(branch_info);
+        node.update_head(branch_info);
         Ok(id)
     }
 
@@ -126,8 +125,8 @@ impl<V: VCS> Repository<V> {
     }
 
     fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
-        for path_info in self.vcs.get_local_paths()? {
-            let path = path_info.get_path();
+        for path_info in self.vcs.get_local_branches()? {
+            let path = path_info.get_branch();
             let p = if path.is_absolute() {
                 &path.strip_n_left(1)
             } else {

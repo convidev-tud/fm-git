@@ -21,3 +21,4 @@ pub mod repository;
 pub mod vcs;
 pub mod view;
 pub mod workspace;
+pub mod registry;
