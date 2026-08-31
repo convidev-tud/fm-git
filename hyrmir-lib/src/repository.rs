@@ -4,19 +4,21 @@ use crate::workspace::*;
 use indextree::{Arena, Node, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
 use thiserror::Error;
 use uuid::Uuid;
+use crate::persistency::PersistencyManager;
 
 #[derive(Error, Debug)]
-pub enum MalformedModelVCSError<VE: VCSError> {
+pub enum ScanError<VE: VCSError> {
     #[error(transparent)]
     MalformedModel(#[from] MalformedModelError),
     #[error(transparent)]
+    IO(#[from] io::Error),
+    #[error(transparent)]
     VCS(#[from] VE),
 }
-
-type ScanError<VE> = MalformedModelVCSError<VE>;
 
 pub struct RepositoryLoader<V: VCS> {
     repository: Repository<V>,
@@ -41,9 +43,29 @@ pub struct Repository<V: VCS> {
     root_id: NodeId,
     vcs_id_to_node_id: HashMap<Uuid, NodeId>,
     vcs: V,
+    persistency: PersistencyManager,
 }
 
 impl<V: VCS> Repository<V> {
+    fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
+        let manifest_version = self.persistency.read_file("manifest")?;
+        
+        for path_info in self.vcs.get_local_branches()? {
+            let path = path_info.get_branch();
+            let p = if path.is_absolute() {
+                &path.strip_n_left(1)
+            } else {
+                panic!("Paths must be absolute when loaded into repository")
+            };
+            let vcs_id = path_info.get_id();
+            let head = path_info.get_head();
+            let info = BranchInfo::new(vcs_id, head.clone());
+            let id = self.insert_path(p, info)?;
+            self.vcs_id_to_node_id.insert(vcs_id, id);
+        }
+        Ok(())
+    }
+
     fn add_node(
         &mut self,
         parent_id: NodeId,
@@ -122,23 +144,6 @@ impl<V: VCS> Repository<V> {
             }
         }
         Ok(current)
-    }
-
-    fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
-        for path_info in self.vcs.get_local_branches()? {
-            let path = path_info.get_branch();
-            let p = if path.is_absolute() {
-                &path.strip_n_left(1)
-            } else {
-                panic!("Paths must be absolute when loaded into repository")
-            };
-            let vcs_id = path_info.get_id();
-            let head = path_info.get_head();
-            let info = BranchInfo::new(vcs_id, head.clone());
-            let id = self.insert_path(p, info)?;
-            self.vcs_id_to_node_id.insert(vcs_id, id);
-        }
-        Ok(())
     }
 
     pub(crate) fn get_root_id(&self) -> NodeId {

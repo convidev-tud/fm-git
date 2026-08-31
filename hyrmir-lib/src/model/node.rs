@@ -181,6 +181,10 @@ impl<V: VCS> NodeData<V> {
         &self.name
     }
 
+    pub fn get_uuid(&self) -> Uuid {
+        self.uuid
+    }
+
     pub(crate) fn get_child(&self, name: &str) -> Option<&NodeId> {
         self.children.get(name)
     }
