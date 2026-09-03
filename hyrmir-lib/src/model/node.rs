@@ -2,33 +2,15 @@ use crate::vcs::VCS;
 use colored::{ColoredString, Colorize};
 use indextree::NodeId;
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use thiserror::Error;
 use uuid::Uuid;
 
 pub const FEATURE_ROOT: &str = "feature";
 pub const PRODUCT_ROOT: &str = "product";
-pub const TEMPORARY: &str = "tmp";
+pub const MODEL_ROOT: &str = "m";
 
-#[derive(Error, Debug)]
-pub struct MalformedModelError {
-    reason: String,
-}
-
-impl MalformedModelError {
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
-        }
-    }
-}
-
-impl Display for MalformedModelError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.reason.as_str())
-    }
-}
 
 #[derive(Error, Debug)]
 #[error("Node already locked")]
@@ -58,15 +40,15 @@ impl VirtualRootMetadata {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeType {
     // Valid types
-    VirtualRoot,
-    Channel(bool),
+    ModelRevision(bool),
+    ModelRoot,
     FeatureRoot,
     ProductRoot,
     Feature(bool),
     Product(bool),
+    Custom(bool),
 
     // Error types
-    Malformed,
     NonExistent,
 }
 
@@ -75,31 +57,34 @@ impl NodeType {
         &self,
         name: &str,
         concrete: bool,
-    ) -> Result<NodeType, MalformedModelError> {
+    ) -> NodeType {
         match self {
-            Self::VirtualRoot => Ok(Self::Channel(concrete)),
-            Self::Channel(_) => match name {
-                FEATURE_ROOT => Ok(Self::FeatureRoot),
-                PRODUCT_ROOT => Ok(Self::ProductRoot),
-                _ => Err(MalformedModelError::new("Expected 'feature' or 'product'")),
+            Self::ModelRevision(_) => match name {
+                MODEL_ROOT => Self::ModelRoot,
+                _ => Self::ModelRevision(concrete),
             },
-            Self::Feature(_) | Self::FeatureRoot => Ok(Self::Feature(concrete)),
-            Self::Product(_) | Self::ProductRoot => Ok(Self::Product(concrete)),
-            Self::Malformed => Ok(Self::Malformed),
-            Self::NonExistent => Ok(Self::NonExistent),
+            Self::ModelRoot => match name {
+                FEATURE_ROOT => Self::FeatureRoot,
+                PRODUCT_ROOT => Self::ProductRoot,
+                _ => Self::Custom(concrete),
+            },
+            Self::Feature(_) | Self::FeatureRoot => Self::Feature(concrete),
+            Self::Product(_) | Self::ProductRoot => Self::Product(concrete),
+            Self::Custom(_) => Self::Custom(concrete),
+            Self::NonExistent => Self::NonExistent,
         }
     }
 
     pub fn accepts_explicit_version(&self) -> bool {
         match self {
-            Self::Channel(true) | Self::Feature(true) | Self::Product(true) => true,
+            Self::ModelRevision(true) | Self::Feature(true) | Self::Product(true) => true,
             _ => false,
         }
     }
 
     pub fn format_node_display(&self, name: ColoredString) -> ColoredString {
         match self {
-            Self::Channel(_) => name.yellow(),
+            Self::ModelRevision(_) => name.yellow(),
             Self::FeatureRoot => name.bright_purple(),
             Self::Feature(_) => name.purple(),
             Self::ProductRoot => name.truecolor(231, 100, 18),
@@ -110,8 +95,8 @@ impl NodeType {
 
     pub fn get_type_name(&self) -> String {
         let name: &str = match self {
-            Self::VirtualRoot => "virtual root",
-            Self::Channel(_) => "channel",
+            Self::ModelRoot => "model root",
+            Self::ModelRevision(_) => "model revision",
             Self::FeatureRoot => "feature root",
             Self::ProductRoot => "product root",
             Self::Feature(_) => "feature",
@@ -123,8 +108,8 @@ impl NodeType {
 
     pub fn get_short_type_name(&self) -> String {
         let name: &str = match self {
-            Self::VirtualRoot => "vr",
-            Self::Channel(_) => "c",
+            Self::ModelRoot => "mr",
+            Self::ModelRevision(_) => "c",
             Self::FeatureRoot => "fr",
             Self::ProductRoot => "pr",
             Self::Feature(_) => "f",
@@ -147,7 +132,7 @@ impl NodeType {
 #[derive(Debug)]
 pub struct NodeData<V: VCS> {
     name: String,
-    uuid: Uuid,
+    uuid: Option<Uuid>,
     node_type: NodeType,
     head: Option<V::RevisionId>,
     children: HashMap<String, NodeId>,
@@ -160,7 +145,7 @@ pub struct NodeData<V: VCS> {
 impl<V: VCS> NodeData<V> {
     pub fn new(
         name: impl Into<String>,
-        uuid: Uuid,
+        uuid: Option<Uuid>,
         node_type: NodeType,
         head: Option<V::RevisionId>,
     ) -> Self {
@@ -181,7 +166,7 @@ impl<V: VCS> NodeData<V> {
         &self.name
     }
 
-    pub fn get_uuid(&self) -> Uuid {
+    pub fn get_uuid(&self) -> Option<Uuid> {
         self.uuid
     }
 
@@ -213,7 +198,7 @@ impl<V: VCS> NodeData<V> {
         &self,
         name: &str,
         head: &Option<V::RevisionId>,
-    ) -> Result<NodeType, MalformedModelError> {
+    ) -> NodeType {
         let concrete = match head {
             Some(_) => true,
             None => false,

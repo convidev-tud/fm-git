@@ -8,17 +8,6 @@ pub struct ManifestNode {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ManifestRemote {
-    name: String,
-    url: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Manifest {
     nodes: Vec<ManifestNode>,
-    remotes: Vec<ManifestRemote>,
-}
-
-impl Manifest {
-
 }

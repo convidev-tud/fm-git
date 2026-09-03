@@ -13,13 +13,12 @@ use crate::persistency::PersistencyManager;
 #[derive(Error, Debug)]
 pub enum ScanError<VE: VCSError> {
     #[error(transparent)]
-    MalformedModel(#[from] MalformedModelError),
-    #[error(transparent)]
     IO(#[from] io::Error),
     #[error(transparent)]
     VCS(#[from] VE),
 }
 
+#[derive(Debug)]
 pub struct RepositoryLoader<V: VCS> {
     repository: Repository<V>,
 }
@@ -32,7 +31,7 @@ impl<V: VCS> RepositoryLoader<V> {
     }
 
     pub fn load_repo(&mut self) -> Result<&mut Repository<V>, ScanError<V::VCSError>> {
-        self.repository.scan_repository()?;
+        self.repository.scan_model_revision()?;
         Ok(&mut self.repository)
     }
 }
@@ -40,14 +39,14 @@ impl<V: VCS> RepositoryLoader<V> {
 #[derive(Debug)]
 pub struct Repository<V: VCS> {
     arena: Arena<RefCell<NodeData<V>>>,
-    root_id: NodeId,
-    vcs_id_to_node_id: HashMap<Uuid, NodeId>,
+    model_revisions: HashMap<String, NodeId>,
+    feature_uuid_to_node_id: HashMap<Uuid, NodeId>,
     vcs: V,
     persistency: PersistencyManager,
 }
 
 impl<V: VCS> Repository<V> {
-    fn scan_repository(&mut self) -> Result<(), ScanError<V::VCSError>> {
+    fn scan_model_revision(&mut self) -> Result<(), ScanError<V::VCSError>> {
         let manifest_version = self.persistency.read_file("manifest")?;
         
         for path_info in self.vcs.get_local_branches()? {
@@ -61,7 +60,7 @@ impl<V: VCS> Repository<V> {
             let head = path_info.get_head();
             let info = BranchInfo::new(vcs_id, head.clone());
             let id = self.insert_path(p, info)?;
-            self.vcs_id_to_node_id.insert(vcs_id, id);
+            self.feature_uuid_to_node_id.insert(vcs_id, id);
         }
         Ok(())
     }
@@ -155,13 +154,13 @@ impl<V: VCS> Repository<V> {
     }
 
     pub fn new(vcs: V) -> Self {
-        let root = NodeData::new("".to_string(), NodeType::VirtualRoot, None);
+        let root = NodeData::new("".to_string(), NodeType::ModelRoot, None);
         let mut arena = Arena::new();
         let root_id = arena.new_node(RefCell::new(root));
         Self {
             arena,
             root_id,
-            vcs_id_to_node_id: HashMap::new(),
+            feature_uuid_to_node_id: HashMap::new(),
             vcs,
         }
     }
@@ -197,7 +196,7 @@ pub mod test_utils {
 
     pub fn prepare_repo() -> Repository<TestVCS> {
         let mut repo = Repository::new(TestVCS::new());
-        repo.scan_repository().unwrap();
+        repo.scan_model_revision().unwrap();
         repo
     }
 }

@@ -90,7 +90,7 @@ impl SymbolicNodeType for VirtualRoot {
     type Classification = Abstract;
 
     fn compatible() -> Vec<NodeType> {
-        vec![NodeType::VirtualRoot]
+        vec![NodeType::ModelRoot]
     }
 }
 
@@ -105,9 +105,9 @@ impl<C: NodeClassification> SymbolicNodeType for Channel<C> {
 
     fn compatible() -> Vec<NodeType> {
         match Self::Classification::requires_artifact() {
-            Some(true) => vec![NodeType::Channel(true)],
-            Some(false) => vec![NodeType::Channel(false)],
-            None => vec![NodeType::Channel(true), NodeType::Channel(false)],
+            Some(true) => vec![NodeType::ModelRevision(true)],
+            Some(false) => vec![NodeType::ModelRevision(false)],
+            None => vec![NodeType::ModelRevision(true), NodeType::ModelRevision(false)],
         }
     }
 }
@@ -199,30 +199,30 @@ impl<C: NodeClassification> SymbolicNodeType for AnyType<C> {
         match Self::Classification::requires_artifact() {
             Some(true) => {
                 vec![
-                    NodeType::Channel(true),
+                    NodeType::ModelRevision(true),
                     NodeType::Feature(true),
                     NodeType::Product(true),
                 ]
             }
             Some(false) => {
                 vec![
-                    NodeType::Channel(false),
+                    NodeType::ModelRevision(false),
                     NodeType::Feature(false),
                     NodeType::Product(false),
-                    NodeType::VirtualRoot,
+                    NodeType::ModelRoot,
                     NodeType::FeatureRoot,
                     NodeType::ProductRoot,
                 ]
             }
             None => {
                 vec![
-                    NodeType::Channel(true),
+                    NodeType::ModelRevision(true),
                     NodeType::Feature(true),
                     NodeType::Product(true),
-                    NodeType::Channel(false),
+                    NodeType::ModelRevision(false),
                     NodeType::Feature(false),
                     NodeType::Product(false),
-                    NodeType::VirtualRoot,
+                    NodeType::ModelRoot,
                     NodeType::FeatureRoot,
                     NodeType::ProductRoot,
                 ]

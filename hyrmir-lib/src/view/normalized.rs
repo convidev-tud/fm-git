@@ -6,8 +6,9 @@ use std::fmt::{Display, Formatter};
 use std::ops::{Add, Index};
 use thiserror::Error;
 
+const MODEL_REVISION_PREFIX: char = '@';
 const PATH_SEPARATOR: char = '/';
-const REVISION_SEPARATOR: char = ':';
+const DIMENSION_SEPARATOR: char = ':';
 
 // ##########
 // # Errors #
@@ -47,15 +48,51 @@ impl Normalized {
 
     pub fn try_parse(value: impl AsRef<str>) -> Result<Self, NormalizeError> {
         let value = value.as_ref();
-        let split = value.split(REVISION_SEPARATOR).collect::<Vec<&str>>();
-        if split.len() > 2 {
-            return Err(NormalizeError::new(format!(
-                "Cannot normalize '{value}': input is malformed"
-            )));
+        let split = value.split(DIMENSION_SEPARATOR).collect::<Vec<&str>>();
+
+        let mut model_revision: Option<&str> = None;
+        let mut model_path: Option<&str> = None;
+        let mut revision: Option<&str> = None;
+        for (index, element) in split.iter().enumerate() {
+            match (index, element) {
+                (0, e) => {
+                    if e.starts_with(MODEL_REVISION_PREFIX) {
+                        model_revision = Some(e);
+                    }
+                    else {
+                        model_path = Some(e);
+                    }
+                },
+                (1, e) => {
+                    if e.starts_with(MODEL_REVISION_PREFIX) {
+                        return Err(NormalizeError::new("@ at wrong position"))
+                    } else if model_revision.is_some() {
+                        model_path = Some(e);
+                    } else {
+                        revision = Some(e);
+                    }
+                }
+                (2, e) => {
+                    if e.starts_with(MODEL_REVISION_PREFIX) {
+                        return Err(NormalizeError::new("@ at wrong position"))
+                    } else {
+                        revision = Some(e);
+                    }
+                }
+                (_, _) => {
+                    return Err(NormalizeError::new("mismatched number of dimensions"))
+                }
+            }
         }
-        let path = NormalizedPath::new(split[0].to_string());
-        let revision = if split.len() == 2 {
-            NormalizedRevision::Revision(split[1].to_string())
+
+        let path = match (model_revision, model_path) {
+            (Some(mr), Some(mp)) => NormalizedPath::new_from_split(mr, mp),
+            (Some(mr), None) => NormalizedPath::new(mr),
+            (None, Some(mp)) => NormalizedPath::new(mp),
+            (_, _) => unreachable!(),
+        };
+        let revision = if let Some(revision) = revision {
+            NormalizedRevision::Revision(revision.to_string())
         } else {
             NormalizedRevision::None
         };
@@ -125,7 +162,7 @@ impl ColorFormat for Normalized {
             NormalizedRevision::Revision(revision) => {
                 format!(
                     "{path}{}{}",
-                    REVISION_SEPARATOR.to_string().yellow(),
+                    DIMENSION_SEPARATOR.to_string().yellow(),
                     revision.yellow()
                 )
             }
@@ -157,6 +194,16 @@ impl Display for NormalizedRevision {
             Self::Revision(revision) => f.write_str(revision),
         }
     }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+pub struct NormalizedIdentifier {
+    model: Option<NormalizedPath>,
+    model_revision: Option<NormalizedPath>,
+}
+
+impl NormalizedIdentifier {
+
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -435,7 +482,7 @@ impl GetPathName for Normalized {
         match self.get_revision() {
             NormalizedRevision::None => path_name,
             NormalizedRevision::Revision(revision) => {
-                format!("{}{}{}", path_name, REVISION_SEPARATOR, revision)
+                format!("{}{}{}", path_name, DIMENSION_SEPARATOR, revision)
             }
         }
     }
@@ -517,28 +564,28 @@ mod tests {
 
     #[test]
     fn test_normalize_relative() {
-        assert_eq!("foo/bar".normalize().get_path().path, vec!["foo", "bar"]);
+        assert_eq!("foo/bar".normalize().get_path().model_path, vec!["foo", "bar"]);
     }
 
     #[test]
     fn test_normalize_absolute() {
-        assert_eq!("/foo/bar".normalize().get_path().path, vec!["", "foo", "bar"]);
+        assert_eq!("/foo/bar".normalize().get_path().model_path, vec!["", "foo", "bar"]);
     }
 
     #[test]
     fn test_normalize_relative_dir() {
-        assert_eq!("foo/".normalize().get_path().path, vec!["foo", ""]);
+        assert_eq!("foo/".normalize().get_path().model_path, vec!["foo", ""]);
     }
 
     #[test]
     fn test_normalize_root() {
-        assert_eq!("/".normalize().get_path().path, vec!["", ""]);
+        assert_eq!("/".normalize().get_path().model_path, vec!["", ""]);
     }
 
     #[test]
     fn test_normalize_revision() {
         let normalized = "foo/bar:1.0".normalize();
-        assert_eq!(normalized.get_path().path, vec!["foo", "bar"]);
+        assert_eq!(normalized.get_path().model_path, vec!["foo", "bar"]);
         assert_eq!(
             normalized.get_revision(),
             &NormalizedRevision::Revision("1.0".to_string())
@@ -556,28 +603,28 @@ mod tests {
     fn test_normalized_path_add_to_absolute() {
         let l = NormalizedPath::new("");
         let r = NormalizedPath::new("bar/baz");
-        assert_eq!((l + &r).path, vec!["", "bar", "baz"]);
+        assert_eq!((l + &r).model_path, vec!["", "bar", "baz"]);
     }
 
     #[test]
     fn test_normalized_path_add_empty_string() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("");
-        assert_eq!((l + &r).path, vec!["bar", "baz", ""]);
+        assert_eq!((l + &r).model_path, vec!["bar", "baz", ""]);
     }
 
     #[test]
     fn test_normalized_path_add_slash() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("/");
-        assert_eq!((l + &r).path, vec!["", ""]);
+        assert_eq!((l + &r).model_path, vec!["", ""]);
     }
 
     #[test]
     fn test_normalized_path_add_absolute() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("/foo");
-        assert_eq!((l + &r).path, vec!["", "foo"]);
+        assert_eq!((l + &r).model_path, vec!["", "foo"]);
     }
 
     #[test]
@@ -650,7 +697,7 @@ mod tests {
     #[test]
     fn test_normalized_path_trim() {
         let path = NormalizedPath::new("foo/bar");
-        assert_eq!(path.strip_n(0, path.len() - 1).path, vec!["foo"]);
+        assert_eq!(path.strip_n(0, path.len() - 1).model_path, vec!["foo"]);
     }
 
     #[test]
