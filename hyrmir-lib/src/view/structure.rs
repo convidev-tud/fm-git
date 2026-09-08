@@ -94,11 +94,9 @@ pub enum StructureViewError<V: VCS> {
     InvalidType(#[from] InvalidTypeError<V>),
 }
 
-/*
-    #######################
-        Main Definition
-    #######################
-*/
+// ###################
+// # Main Definition #
+// ###################
 
 /// Semantic view onto the path model.
 ///

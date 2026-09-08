@@ -37,27 +37,27 @@ impl Display for NormalizeError {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Normalized {
-    path: NormalizedPath,
+    dimensions: NormalizedDimensionPath,
     revision: NormalizedRevision,
 }
 
 impl Normalized {
-    pub fn new(path: NormalizedPath, revision: NormalizedRevision) -> Self {
-        Self { path, revision }
+    pub fn new(dimensions: NormalizedDimensionPath, revision: NormalizedRevision) -> Self {
+        Self { dimensions, revision }
     }
 
     pub fn try_parse(value: impl AsRef<str>) -> Result<Self, NormalizeError> {
         let value = value.as_ref();
         let split = value.split(DIMENSION_SEPARATOR).collect::<Vec<&str>>();
 
-        let mut model_revision: Option<&str> = None;
+        let mut revision_path: Option<&str> = None;
         let mut model_path: Option<&str> = None;
         let mut revision: Option<&str> = None;
         for (index, element) in split.iter().enumerate() {
             match (index, element) {
                 (0, e) => {
                     if e.starts_with(MODEL_REVISION_PREFIX) {
-                        model_revision = Some(e);
+                        revision_path = Some(e);
                     }
                     else {
                         model_path = Some(e);
@@ -66,7 +66,7 @@ impl Normalized {
                 (1, e) => {
                     if e.starts_with(MODEL_REVISION_PREFIX) {
                         return Err(NormalizeError::new("@ at wrong position"))
-                    } else if model_revision.is_some() {
+                    } else if revision_path.is_some() {
                         model_path = Some(e);
                     } else {
                         revision = Some(e);
@@ -85,10 +85,17 @@ impl Normalized {
             }
         }
 
-        let path = match (model_revision, model_path) {
-            (Some(mr), Some(mp)) => NormalizedPath::new_from_split(mr, mp),
-            (Some(mr), None) => NormalizedPath::new(mr),
-            (None, Some(mp)) => NormalizedPath::new(mp),
+        let path = match (revision_path, model_path) {
+            (Some(mr), Some(mp)) => NormalizedDimensionPath::RevisionAndModelPath(
+                NormalizedPath::new(mr),
+                NormalizedPath::new(mp),
+            ),
+            (Some(mr), None) => NormalizedDimensionPath::RevisionPath(
+                NormalizedPath::new(mr),
+            ),
+            (None, Some(mp)) => NormalizedDimensionPath::ModelPath(
+                NormalizedPath::new(mp),
+            ),
             (_, _) => unreachable!(),
         };
         let revision = if let Some(revision) = revision {
@@ -99,16 +106,16 @@ impl Normalized {
         Ok(Normalized::new(path, revision))
     }
 
-    pub fn get_path(&self) -> &NormalizedPath {
-        &self.path
+    pub fn get_path(&self) -> &NormalizedDimensionPath {
+        &self.dimensions
     }
 
     pub fn get_revision(&self) -> &NormalizedRevision {
         &self.revision
     }
 
-    pub fn extract(self) -> (NormalizedPath, NormalizedRevision) {
-        (self.path, self.revision)
+    pub fn extract(self) -> (NormalizedDimensionPath, NormalizedRevision) {
+        (self.dimensions, self.revision)
     }
 }
 
@@ -145,9 +152,9 @@ impl<T: AsRef<str>> PartialEq<T> for Normalized {
 impl Display for Normalized {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let s = match &self.revision {
-            NormalizedRevision::None => self.path.to_string(),
+            NormalizedRevision::None => self.dimensions.to_string(),
             NormalizedRevision::Revision(revision) => {
-                format!("{}:{revision}", self.path)
+                format!("{}:{revision}", self.dimensions)
             }
         };
         f.write_str(&s)
@@ -197,13 +204,10 @@ impl Display for NormalizedRevision {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub struct NormalizedIdentifier {
-    model: Option<NormalizedPath>,
-    model_revision: Option<NormalizedPath>,
-}
-
-impl NormalizedIdentifier {
-
+pub enum NormalizedDimensionPath {
+    RevisionPath(NormalizedPath),
+    ModelPath(NormalizedPath),
+    RevisionAndModelPath(NormalizedPath, NormalizedPath),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -564,28 +568,28 @@ mod tests {
 
     #[test]
     fn test_normalize_relative() {
-        assert_eq!("foo/bar".normalize().get_path().model_path, vec!["foo", "bar"]);
+        assert_eq!("foo/bar".normalize().get_path().path, vec!["foo", "bar"]);
     }
 
     #[test]
     fn test_normalize_absolute() {
-        assert_eq!("/foo/bar".normalize().get_path().model_path, vec!["", "foo", "bar"]);
+        assert_eq!("/foo/bar".normalize().get_path().path, vec!["", "foo", "bar"]);
     }
 
     #[test]
     fn test_normalize_relative_dir() {
-        assert_eq!("foo/".normalize().get_path().model_path, vec!["foo", ""]);
+        assert_eq!("foo/".normalize().get_path().path, vec!["foo", ""]);
     }
 
     #[test]
     fn test_normalize_root() {
-        assert_eq!("/".normalize().get_path().model_path, vec!["", ""]);
+        assert_eq!("/".normalize().get_path().path, vec!["", ""]);
     }
 
     #[test]
     fn test_normalize_revision() {
         let normalized = "foo/bar:1.0".normalize();
-        assert_eq!(normalized.get_path().model_path, vec!["foo", "bar"]);
+        assert_eq!(normalized.get_path().path, vec!["foo", "bar"]);
         assert_eq!(
             normalized.get_revision(),
             &NormalizedRevision::Revision("1.0".to_string())
@@ -603,28 +607,28 @@ mod tests {
     fn test_normalized_path_add_to_absolute() {
         let l = NormalizedPath::new("");
         let r = NormalizedPath::new("bar/baz");
-        assert_eq!((l + &r).model_path, vec!["", "bar", "baz"]);
+        assert_eq!((l + &r).path, vec!["", "bar", "baz"]);
     }
 
     #[test]
     fn test_normalized_path_add_empty_string() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("");
-        assert_eq!((l + &r).model_path, vec!["bar", "baz", ""]);
+        assert_eq!((l + &r).path, vec!["bar", "baz", ""]);
     }
 
     #[test]
     fn test_normalized_path_add_slash() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("/");
-        assert_eq!((l + &r).model_path, vec!["", ""]);
+        assert_eq!((l + &r).path, vec!["", ""]);
     }
 
     #[test]
     fn test_normalized_path_add_absolute() {
         let l = NormalizedPath::new("bar/baz");
         let r = NormalizedPath::new("/foo");
-        assert_eq!((l + &r).model_path, vec!["", "foo"]);
+        assert_eq!((l + &r).path, vec!["", "foo"]);
     }
 
     #[test]
@@ -697,7 +701,7 @@ mod tests {
     #[test]
     fn test_normalized_path_trim() {
         let path = NormalizedPath::new("foo/bar");
-        assert_eq!(path.strip_n(0, path.len() - 1).model_path, vec!["foo"]);
+        assert_eq!(path.strip_n(0, path.len() - 1).path, vec!["foo"]);
     }
 
     #[test]
